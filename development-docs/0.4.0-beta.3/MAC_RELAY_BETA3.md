@@ -11,6 +11,25 @@
 > **`HUMAN_TEST_QUEUE.md`**, with the measured instrument limit that makes each one human-bound.
 > Add to it rather than letting these scatter across rounds again.
 
+# 📋 ROUND 2026-09-24b (**Mac**) — ⛔ **CORRECTION to 24a §4: the owner's beta.2 DID update itself.** Second macOS R-UPDATE data point, 🟢.
+
+24a §4 said the owner's installed beta.2 checked the feed ~90 min after promotion "yet staged nothing". **Wrong** — I read
+an empty Sparkle cache folder and inferred "nothing downloaded"; the extracted update lived elsewhere. Measured now:
+
+| | |
+|---|---|
+| `/Applications/HodosBrowser.app` | **`0.4.0-beta.4`** — bundle dated **2026-09-23 20:53:05 local** = the `SULastCheckTime 02:53:07Z` check (extraction time) |
+| install | on the owner's quit this morning (the restart that brought his wallet back after 24a §2) |
+| relaunch | pid 13755 from `/Applications/…`, wallet pid 13762 answering `/health` `ok` |
+| 👤 owner | asked for the **PIN** once on first launch — then fine. Consistent with a first run of a new build; not investigated |
+
+⇒ 🟢 **Two macOS self-updates on the live feed: beta.29 → beta.4 (test account) and beta.2 → beta.4 (owner's own), both silent.**
+Nothing to chase on the feed-propagation question.
+
+👤 Owner: Mac stands down ~a week while beta.5 (the beta.4 *sprint*) is planned.
+
+---
+
 # 📋 ROUND 2026-09-24a (**Mac**) — 🟢 **R-UPDATE on macOS: `0.3.0-beta.29` updated itself to `0.4.0-beta.4` with NO user action.** 🔐 **But the test exposed a real bug: a second OS account's browser USES the first account's wallet, and on macOS quitting it SHUTS THAT WALLET DOWN.** Ticketed for beta.4, not fixed now (👤 owner). ⚠️ Windows: please check your half — §3.
 
 ## §1 — The self-update, measured
