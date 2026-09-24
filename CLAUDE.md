@@ -78,7 +78,7 @@ Six standing rules. They are short on purpose. Adopted 2026-08-30; provenance an
 6. ⛔ **The instrument is not edited by the change it measures.**
    `scripts/preflight.ps1` gate patterns, gate baselines, and `REGRESSION_SET.md` are **not** touched in the same change that implements the code they measure. Loosening a pattern or raising a baseline is its own commit, with the reason written in `HARNESS.md` §4, and it re-runs `-NegativeControl`. This project has already shipped a preflight that reported PASS while running zero checks.
 
-7. 🚨 **A POISONING defect outranks the sprint. Verify it cheaply, then stop and say so.**
+7. 🚨 **A POISONING defect outranks the cycle. Verify it cheaply, then stop and say so.**
    Adopted 2026-09-17. 👤 *"If we have something that's totally breaking a wallet, we can't continue — not everything in testing is going to be off, everything is broken and we can't trust anything after that."*
 
    **What makes a defect *poisoning* rather than merely bad:** it corrupts state that **later work reads**, so every measurement taken after it is suspect. A bug that produces a wrong answer is ordinary. A bug that makes *the next ten answers unverifiable* is not.
@@ -101,6 +101,25 @@ Six standing rules. They are short on purpose. Adopted 2026-08-30; provenance an
    - ⛔ **Re-run anything already measured against the affected state.** A green from before the discovery proves nothing; say so rather than quietly keeping it.
 
    ⚠️ **A deliberate fault-injection test must DECLARE its residue.** A negative control that breaks bookkeeping on purpose leaves rows that look exactly like trip-wire 1. Say what it leaves behind, in the row that owns it, or the next person to find it will — correctly — treat it as a live defect. `PAYMENT_TEST_BATCH.md` M4 is the worked example.
+
+8. 👤 **Never hand the owner a bare identifier. Say what it IS.**
+   Adopted 2026-09-24. 👤 *"When you just give me a number as a line item, I have no idea what it is… it might take me two minutes to figure out what line item 12ABC is."*
+
+   Every row id, phase id, gate, ticket name or commit sha written **in chat** carries its subject in
+   plain language, on the same line:
+
+   | ⛔ don't | ⭐ do |
+   |---|---|
+   | *"W7 passed"* | *"**W7 — an expired prompt must not come back and spend** — passed"* |
+   | *"closing B5-T2-P3"* | *"closing **B5-T2-P3 — the ordinals mint path**"* |
+   | *"see `c4ef538`"* | *"see **`c4ef538` — never destroy the logging mutex**"* |
+
+   ⭐ **The id is for the document; the sentence is for the person.** An id is a lookup key, and the
+   lookup costs the owner minutes of navigating a repo to recover one line of context the writer
+   already had. It costs the writer six words.
+
+   ⚠️ Applies to **chat**, not to evidence tables or commit bodies, where ids are the point and the
+   surrounding document supplies the meaning.
 
 ## Scoping a sprint or release — `development-docs/SCOPING_PROCESS.md`
 

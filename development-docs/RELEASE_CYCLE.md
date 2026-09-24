@@ -1,6 +1,6 @@
 # The release cycle
 
-**Created:** 2026-09-24, out of the beta.3 cycle's AAR (`0.4.0-beta.3/AAR.md`). **Version: v2.**
+**Created:** 2026-09-24, out of the beta.3 cycle's AAR (`0.4.0-beta.3/AAR.md`). **Version: v3.**
 ⭐ **This document is an output of every AAR.** It is expected to change each cycle; when it does,
 the AAR that changed it says so (§7).
 
@@ -44,6 +44,18 @@ and if it changed scope, it becomes a ticket or a track — never a silent addit
 - ⛔ **"Sprint" is retired** — it names a timebox everywhere else in the industry.
 - ⛔ **Never write a bare rung number.** Every reference starts at the release.
 - **AAR** — After-Action Review. One per cycle.
+
+⭐ **Every rung has a contract — but not every rung needs a document.** The mistake would be four docs.
+
+| Rung | Its contract is… | Gates |
+|---|---|---|
+| **Release** | §2 of this file | `G0`–`G12` |
+| **Track** | a scope doc — integration check (§3.3), open/close | `G2`, `G8` |
+| **Phase** | ⭐ **the contract document** — `PHASE_CONTRACT_TEMPLATE.md` | `G3`, `G7` |
+| **Item** | **a row with required fields** — assertion · negative control · evidence · RED observed | the row is complete, or it is not |
+
+⛔ An item needs a row it cannot leave half-filled, not a document. Making it a document is the
+ceremony that gets abandoned.
 
 ### The three scopes — each must earn its name
 
@@ -98,6 +110,28 @@ Over-planning is the failure this process exists to prevent, not the one it exis
 ⛔ A gate is **signed off**, not assumed. A gate that is deliberately skipped is **written down as
 skipped, with the reason** — an unrecorded skip is the thing this contract exists to prevent.
 
+### ⭐ Who signs — four stops, not twelve
+
+⛔ **Stop when the decision is the owner's. Proceed when the gate is verification.**
+
+| Gate | Who |
+|---|---|
+| **G1 Mission** | 👤 **owner** — what this release is *for* |
+| **G5.5 Feasibility** | 👤 **owner** — defer or not |
+| **G6 Planning closed** | 👤 **owner** — the go/no-go |
+| **G9 / G10 Release DoD + promote** | 👤 **owner** — human rows, and irreversible |
+| everything else | agent certifies and **keeps moving** |
+
+⭐ **Why not stop at every gate.** 👤 Owner, 2026-09-24: *"it does condition me to just rubber stamp
+stuff… I'm what's slowing us down."* A rubber-stamped gate is worse than no gate — it launders an
+unchecked step as a checked one.
+
+⛔ **Four unconditional stops, at any gate, regardless of the above:**
+1. A **poisoning trip-wire** fires ⇒ root `CLAUDE.md` working rule 7
+2. Two readings of the request differ **materially** ⇒ working rule 1
+3. A failing test points at **production code** being wrong ⇒ invariant 13
+4. Anything **irreversible or outward-facing**
+
 ### Planning gates
 
 - [ ] **G0 — Oriented.** Project, higher, adjacent, and **ourselves** (steps 1–5). ⛔ The last AAR
@@ -110,6 +144,7 @@ skipped, with the reason** — an unrecorded skip is the thing this contract exi
 - [ ] **G3 — Phases and items defined.** Every phase has a contract; sub-phases only where justified
 - [ ] **G4 — Admin & Logistics checked** (§3.4). ⛔ Nothing we depend on expires inside this cycle
 - [ ] **G5 — Comms plan set and serialization mapped.** Relay opened; lead named; constraints listed
+- [ ] **G5.5 — ⭐ FEASIBILITY.** 👤 *Is this too big?* — answered with numbers, not a vibe (§3.7)
 - [ ] **G6 — 👤 PLANNING CLOSED.** Owner sign-off. ⇒ **execution may begin**
 
 ### Execution gates *(per track — the detail lives in the phase contracts)*
@@ -195,6 +230,45 @@ is parallel by default and needs no planning.
 **Per-cycle map (step 14, gate G5):** given *these* tracks, what else is serial? Cross-platform
 dependencies, shared files two tracks both edit, anything needing the owner.
 
+### 3.7 ⭐ Feasibility — the gate that asks "is this too big?" *(G5.5)*
+
+⛔ **Counted in 👤 OWNER-HOURS, not tracks or phases.** Agent hours are elastic and nearly free; the
+owner's attention is the binding constraint — 📏 four of the beta.3 cycle's nine defects were found by
+him at the keyboard, and every serialization constraint in §3.6 traces back to him.
+
+Estimate three numbers, then ask one question:
+
+| Number | How |
+|---|---|
+| **N — owner-hours** | sum the human-bound rows across all tracks: install/upgrade sittings, real-money rows, visual judgement, native input, AV submissions |
+| **M — tracks** | as planned |
+| **K — unknowns** | phases containing a genuine unknown. ⚠️ **uncertainty, not difficulty** — hard-but-understood is not a risk |
+
+> 👤 *"This is **N** owner-hours across **M** tracks with **K** unknowns. Defer anything?"*
+
+⚠️ **The estimate will be bad at first.** 👤 Owner: *"that seems like it's going to be hard to
+estimate."* Correct — record the estimate **and the actual** in the AAR, and the third cycle's estimate
+will be worth something. An estimate nobody scores never improves.
+
+⭐ **Sequencing, once feasibility passes:** front-load the **uncertain**, not the hard. Uncertainty is
+what invalidates plans; difficulty does not. 📏 Phase 13 was parked on its own Step 0 — that is the
+pattern working. ⚠️ Prioritisation matters less *within* a cycle (everything ships) but sequencing still
+decides three things: **dependency**, **risk discovered early**, and **what gets cut** if the cycle runs long.
+
+### 3.8 Human-bound testing — batch it, with one exception
+
+⭐ The pattern already exists and works: **`HUMAN_TEST_QUEUE.md`**, with the *measured* instrument limit
+that makes each row human-bound recorded beside it.
+
+**Batch human rows to the end of the phase by default.** ⛔ **The exception, and it has a precise test:**
+
+> **Does later work READ this result?** If a human row's failure would invalidate measurements taken
+> after it, it **cannot** be deferred.
+
+⭐ That is deliberately the same test as the poisoning rule — one standard, not two.
+🚨 `R-GOLD` is the cautionary case: it read *"needs a real payment"* at **five** consecutive boundaries
+because deferring felt free. It was not free; the cost moved, and grew.
+
 ---
 
 ## 4. Stage B — EXECUTE
@@ -254,8 +328,26 @@ INSTRUMENT: which instrument should have caught this, and why it didn't
 | When | What |
 |---|---|
 | **Item close** | drift check · capture anything learned |
-| **Phase close** | `AAR_NOTES.md` sweep · **adversarial review of the evidence** · contract signed off *(G7)* |
+| **Phase close** | `AAR_NOTES.md` sweep · **adversarial review of the evidence** · ⭐ **context boundary decided** (§4.6) · contract signed off *(G7)* |
 | **Track close** | **kaleidoscope(close)** · regression at the boundary · ⭐ *does anything we learned change what the next track should do?* *(G8)* |
+
+### 4.6 ⭐ Context boundaries — a new session per phase
+
+⛔ **Default: a fresh session at every phase boundary, even a short phase.** A phase is the right
+grain — per item is too frequent to respect, per track is weeks and far too coarse.
+
+Add to the phase contract's sign-off:
+
+```
+- [ ] Context: memory saved · boundary decided (continue / fresh session)
+```
+
+**Override either way, deliberately:** a trivial phase may continue in the same session; a phase that
+grew mid-way should split **early** rather than at its nominal end.
+
+⚠️ **This was a known practice that had never been written down** — it appeared in no doc, harness or
+contract template before 2026-09-24. Which is the argument for the rule: an undocumented habit is one
+tired session away from not existing.
 
 ---
 
@@ -307,6 +399,12 @@ increments. ⛔ No silent edits.
 
 - **v1 — 2026-09-24**, from the beta.3 AAR. Introduced Admin & Logistics, Command & Signal,
   serialization-first orchestration, the phase-close adversarial review, `AAR_NOTES.md`, kaleidoscope.
+- **v3 — 2026-09-24**, 👤 second owner review: **four stops, not twelve** (§2) — *"it does condition me
+  to just rubber stamp stuff"*; the **G5.5 feasibility gate** counted in **owner-hours** (§3.7);
+  **human-bound testing batched** with the poisoning test as its one exception (§3.8); **context
+  boundary per phase** (§4.6); **contract weight per rung** (§0) — an item gets a row, not a document.
+  Root `CLAUDE.md` gained **working rule 8** (never hand the owner a bare identifier) and rule 7 now
+  says *cycle* rather than the retired *sprint*.
 - **v2 — 2026-09-24**, 👤 owner review of v1: the **cycle contract with gates** (§2) — *"it should
   always go back to one master document checked off as a gate"*; the **human-readable planning
   table** (§1); **kaleidoscope at track OPEN as well as close** (§4.2) — *"shouldn't we look for
