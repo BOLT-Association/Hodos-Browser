@@ -71,6 +71,59 @@ accumulated finished and misfiled documents.
 the relays, `DevOps-CICD/README.md`, and ticket indexes all carry paths. A move that leaves a dangling
 reference is worse than no move.
 
+### Part B.5 — ⭐ ADD A TRACK: the Chromium/CEF engine bump
+
+👤 **Owner, 2026-09-24, after the disposition was agreed:** *"we should do a new full Chromium
+build at the start of beta.5… that needs to be a whole track… that will be what we need to do first
+because we'll build everything on top of that."*
+
+⛔ **Create this as a ticket in `0.4.0-beta.5/tickets/` and carry it into your `G2` track proposal as a
+likely Track 0.** It is not optional scope and it is not small.
+
+**Why it sequences first — and note WHICH argument this is.** ⭐ It is a **serialization** constraint,
+not a priority one: every other track compiles against the engine, so a bump afterwards re-tests
+everything. It is also the highest-**uncertainty** work in the cycle, which `RELEASE_CYCLE.md` §3.7
+says to front-load — an engine bump re-litigates every fork patch, and you want that in week one.
+
+⚠️ **Version: VERIFY, do not assume.** 👤 The owner believes **Chromium 154 recently went stable**.
+📏 We currently ship `CEF_VERSION 150.0.43-7871.3576+g9ccef04+chromium-150.0.7871.187`. ⛔ Confirm the
+current stable Chromium **and** which CEF branch tracks it before writing any number into a plan —
+CEF branches lag Chromium, and the pin must be a real CEF branch, not a Chromium version we wish for.
+⛔ **Read `CEF_VERSION` for identity, never the Chromium version** — three different engines we have
+shipped all report `150.0.7871.187`.
+
+**Its existing home documents** — this track should reference rather than re-derive them:
+
+| Doc | What it carries |
+|---|---|
+| `DevOps-CICD/NEXT_CHROMIUM_BUILD.md` | ⭐ **the entry point.** PART 1 = what goes in **every** build forever (proprietary codecs; farbling patches C1, C3–C6). PART 2 = the **PENDING queue** |
+| `DevOps-CICD/CEF_BUILD_RUNBOOK.md` | step by step, ~1,300 lines |
+| `DevOps-CICD/CEF_VERSION_UPDATE_TRACKER.md` | pin history, and the macOS **minimum deployment version** — ⚠️ this floor can move on a bump |
+| `cef-native/CLAUDE.md` | the bootstrap model, the wrapper build, the *"never merge-copy one distribution over another"* trap |
+
+**📏 Already queued in PART 2, both added 2026-09-21 — this track inherits them:**
+1. **Cosmetic-filter payload delivery** — the real fix for **Phase 12** (the adblock push landing in
+   the wrong render process). Shipped mitigation only; the engine patch is the cure
+2. **`Sec-CH-UA` brand** — say who we are. ⚠️ **A decision is still owed** on this one (§"Decision
+   still owed" in that doc), and 👤 the owner already chose **our own brand, not Chrome's**
+
+**Scope the track to include, at minimum** — expect several phases, and say so:
+- Target selection and the CEF branch that carries it
+- ⛔ **Re-applying the fork patches** (farbling C1, C3–C6 + P4e/P4f) to the new branch. ⚠️ **This is
+  the real cost of a bump** and the reason `cef-native/CLAUDE.md` says capability is bounded by
+  *patch scale and per-bump maintenance*
+- The PART 2 queue above
+- The build itself — **hours**, on the build host, both platforms
+- ⭐ **Pinning: a TAG, never a branch** — `refs/tags/pin-<sha7>/<cef-branch>`, because
+  `cef_version.py` derives the version's branch field from the commit's decoration
+- Uploading **versioned `cef-binaries-*` assets for BOTH platforms** to the org repo, and bumping
+  `env.CEF_ASSET` in **both arms** of `release.yml`. 🚨 A stale asset is a **silent** failure on
+  macOS — it builds green and ships a browser with **no farbling at all**
+- Staging locally on both platforms (⚠️ macOS ignores `CEF_ROOT`; staging is mandatory there)
+- ⭐ **Re-running the farbling release gate against the new engine** — the promote gate checks the
+  token's `engine=` against the tag's `CEF_ASSET`, so an old token will be rejected
+- A `workflow_dispatch` validation build **before** the first tag on the new engine
+
 ### Part C — gate `G0` (orientation) and propose a mission
 
 Per `RELEASE_CYCLE.md` §1, steps 1–5:
@@ -123,10 +176,14 @@ undocumented close is how a defect gets re-discovered in six months.
    - ⭐ **"Early" is a serialization question, not a priority one** — if other tracks read its
      output, it is a dependency, settled at `G0`/`G5` regardless of importance
 
-2. **`X402_INTEGRATION.md` → a track.** How does it relate to BRC-121? (Prior finding: x402 is
+2. ⭐ **The engine bump (Part B.5): how many phases, and does it block the other tracks?** Bring a
+   recommendation. ⚠️ If other tracks cannot start until the engine lands, say so plainly — that is a
+   schedule fact the owner needs at `G1`, not a discovery at week three.
+
+3. **`X402_INTEGRATION.md` → a track.** How does it relate to BRC-121? (Prior finding: x402 is
    *"BRC-121 in a different envelope"*, and `pay_402` is byte-compatible ⇒ an adapter, not a rewrite.)
 
-3. **`RESUME_beta4.md` / `SESSION_PROMPT_beta4_kickoff.md`** — rename or archive?
+4. **`RESUME_beta4.md` / `SESSION_PROMPT_beta4_kickoff.md`** — rename or archive?
 
 ---
 
@@ -164,4 +221,4 @@ End with:
 1. What moved, and what broke that you fixed *(the pointer sweep)*
 2. The **ticket inventory**, grouped as you would propose tracks
 3. Your proposed **mission** for beta.5, in one paragraph
-4. The three open questions from §3, with a **recommendation** on each
+4. The **four** open questions from §3, with a **recommendation** on each
