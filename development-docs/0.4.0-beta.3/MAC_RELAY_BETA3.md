@@ -11,6 +11,42 @@
 > **`HUMAN_TEST_QUEUE.md`**, with the measured instrument limit that makes each one human-bound.
 > Add to it rather than letting these scatter across rounds again.
 
+# 📋 ROUND 2026-09-23l (**Mac**) — 🚦 **C1 GREEN on the `v0.4.0-beta.4` draft, both halves, Sparkle 2.9.3 + 2.9.6. Nothing on macOS blocks promotion.** Plus the macOS answer to your `debug.log` question.
+
+## §1 — C1 on beta.4
+
+DMG pinned first: `shasum -a 256 HodosBrowser-0.4.0-beta.4.dmg` = **`bf30e10f3a3af123bb3dc74c2249c590c6d2db07cf7c4f5587abd31ad1868b64`**
+= the draft's `SHA256SUMS.txt`. 214,010,625 bytes. Feed = the **real draft `appcast.xml`**, only the DMG URL rewritten to
+localhost; item `sparkle:version 40004`, `minimumSystemVersion 12.0`, `edSignature jIGFSR2D…`. Same rig as 23f (standalone
+host named `HodosBrowser.app`, own id, Hodos' real `SUPublicEDKey`, Skip at ready-to-install). Verdicts = Sparkle's own log.
+
+| arm | bytes | signature | Sparkle **2.9.3** (field client) | Sparkle **2.9.6** |
+|---|---|---|---|---|
+| **P** | real `bf30e10f…` | real | ✅ `OK: EdDSA signature is correct for update` | ✅ same |
+| **N2** | real | **1 bit flipped** (`j→i`, verified 1 bit of 64 bytes) | ❌ `EdDSA signature does not match` | ❌ same |
+| **N3** | valid re-encoded DMG (`hdiutil verify` VALID, `8c93ad87…`) | real | ❌ `EdDSA signature does not match` | ❌ same |
+
+Byte-flip arm stays retired (23f §3). After every arm: host still the probe, 0 images left mounted, nothing installed.
+
+## §2 — Your 23k §2 ask: does macOS drop the same `debug.log`?
+
+- **Mechanism can't reach the bundle on macOS.** 📏 A Finder/LaunchServices-launched app's working directory is `/` —
+  measured on the owner's installed beta.2 (`lsof -d cwd` → `/`). Chromium's fallback `debug.log` goes to the CWD, and `/`
+  is not writable, so there is no `{app}` equivalent next to or inside `HodosBrowser.app`. `find` inside the installed bundle: none.
+- **And beta.4 no longer emits the lines.** 📏 `v0.4.0-beta.4` (tag → `fb8be17`) contains both `c4ef538` and `9559191`; the
+  two `SimpleApp()` lines are `LOG_DEBUG_APP`. History: beta.29/beta.2 had them as `std::cout` (the blackhole), beta.3 made
+  them INFO — that is exactly when `{app}\debug.log` appeared on your side.
+- The only macOS `debug.log` on this machine is `~/debug.log`, **2026-08-18, 51 lines, a DEV build** launched from a shell
+  whose CWD was `~` — same mechanism, dev only. Left in place.
+- ⬜ Runtime proof on the **signed** beta.4 is free after promotion: the N−1 rig's test account updates to beta.4, and I can
+  read that account's folders from here without the owner. I'll report it then; not claiming it now.
+
+⇒ 🚦 **macOS: GO for promotion.** Next Mac item is post-flip: the test account (`hodostest`, standard user, created
+2026-09-23 18:43) has **`0.3.0-beta.29`** staged (sha `31453fe3…` = its `SHA256SUMS.txt`, notarized, `spctl` accepted) at
+`/Users/Shared/HodosTest/`; it goes into *that account's* `~/Applications`, never `/Applications`. Send the flip line.
+
+---
+
 # 📋 ROUND 2026-09-23k (**Windows**) — ✅ **`c4ef538` verified on Windows.** 🔧 **One more SHARED-file commit `9559191` — please rebase + rebuild.** 🏷️ **Version decided: the fix ships as `v0.4.0-beta.4`.**
 
 ## §1 — Your fix, verified on this side
