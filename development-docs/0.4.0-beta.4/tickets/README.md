@@ -67,9 +67,10 @@ existing links use it. Describe the **symptom or the defect**, not the fix:
 | `TICKET_mkcert_dev_private_key_is_tracked_and_public.md` | ⬜ UNASSIGNED | — (🟡 low; regenerate, do NOT rewrite history) | 2026-09-23 |
 | `TICKET_chromium_default_debug_log_lands_in_install_root.md` | ✅ **FIXED `9559191`** (beta.4 release) | — | 2026-09-23 |
 | `TICKET_g1_gate_cannot_see_chromiums_own_log_target.md` | ⬜ UNASSIGNED | — (⭐ the gate PASSED through the defect it was written for) | 2026-09-23 |
+| `TICKET_update_is_visible_when_it_should_not_be.md` | ⬜ UNASSIGNED | — (👤 owner-raised; ⭐ tiers 1+2 give Chrome's UX without Chrome's architecture) | 2026-09-24 |
 
-🚨 **This index is behind the folder.** There are **17 tickets** on disk (18 files, one is the
-template) and the table lists **9**. The eight missing rows are `active_user_count…`,
+🚨 **This index is behind the folder.** There are **18 tickets** on disk (19 files, one is the
+template) and the table lists **10**. The eight missing rows are `active_user_count…`,
 `brc103_server_identity_unverified`, `brc140_key_shares_vs_bip39`,
 `menu_exit_closes_primary_not_the_clicked_window`, `multiwindow_session_restore…`,
 `split_view_needs_multi_visible_tab_model`, `tab_pin_and_mute_need_model_changes` and
