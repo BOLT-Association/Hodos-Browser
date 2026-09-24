@@ -68,6 +68,7 @@ existing links use it. Describe the **symptom or the defect**, not the fix:
 | `TICKET_chromium_default_debug_log_lands_in_install_root.md` | ✅ **FIXED `9559191`** (beta.4 release) | — | 2026-09-23 |
 | `TICKET_g1_gate_cannot_see_chromiums_own_log_target.md` | ⬜ UNASSIGNED | — (⭐ the gate PASSED through the defect it was written for) | 2026-09-23 |
 | `TICKET_update_is_visible_when_it_should_not_be.md` | ⬜ UNASSIGNED | — (👤 owner-raised; ⭐ tiers 1+2 give Chrome's UX without Chrome's architecture) | 2026-09-24 |
+| `TICKET_wallet_backend_is_shared_across_os_accounts.md` | ⬜ UNASSIGNED | — (🔐 measured once on macOS; mechanism is code reading) | 2026-09-24 |
 
 🚨 **This index is behind the folder.** There are **18 tickets** on disk (19 files, one is the
 template) and the table lists **10**. The eight missing rows are `active_user_count…`,

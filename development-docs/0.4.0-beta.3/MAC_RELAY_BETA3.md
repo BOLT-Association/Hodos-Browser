@@ -11,6 +11,69 @@
 > **`HUMAN_TEST_QUEUE.md`**, with the measured instrument limit that makes each one human-bound.
 > Add to it rather than letting these scatter across rounds again.
 
+# 📋 ROUND 2026-09-24a (**Mac**) — 🟢 **R-UPDATE on macOS: `0.3.0-beta.29` updated itself to `0.4.0-beta.4` with NO user action.** 🔐 **But the test exposed a real bug: a second OS account's browser USES the first account's wallet, and on macOS quitting it SHUTS THAT WALLET DOWN.** Ticketed for beta.4, not fixed now (👤 owner). ⚠️ Windows: please check your half — §3.
+
+## §1 — The self-update, measured
+
+Rig: standard macOS account `hodostest` (Fast User Switching enabled for it), `0.3.0-beta.29` (sha `31453fe3…` = its
+`SHA256SUMS.txt`, notarized) in **that account's** `~/Applications`, launched from a Desktop link to that path.
+👤 Owner's call, and he was right: a *manual* "Install Update" click tests the wrong path ⇒ he only opened it, waited,
+and quit — the default **Silent** mode beta.29 ships (`AutoUpdater_mac.mm :: SetUpdateMode` → forced background check on launch).
+
+| | |
+|---|---|
+| live feed before the test | `https://hodosbrowser.com/appcast.xml` macOS item `40004` / `0.4.0-beta.4`, floor `12.0`, DMG on the `v0.4.0-beta.4` release; GitHub **Latest** = `v0.4.0-beta.4` |
+| 06:55:36 | beta.29 launched from `/Users/hodostest/Applications/…` (pid 9325, `processImagePath`) |
+| 07:09:13 | owner quits it — no update UI touched |
+| after | that bundle is **`0.4.0-beta.4` / `40004`**, `codesign --deep --strict` OK, `spctl`: **accepted, Notarized Developer ID** |
+
+🟢 ⇒ download-in-background + install-on-quit works on the real published feed from the oldest shipped client.
+⚠️ Relaunch leg: the owner's *next* open (07:09:31) ran **`/Applications/…` = his own beta.2**, not the updated copy —
+two copies with one bundle id on one Mac; LaunchServices picked the other. A rig artefact, not a product defect.
+The updated beta.4 did open later from the test path (07:27:46 → gone 07:27:59, **no crash-reporter activity**), but
+launchd recorded no exit reason and I did not watch that quit ⇒ **not** claimed as the signed-build clean-quit proof.
+
+## §2 — 🔐 The bug it exposed → `development-docs/0.4.0-beta.4/tickets/TICKET_wallet_backend_is_shared_across_os_accounts.md`
+
+⭐ Loopback ports are **machine-wide** on macOS and Windows. Measured on this Mac:
+- During beta.29's run in the test account **no `hodos-wallet` from the test bundle ever appeared** — it adopted the
+  wallet already on `31301`, which was the **owner's** (installed beta.2, pid 56792, up since 2026-09-08).
+  👤 The owner suspected exactly this: *"it still has the wallet … it's using the same database"*.
+- **07:09:13 — the second the test account's browser quit, the owner's wallet (56792) and adblock (56793) died.** His
+  browser stayed up with **nothing on 31301/31302** — the 2026-09-01 "no wallet" shape, triggered from another account.
+  Data untouched. Recovered by restarting his browser.
+
+Mechanism (code reading): `SpawnWalletServer` adopts anything that answers `/health` ("already running (dev mode)" —
+**not** gated on `IsDevEnv()`), and `StopServers` then sends `POST /shutdown` because it thinks the wallet is its own.
+`/shutdown` has no check.
+
+⚠️ And the fact under it, also code reading and **not** exercised against a wallet: a request with **no**
+`X-Requesting-Domain` passes `domain_trust_mw` ("Internal call → no gate") and every `request_gate` arm (`Proceed`), and
+the wallet auto-unlocks at startup (Keychain / DPAPI). The beta.3 work on the **browser** path stands — dApp traffic is
+stamped and gated. It is a **non-browser** local caller, from any OS account, that looks identical to the wallet UI.
+
+👤 Owner's policy for the fix: **OS accounts must be isolated; profiles inside one account keep sharing one wallet.**
+The ticket proposes a floor (adopt only a same-user wallet; never `/shutdown` one we did not start) and a system option
+(per-user socket / ACL'd named pipe), unsized.
+
+## §3 — 🪟 Windows: please check your half (I only read the code)
+
+- `cef_browser_shell.cpp :: LaunchWalletProcess` (≈`:3988`) adopts on `IsPortListening(hodos::WalletPort())` — **any**
+  listener, not even a `/health` reply. Same for adblock (≈`:4184`). ⇒ cross-account **use** looks present on Windows too.
+- `StopWalletServer` (≈`:4094`) only sends `/shutdown` when it holds `g_walletServerProcess.hProcess` ⇒ an adopted wallet
+  is **not** shut down on Windows. That guard is the macOS floor, ready-made.
+- Not measured on Windows. A two-user Windows box (or the owner's second Windows account from 23i §6) would settle it.
+
+## §4 — Loose ends, stated not chased
+
+- The owner's installed beta.2 recorded `SULastCheckTime 2026-09-24 02:53:07 +0000` — ~90 min **after** promotion
+  (`01:22:19Z`) — yet staged nothing (its Sparkle cache is empty). Unexplained; not investigated (feed propagation to
+  `hodosbrowser.com` vs the GitHub release time is the first thing I'd look at).
+- `debug.log` on the signed beta.4 at runtime: still owed; the test account's folders are readable from here except
+  `Library/`, so the check needs a look from inside that account.
+
+---
+
 # 📋 ROUND 2026-09-23l (**Mac**) — 🚦 **C1 GREEN on the `v0.4.0-beta.4` draft, both halves, Sparkle 2.9.3 + 2.9.6. Nothing on macOS blocks promotion.** Plus the macOS answer to your `debug.log` question.
 
 ## §1 — C1 on beta.4
