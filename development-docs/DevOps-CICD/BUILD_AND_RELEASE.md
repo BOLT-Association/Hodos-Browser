@@ -8,9 +8,54 @@
 
 ---
 
-## Current Status (2026-07-09)
+## Current Status (2026-09-24)
 
-**Last shipped (promoted): `v0.3.0-beta.28`** — live + marked **Latest** (promoted 2026-07-15: dev/prod deconfliction + WS1 wallet-hardening reconcile; Win10 dead-buttons resolved as install corruption, no code change). Prior promoted: beta.26.
+**Last shipped (promoted): `v0.4.0-beta.4`** — live + marked **Latest**, promoted 2026-09-24. ⭐ **The
+first 0.4.0 the public has ever had**: `v0.4.0-beta.1` and `v0.4.0-beta.2` were built and **never
+published**, so the line went straight from `v0.3.0-beta.29` (2026-07-20) to `v0.4.0-beta.4`.
+📏 Verified live: feed serves `0.4.0-beta.4` / build `40004`, and `/download/win` + `/download/mac`
+both redirect to the beta.4 assets. 🧾 VirusTotal **0/69**, Defender seeded
+`657053ff-602c-43b2-b9dd-db060eb950ab`, farbling rotation **PASS** with its negative control.
+
+> ### 🚨 Read this before your next promote — four things bit us on 2026-09-24
+>
+> **1. ⛔ `SHA256SUMS` CANNOT BE PASTED INTO THE WEB FORM.** `workflow_dispatch` string inputs are
+> **single-line**; a three-line paste arrives space-joined, and the pinning loop then compares the
+> *first* hash against the *last* filename and refuses with a **digest mismatch that looks like the
+> bytes changed**. 📏 Exactly that happened, and the build was fine.
+> ⇒ **Run promote from the CLI whenever you want pinning**, which passes newlines correctly:
+> ```bash
+> SUMS=$(cat SHA256SUMS.txt)
+> gh workflow run promote.yml --repo Hodos-Browser/Hodos-Browser >   -f tag=vX.Y.Z-beta.N -f expected_sha256sums="$SUMS" -f virustotal_report_url=... >   -f virustotal_detections=... -f defender_submission_id=... >   -f farbling_rotation_token="..." -f dry_run=true
+> ```
+> ⭐ The 2026-08-17 run that logged `pinned OK` for all three files was CLI-driven; that is why this
+> had never been seen. The web form works for every *other* field — only this one is multi-line.
+>
+> **2. 🚨 `WEBSITE_DEPLOY_TOKEN` expired mid-release, and the failure mode is a HALF-PROMOTED state.**
+> 📏 Set 2026-06-25, default 90-day fine-grained PAT ⇒ died **2026-09-23**, the day we needed it. The
+> release **flipped to public Latest** and then the website push failed ⇒ GitHub served beta.4 while
+> `hodosbrowser.com` still advertised beta.29. ⚠️ **This is the safe half** — no user is offered an
+> update the feed does not carry — but know it can happen and that it is **recoverable**: fix the
+> token and **re-run promote**; it detects an already-public release and skips the flip.
+> ⭐ The token is now set to **no expiry** (2026-09-24), so this specific failure cannot recur — but
+> nothing will warn you if it is ever revoked. ⛔ Its scope is deliberately minimal: resource owner
+> **Hodos-Browser**, **only** `Hodos-Browser/hodosbrowser.com`, **Contents: Read and write** (+ the
+> mandatory Metadata: Read-only). Nothing else. ⛔ **Never commit the value** — rotate instead.
+>
+> **3. ⚠️ The website-push retry misdiagnoses auth failures as races.** On a 401 git falls back to
+> prompting and dies with *"could not read Username"*; the loop prints **"push rejected (concurrent
+> update on main?) — rebasing"** and rebases three times against an already-current branch. The log
+> therefore *names the wrong cause*. ⇒ read for `could not read Username` / `403` before believing
+> the concurrency story. Ticketed for beta.4.
+>
+> **4. ⚠️ MS Defender's form now REQUIRES a "Detection name", and a clean file has none.** ⛔ Do not
+> invent one. Scan the installer first (`MpCmdRun.exe -Scan -ScanType 3 -File <exe>`); when it comes
+> back clean, put `N/A - no detection; proactive developer submission` in that field and explain in
+> **Additional information** (publisher, product, the local scan's engine/definition versions, the
+> VirusTotal count, the Authenticode subject + intermediate CA, and the SHA-256). 📏 Microsoft's own
+> rescan then reported *"No malware detected"* on both cloud and client.
+
+**Previously shipped: `v0.3.0-beta.28`** — live + marked **Latest** (promoted 2026-07-15: dev/prod deconfliction + WS1 wallet-hardening reconcile; Win10 dead-buttons resolved as install corruption, no code change). Prior promoted: beta.26.
 
 > **Silent-update saga is COMPLETE.** Windows SILENT auto-update — including through the two-process
 > profile picker — is DONE and **PROVEN LIVE** (beta.25 → beta.26 silently applied on real hardware;
@@ -611,6 +656,7 @@ If we ever land back on `EOC CA 02` (the pre-regression CA) on a future release,
 - beta.29, v0.4.0-beta.1 — not separately cert-checked
 - **v0.4.0-beta.2 — `EOC CA 04`** (rotated off beta.28's `EOC CA 03`; leaf thumbprint `09D486F9F46A2F4B8B60CA834EE5885A4407F199`, leaf validity 2026-08-16 → **2026-08-19**). ⚠️ Note the leaf is valid for **three days** — Trusted Signing rotates leaves ~every 3 days, which is why the silent-updater signer gate compares the **Subject CN**, not the thumbprint (§ silent-update). It is also why file-vs-publisher reputation matters more to us than to most publishers.
 - **v0.4.0-beta.3 — `EOC CA 04`** ⭐ **a REPEAT of beta.2's intermediate — the first back-to-back pair since beta.9/beta.10.** Leaf thumbprint `9AD7DA9E2E922A3E75FAFE5030AC450BCF062270`, leaf validity **2026-09-21 → 2026-09-24** (3 days, the usual Azure short-lived leaf; ✅ **timestamped** by `Microsoft Public RSA Time Stamping Authority`, so the signature outlives the leaf). Status `Valid`. ⭐ Two consecutive releases on one intermediate is what SmartScreen reputation actually needs — every rotation between the EOC/AOC families resets it. ✅ **Not** the `EOC CA 03` regression cohort, so nothing special to call out in this release's Defender submission. Checked 2026-09-23 on the **draft** installer, sha256 `13b1c0c3…`, i.e. the exact bytes promotion would publish.
+- **v0.4.0-beta.4 — `EOC CA 04`** ⭐ **THIRD consecutive release on one intermediate** (beta.2, beta.3, beta.4) — the longest run we have had, and the condition SmartScreen reputation actually needs. 📏 **Promoted 2026-09-24.** 👤 Owner reported **no SmartScreen warning and no UAC prompt** installing the signed build — consistent with reputation accruing rather than resetting. VirusTotal **0/69**; a local Defender scan (engine `1.1.26080.3`, definitions `1.459.362.0`) found no threats, and Microsoft's own rescan of submission `657053ff-602c-43b2-b9dd-db060eb950ab` returned *"No malware detected"* on cloud and client.
 
 #### 2.5.2 Per-release submission tracking
 
