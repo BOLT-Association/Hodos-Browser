@@ -1,8 +1,8 @@
 # beta.5 release — scope and running order
 
 **Opened:** 2026-08-29, from the beta.4 kickoff prompt (the telescope pass; archived to `../../archived-docs/0.4.0-beta.4-planning/`).
-**Status:** 🔭 TELESCOPED. Track-level scope is set; **no phase-level design exists yet** and none
-should be written here. The microscope pass produces that — see `TELESCOPE.md`.
+**Status:** ⏸️ **PAUSED 2026-09-25 at the end of G2 research** — owner switched to an urgent `v0.4.0-beta.4`
+fix. ⭐ **Resume at the section directly below.**
 
 > **Naming.** This folder produces **`v0.4.0-beta.5`**. It sits beside `0.4.0-beta.3/`, whose cycle
 > is closed (AAR written) but whose relay stays the live macOS channel until this release opens its
@@ -18,6 +18,61 @@ should be written here. The microscope pass produces that — see `TELESCOPE.md`
 > the old name on purpose. The two beta.4-era planning files (`RESUME_beta4.md`,
 > `SESSION_PROMPT_beta4_kickoff.md`) were folded into this README and archived to
 > `../../archived-docs/0.4.0-beta.4-planning/` on 2026-09-25.
+
+## ▶️ RESUME HERE — where beta.5 planning stopped (2026-09-25)
+
+**Ask:** *"Where were we with beta.5?"* → read this section first, then the decisions table.
+
+| Gate (`../RELEASE_CYCLE.md` §2) | State |
+|---|---|
+| **G0 Oriented** | ✅ done 2026-09-24 (consolidation, cleanup, ticket inventory) |
+| **G1 Mission** | 🟡 **proposed, owner has not signed** — see "🎯 G1 — Mission" below. Owner liked it and wants it reused as release notes |
+| **G2 Tracks** | 🟡 **research done** — seven `SCOPE.md` files, one per track folder (`track-0-engine/` … `track-6-browser-shell/`); **14 owner decisions owed** (table below). Owner has **not yet read** the scope docs |
+| G3–G6 | ⬜ not started. Next after the decisions: G3 phases per track, then G4 logistics, G5 comms + serialization, G5.5 feasibility, G6 go/no-go |
+| macOS | 🍎 **not started, by owner decision** — macOS joins after planning is complete. Keep updating `MAC_RELAY_BETA5.md` as planning moves |
+
+### 🚨 Carried out of planning — urgent
+
+**The public build lacks the fix for an actively exploited Chromium/V8 hole** (verified 2026-09-25 against
+Chromium's and V8's own source): shipped `150.0.7871.187` pins V8 `49df3678` (2026-07-17); the fix
+`085f765` *"[M150] [compiler] Don't inline Array.prototype.sort on mixed elements kinds"* landed on our
+branch 2026-09-01; the newest branch build `150.0.7871.255` pins V8 `4ceb8016`, which contains it. The CVE
+mapping (CVE-2026-85046) is from our tracker, not re-checked. ⇒ **Decision 1** below. Detail:
+`track-0-engine/SCOPE.md` §2.3.
+
+### Owner-hours estimated by the research (agent estimates, not measurements)
+
+T0 ~4.5 · T1 ~10–11 · T2 ~3.5 · T3 ~7.5 · T4 ~4–5 · T5 ~9 · T6 ~4 → **~43 owner-hours** before G5.5 cuts.
+Research was run on Fable for T2 and T4, the current model for the rest — comparable quality on a sample of two.
+
+### ⭐ The 14 decisions owed — each with a recommendation
+
+| # | Decision | Recommendation | Detail |
+|---|---|---|---|
+| 1 | 🚨 Ship the engine refresh **now, alone, as a security release?** | **Yes.** Pick its version name deliberately so "beta.5" is not spent twice | `track-0-engine/SCOPE.md` |
+| 2 | **What counts as money (RQ-1).** Both reference wallets treat a coin as money only when **positively marked**; ours is money by default | Adopt their rule using existing columns, **no schema change** | `track-1-money-path/SCOPE.md` §3 |
+| 3 | **Split backup into two tracks**: *backup you can trust* and *sync & portability* | Yes; both stay in beta.5 | `track-3-backup-sync/SCOPE.md` |
+| 4 | **Multi-device:** nobody runs two devices spending the same coins without conflict | **One active device at a time** for beta.5 — "detect and heal" fails the *no conflicts* bar | same |
+| 5 | **Backup format:** the reference importer would reject our stripped on-chain backup | A standard export file (`.brc39`) built from the full database; the compact on-chain copy never claims to be the standard; settle the format before the first mainnet broadcast of a new version | same |
+| 6 | **Recovery phrases are not portable:** HandCash, Hodos and BRC-157 derive different wallets from the same 12 words | Research phase: have import try other wallets' derivations | same |
+| 7 | **What restore does with a coin it cannot identify (RQ-2)** — good/bad/ugly table | HandCash's *visible but unspendable* fits our fail-closed rule; owner reads the table | same |
+| 8 | **Ordinals:** add BSV-21 *recognise, hold, show*; transfers → beta.6; per-action prompt for token spends, and build that permission first | Yes | `track-2-1sat-ordinals/SCOPE.md` |
+| 9 | **x402 adapter:** nothing upstream moved | To beta.6; do "check the chain before freeing or re-paying" first | `track-4-402-payments/SCOPE.md` |
+| 10 | **Run the read-only chain check on the owner's wallet** — has a "freed but actually spent" coin ever happened? | Yes — needs owner OK and which wallet (production or dev) | same, §5 P1 |
+| 11 | **Derived keys:** prompt at levels 1 and 2 (the reference wallet's norm), or also scope keys to the asking site (no other wallet does) | Prompt first; site-scoping is a separate deliberate choice (breaks compatibility) | `track-5-identity-privacy/SCOPE.md` |
+| 12 | **`createSignature` with no counterparty:** SDK default is `anyone`, our code would fill `self` | Match the SDK — **signing code, invariant 3: owner approval** | same |
+| 13 | **User count:** adopt Brave's usage ping | Yes; state plainly that the server sees IP addresses | same |
+| 14 | **Browser-shell cut line:** split view and Chrome password import → beta.6 | Yes | `track-6-browser-shell/SCOPE.md` |
+
+### Confirmed by the orchestrating session (not only by the research agents)
+
+- **Address counter after a restore:** on-chain restore never writes `current_index` back (stays 0 ⇒ address reuse);
+  the file import's `UPDATE wallets … WHERE id = payload.wallet.id` targets the backup's old id and discards the
+  result (`handlers.rs :: wallet_import`). Privacy, not lost money; **not yet measured**. In T1 scope.
+- **The phantom coins were never the scan's fault** — the backup recorded its own transaction too late; fixed in
+  March (`a1bdfc2`, `reconcile_backup_tx`) but its failures are silently ignored. 11 negative controls designed in
+  `track-1-money-path/SCOPE.md` §5.
+
 
 ## 📝 Planning notes — owner conversation, 2026-09-24 → 25 *(pre-cycle; read before G1)*
 

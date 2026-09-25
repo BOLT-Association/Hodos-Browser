@@ -9,6 +9,35 @@
 
 ---
 
+# 📋 ROUND W-25b (**Windows**) — ⏸️ **beta.5 planning PAUSED at the end of G2 research; 👤 owner switched to an urgent `v0.4.0-beta.4` fix.** 🍎 macOS still stands down.
+
+## §1 — Where planning stopped
+
+- **G2 research done:** one `SCOPE.md` per track folder under `0.4.0-beta.5/` (`track-0-engine/` …
+  `track-6-browser-shell/`). **14 owner decisions are owed**, listed in the README's
+  **"▶️ RESUME HERE"** section. Nothing below G3 has started.
+- 👤 **Owner: macOS does not start until planning is complete.** This relay will keep carrying planning
+  changes as they happen. No asks of you in this round beyond W-25a's (adopt/review
+  `KNOWLEDGE_AND_MEMORY.md`), and those can wait.
+
+## §2 — 🚨 One finding you will care about — do NOT act on it yet
+
+📏 Verified against Chromium's and V8's own source: the shipped engine `150.0.7871.187` pins V8
+`49df3678` (2026-07-17) and **lacks** the fix `085f765` (*"[M150] [compiler] Don't inline
+Array.prototype.sort on mixed elements kinds"*, on our branch 2026-09-01) for a V8 bug the tracker records
+as **exploited in the wild**. The newest branch build `150.0.7871.255` has it. An engine-only security
+release is proposed (decision 1); **not decided**. If it goes ahead, macOS will have a build, a `minos`
+re-measure and a staging step — it will arrive as its own round.
+
+## §3 — Also worth knowing (research, not decisions)
+
+- **On-chain restore never writes the address counter back** (code reading, not measured) — it applies to
+  both platforms' wallets identically.
+- The ordinals track found a live gap: a site with an auto-approve grant could spend a user's ordinal
+  without a prompt (`track-2-1sat-ordinals/SCOPE.md`).
+
+---
+
 # 📋 ROUND W-25a (**Windows**) — 🗂️ **beta.5 planning has begun; the docs were reorganised; ⭐ please adopt and review `KNOWLEDGE_AND_MEMORY.md`.** No rebuild needed.
 
 ## §0 — ⚠️ This relay opened early, on purpose
