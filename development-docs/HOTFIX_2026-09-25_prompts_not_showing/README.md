@@ -1,7 +1,11 @@
 # HOTFIX — permission prompts stop appearing in the public `v0.4.0-beta.4` (Windows)
 
 **Opened:** 2026-09-25, 👤 owner report, on the **installed public `v0.4.0-beta.4`** (Windows).
-**Status:** 🔴 **OPEN — investigate and fix today.** ⛔ **Nothing is decided about the version number or
+**Status:** 🟡 **EMERGENCY AVERTED 2026-09-25 ~16:15 (owner).** With a **single window** the prompts work; the
+failure is the **two-window Z-order** defect (Lead C) — *buggy, not broken, not a security issue*, but it will feel
+broken to a user. ⇒ **To become beta.5 tickets** after the owner walks through what he sees with the modal in
+general (next session). Lead B still to be checked.
+**Was:** 🔴 OPEN — investigate and fix today. ⛔ **Nothing is decided about the version number or
 the release yet** (see §6).
 **Folder name is date + symptom on purpose** — not a version number, so it cannot collide with a
 planning folder the way `0.4.0-beta.4/` did. beta.5 planning is paused: `../0.4.0-beta.5/README.md`
@@ -59,7 +63,17 @@ message from tab roles — so the browser still thinks the site is approved, and
 re-send (a **beta.4** fix: *"connect prompts arriving after approval were orphaned"*) re-sends instead
 of asking. Requests then park on a prompt the user never sees.
 
-⚠️ Both are **hypotheses from logs**, not yet reproduced. Lead A and Lead B may be one defect or two.
+**Lead C — 👤 owner found it, 2026-09-25 ~16:10: the prompt window IS there, but hidden BEHIND.** With
+**two browser windows** open (one torn away from the other — the beta.3 tear-away work), when the prompt
+opens, one window drops away and the owner sees the *other* window; the prompt is behind it. ⇒ a
+**Z-order / owner-window** defect: the notification overlay is positioned or activated against the wrong
+window (likely the primary, or the window it was created with), not the window the site is in. This is
+the same family as the beta.3 tear-away bugs *("open an overlay and the browser disappears; I see the
+other one")*. It **replaces Lead A as the likely cause** of "the prompt never shows" — the keep-alive
+overlay was never dead, just behind. Owner is re-testing with a **single window**.
+
+⚠️ Leads B and C are **hypotheses from logs + one owner observation**, not yet reproduced. Lead B (the
+invalidate message rejected from the advanced-wallet tab) is independent of C and still needs checking.
 
 ## 3. First steps for the fix session
 

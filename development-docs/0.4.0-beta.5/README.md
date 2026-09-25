@@ -31,6 +31,14 @@ fix. ⭐ **Resume at the section directly below.**
 | G3–G6 | ⬜ not started. Next after the decisions: G3 phases per track, then G4 logistics, G5 comms + serialization, G5.5 feasibility, G6 go/no-go |
 | macOS | 🍎 **not started, by owner decision** — macOS joins after planning is complete. Keep updating `MAC_RELAY_BETA5.md` as planning moves |
 
+### 🟡 2026-09-25 interruption — resolved as NOT an emergency
+
+A public beta.4 report ("permission prompts don't appear") turned out to be a **two-window Z-order bug**: the
+prompt opens **behind** the other window. Single window works. 👤 Next: the owner walks through what he sees with
+the modal in general → **new tickets into `tickets/`** (plus Lead B: deleting a site in the advanced wallet does
+not reach the browser's approval cache) → then resume the decisions below. Detail:
+`../HOTFIX_2026-09-25_prompts_not_showing/README.md`.
+
 ### 🚨 Carried out of planning — urgent
 
 **The public build lacks the fix for an actively exploited Chromium/V8 hole** (verified 2026-09-25 against
