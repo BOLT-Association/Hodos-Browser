@@ -1,5 +1,18 @@
 # TICKET — BRC-121 re-mints a NEW payment on every retry, and "funds preserved" is not a guarantee
 
+> 🔎 **Re-verified 2026-09-25 (code reading, nothing run) — KEEP OPEN, NARROWED.**
+> ✅ Retries **within 25 s** reuse the in-flight payment: the reuse query was fixed (`a337538` — it read a column that
+> no longer existed) and the reuse/release race closed (`1ec1b8f`); see `handlers.rs :: pay_402`, `PAY402_REUSE_TTL_MS`.
+> **Remaining:** (1) a **"possibly paid"** outcome — no response (`status == 0`), or a retry after 25 s — still mints a
+> **new** payment even if the server already broadcast the first (this ticket's 4,600-sat scenario); (2) the log and UI
+> still say *"NOT broadcasting (funds preserved)"* and nothing tells the user *"delivery unknown — you may have paid"*;
+> (3) Option 2 (treat no-response as unknown, stop auto-retrying) not done; (4) Phase 11 row A3's known leftover — a
+> second navigation can mint one extra, never-broadcast payment. ⚠️ beta.3's A1–A8 evidence was **Windows-only**, and the
+> real-money row (A5) did not exercise the no-response-then-late-retry case. Note the 25 s reuse window sits close to
+> BRC-121's 30 s freshness window (a reuse at ~33 s was rejected as stale).
+> ⚠️ Related, **unverified**: `TICKET_brc121_release_restores_inputs_the_server_may_have_spent.md`.
+
+
 **Found:** 2026-08-10, during the P6 money-path row (owner-driven test against
 `now.bsvblockchain.tech`).
 **Status:** OPEN. **Deliberately deferred** — owner decision 2026-08-10 to stay on the 0.4.0

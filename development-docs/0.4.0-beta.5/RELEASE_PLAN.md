@@ -200,7 +200,7 @@ harness §8 exists to catch. Track 2's provenance rows are the measurement subje
 | ✅ In | ❌ Out |
 |---|---|
 | Executing `IMPLEMENTATION_PLAN.md`'s phases | Redesigning the plan, the delta format, or D1–D15 |
-| Measuring real token rows and sizing against them | The BRC draft — it follows the code, and it waits on the provisional-patent decision |
+| Measuring real token rows and sizing against them | The BRC draft — its timing is a research question (format-first vs code-first; see `track-4-onchain-backup-sync/BACKUP_HISTORY_OVERVIEW.md` §8(c)) |
 | Reconciling the plan against tracks 1–3 outcomes | Anything the plan already marked out of scope |
 
 ### Owed to microscope

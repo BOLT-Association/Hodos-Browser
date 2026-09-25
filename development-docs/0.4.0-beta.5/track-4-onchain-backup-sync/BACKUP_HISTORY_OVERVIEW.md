@@ -14,11 +14,6 @@ file gathers it into one place so that (a) a new session does not have to read a
 > conflict-free *and* efficient together, the design is not ready. §5 and §6 say plainly where the
 > current plan stands against that bar.
 
-> ⚠️ **Disclosure note.** §5–§6 describe the snapshot+delta chain used as a multi-device sync log. The
-> patent research (`Marston Enterprises/Patents/RECOMMENDATION.md`, 2026-08-23) calls that exact
-> combination the one plausibly-novel element and asks that it not be disclosed before the filing
-> decision. This file lives next to the plan it summarises (already on the private `origin`). ⛔ Do not
-> push it to the public `release` remote. See §8(c).
 
 ### How to read the labels
 
@@ -47,7 +42,7 @@ Commit shas quoted below were each checked with `git show -s` on 2026-09-25.
 | `track-4…/README.md` | Work items 0–7, the wallet export/import survey, tests T1–T11, "already decided" block | Annotated in place; plan supersedes where marked |
 | `track-4…/IMPLEMENTATION_PLAN.md` | The authority: goals G1–G12, decisions D1–D15, phases 1–8, harness H1–H19 | Current plan. **Nothing in it has been implemented yet** [code: no harness, no header, no intent record] |
 | `track-4…/ADVERSARIAL_REVIEW.md` + `research/ADV_R1…R5` | 36 confirmed findings (7 critical) against the plan, each answered by a plan edit; 3 refuted | Accurate against the plan as revised 2026-08-24 |
-| `track-4…/TRACK_KICKOFF_PROMPT.md` | The prompt that produced the research and the patent study | Executed; history only |
+| `track-4…/TRACK_KICKOFF_PROMPT.md` | The prompt that produced the research | Executed; history only |
 | `research/A1_code_map.md` | Line-by-line map of what the code does vs the docs; the live-DB size numbers | Accurate at 2026-08-22. **Line numbers have moved** (`handlers.rs` is now 21,619 lines); symbols still hold |
 | `research/A2_export_import.md` | File export/import is live in the backend, hidden in the UI | Accurate [code spot-checked] |
 | `research/A3_retrospective.md` ⭐ | Episodes E1–E13, seven root-cause mechanisms, sixteen "never again" constraints | Accurate; the best single history source |
@@ -460,13 +455,10 @@ invoice string (D5). The README's survey (Aug 2026) found HandCash shipping `.br
 a different ZIP-of-chunks format. Questions: what do the updated specs now require; does D1/D11/D5 still
 stand; how does a foreign import get its seed at all (plan §6.3 item 8).
 
-**(c) Format-first vs code-first.** The old plan says **the BRC follows the code**, and
-`RELEASE_PLAN.md` says the BRC draft *"waits on the provisional-patent decision"*. The owner now notes
-that **a published spec is far harder to change than code**. The research must weigh this explicitly.
-Input to that: the patent recommendation (research, not legal advice) says any filing must precede the
-BRC's publication, and sets planning dates of **engage counsel by 2026-09-15** and **decide by
-~2026-10-31** [doc — `Marston Enterprises/Patents/RECOMMENDATION.md`]. Whether those dates were met is
-not recorded anywhere I read.
+**(c) Format-first vs code-first.** The old plan says **the BRC follows the code**. The owner now
+notes that **a published spec is far harder to change than code**, which argues for settling the
+format early. The research must weigh this explicitly. *(A patent question that once gated the BRC's
+timing was dropped by the owner on 2026-09-25 — it no longer constrains the plan.)*
 
 **(d) Research and implementation may interleave, but any spike must be thrown away at a named
 moment.** Name the moment when the spike is started, not after.

@@ -1,5 +1,16 @@
 # TICKET — `debug_output.log` is unfiltered in production: full URLs with query strings, unbounded, 1.2 GB observed
 
+> 🔎 **Re-verified 2026-09-25 (code reading, nothing run) — KEEP OPEN, NARROWED.**
+> ✅ Level filter fixed (`fa0c143`: `Logger::Log` defaults to INFO in production, child processes via `ChildProcessLogSink.cpp`).
+> ✅ Unbounded growth fixed **on Windows** (`fa0c143`: 10 MB × 5 rotation + `PruneOldLogs`, 30 days / 200 MB).
+> ✅ The three URL lines this ticket named now go through `LogSafeUrl.h :: hodos::LogSafeUrl`.
+> **Remaining:** (1) a few **INFO** lines still write full URLs in production — the BRC-121 paid-request line in
+> `HttpRequestInterceptor.cpp`, history-delete lines in `HistoryManager.cpp`, the bookmark (Ctrl+D) and QR lines in
+> `simple_handler.cpp`, and on macOS the tab-switch line in `TabManager_mac.mm`; (2) **macOS never prunes old logs**
+> (`cef_browser_shell_mac.mm` calls neither `SetRotation` nor `PruneOldLogs`; each file is still capped by default);
+> (3) macOS runs Chromium's own log at INFO in production, so `TabManager.cpp`'s `LOG(INFO)` URL lines reach `debug.log` there.
+
+
 **Found:** 2026-08-11, incidentally, while verifying that the new renderer-crash handler's
 origin redaction actually redacted.
 **Status:** OPEN, not started. **Pre-existing** — not introduced by the crash handler.

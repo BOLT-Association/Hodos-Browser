@@ -74,6 +74,45 @@ and delta sizes have never been measured.
 
 **Next:** triage every ticket in `tickets/` into tracks (`../RELEASE_CYCLE.md` §1 step 9, gate G2), after the mission is signed off at G1.
 
+## 🎯 G1 — Mission *(PROPOSED 2026-09-25 — 👤 owner sign-off owed)*
+
+> **beta.5 makes Hodos a wallet people can trust with more than coins — and can take with them.**
+> Nothing the wallet cannot positively identify as money can be spent, by any path. Ordinals can be
+> held, seen and moved on purpose. The wallet's state is backed up on chain and restored across
+> devices in a standard format — without conflicts and without bloat. Every site learns only what the
+> user chose to show it. All of it runs on a supported, fully patched engine and is built to the
+> current BRCs, so it works with the rest of the ecosystem.
+
+**Fixed scope (owner):** the money path and on-chain backup cannot be cut. **Out:** OpNS (D4).
+**If the release runs long, cut from the back:** browser-shell items first, then the x402 adapter.
+
+## 🧭 G2 — Tracks and ticket triage *(PROPOSED 2026-09-25)*
+
+Every ticket in `tickets/` now names a track in the register's **Track** column (`tickets/README.md`).
+
+| Track | Goal, one line | Tickets | Existing material |
+|---|---|---|---|
+| **B5-T0 Engine** | Refresh CEF 150 (long-term branch) in-branch and ship the two queued engine fixes | 1 | `tickets/TICKET_engine_behind…`, `../DevOps-CICD/NEXT_CHROMIUM_BUILD.md` |
+| **B5-T1 Money path** | No path can spend what the wallet has not classified as money, and the coin/transaction record stays true to the chain | 10 | `track-1-utxo-safety-guard/`, `track-0-reqwest-tls-bump/` *(becomes a phase here)*, the reservation-ownership ticket |
+| **B5-T2 1Sat Ordinals** | Hold, show, receive and deliberately transfer ordinals (BRC-147/150/165) | 2 | `track-2-1sat-ordinals/` |
+| **B5-T3 Backup & sync** | On-chain backup and multi-device restore in a standard, interoperable format — stable, conflict-free, efficient | 1 | `track-4-onchain-backup-sync/` ⭐ start at `BACKUP_HISTORY_OVERVIEW.md` |
+| **B5-T4 402 payments** | The x402 adapter over our BRC-121 client, plus the open 402 defects | 4 | `X402_INTEGRATION.md` |
+| **B5-T5 Identity & privacy** | A site gets only the keys, identity and wallet surface the user chose to give it; servers prove who they are (BRC-103/104) | 9 | — |
+| **B5-T6 Browser shell** | Multi-window, tabs, import, update visibility and consent-UI defects | 14 | `TOOLS_TAB_claim_a_payment.md` (outline) |
+| *Background* | Agent-run instruments and hygiene — **not a track** | 7 | — |
+| *Owner decision / close / defer* | Screenshots in public history · Big Sur feed item · close the fixed Chromium `debug.log` ticket · defer 2 research tickets | 5 | — |
+
+⚠️ **7 tracks is above the 4–5 guideline.** That is a **feasibility (G5.5)** question, answered in
+owner-hours, not now. Recommendation already on record: cut from the back — `T6`, then `T4`.
+
+⚠️ **Folder numbers do not match yet** (the backup folder is still `track-4-…`, and T4/T5/T6 have no
+folder). Renamed when each track's scope doc is written, so pointers move once.
+
+**Still owed to close G2** (per `../RELEASE_CYCLE.md` §2): for each track, a **scope doc** with its
+**integration check** (what invariant could it break; what does it touch that we did not write; what
+would we un-ship), a **telescope** pass that **re-fetches the current BRCs and SDKs first** (§3.1a),
+and a **kaleidoscope** pass (*do we already have this shape?*). Then RQ-1 and RQ-2 above.
+
 ### ✅ Process change — approved 2026-09-25
 
 **Ecosystem currency** is now part of orientation for every cycle: `../RELEASE_CYCLE.md` **v4**, §1

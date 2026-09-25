@@ -58,60 +58,61 @@ existing links use it. Describe the **symptom or the defect**, not the fix:
 
 | Ticket | Status | Track | Filed |
 |---|---|---|---|
-| `TICKET_e2e_specs_wrong_subject_and_never_run.md` | ⬜ UNASSIGNED | — | 2026-08-29 |
-| `TICKET_dapp_reachable_surface_is_a_denylist_not_an_allowlist.md` | ⬜ UNASSIGNED | — (⭐ suggest track 1) | 2026-09-19 |
-| `TICKET_brc100_consent_model_diverges_from_1sat_wallet_api.md` | ⬜ UNASSIGNED | — (⭐ suggest track 2) | 2026-09-21 |
-| `TICKET_derived_public_keys_have_no_prompt_and_can_match_across_sites.md` | ⬜ UNASSIGNED | — | 2026-09-21 |
-| `TICKET_well_known_auth_returns_a_key_it_cannot_sign_for.md` | ⬜ UNASSIGNED | — | 2026-09-21 |
-| `TICKET_brc121_client_has_no_body_transport_for_large_beef.md` | ⬜ UNASSIGNED | — (decision at the microscope pass; waits on BRCs #261) | 2026-09-23 |
-| `TICKET_mkcert_dev_private_key_is_tracked_and_public.md` | ⬜ UNASSIGNED | — (🟡 low; regenerate, do NOT rewrite history) | 2026-09-23 |
-| `TICKET_chromium_default_debug_log_lands_in_install_root.md` | ✅ **FIXED `9559191`** (beta.4 release) | — | 2026-09-23 |
-| `TICKET_g1_gate_cannot_see_chromiums_own_log_target.md` | ⬜ UNASSIGNED | — (⭐ the gate PASSED through the defect it was written for) | 2026-09-23 |
-| `TICKET_update_is_visible_when_it_should_not_be.md` | ⬜ UNASSIGNED | — (👤 owner-raised; ⭐ tiers 1+2 give Chrome's UX without Chrome's architecture) | 2026-09-24 |
-| `TICKET_wallet_backend_is_shared_across_os_accounts.md` | ⬜ UNASSIGNED | — (🔐 measured once on macOS; mechanism is code reading) | 2026-09-24 |
-| `TICKET_active_user_count_without_identifying_users.md` | ⬜ UNASSIGNED | — | 2026-09-17 |
-| `TICKET_brc103_server_identity_unverified.md` | ⬜ UNASSIGNED | — (🔴 AuthFetch trusts the server's claimed key) | 2026-09-16 |
-| `TICKET_brc140_key_shares_vs_bip39.md` | ⬜ UNASSIGNED | — (🔬 research-and-decide) | 2026-09-16 |
-| `TICKET_menu_exit_closes_primary_not_the_clicked_window.md` | ⬜ UNASSIGNED | — | beta.3 Phase 3.5 |
-| `TICKET_multiwindow_session_restore_loses_all_but_last_window.md` | ⬜ UNASSIGNED | — | beta.3 Phase 3.5 |
-| `TICKET_split_view_needs_multi_visible_tab_model.md` | ⬜ UNASSIGNED | — | beta.3 Phase 4 |
-| `TICKET_tab_pin_and_mute_need_model_changes.md` | ⬜ UNASSIGNED | — | beta.3 Phase 4 |
-| `TICKET_window_scoped_work_uses_process_globals.md` | ⬜ UNASSIGNED | — | beta.3 Phase 3 |
-| `TICKET_derivation_params_unbound_to_origin.md` | OPEN | — (⚠️ **same source finding** as `derived_public_keys_have_no_prompt…` — likely a duplicate; merge at `G2`) | 2026-09-02 |
-| `TICKET_chrome_import_bookmarks_history_passwords.md` | 🅿️ DEFERRED to beta.5 | — (cut from beta.3 Phase 6) | 2026-09-02 |
-| `TICKET_brc121_remint_on_retry.md` | OPEN *(⚠️ likely stale)* — deferred 2026-08-10 | — (real money; beta.3's `TICKET_brc121_paid_retry_aborts_and_mints_a_payment_each_time.md` was **closed** by Phase 11 item 11 — in-flight payment reuse — which likely closes this too. **Verify, then close with evidence**) | 2026-08 |
-| `TICKET_debug_log_unfiltered_in_production.md` | OPEN *(⚠️ likely stale)* | — (beta.3 `CRITICAL_UPDATES.md` reads it as fixed by `fa0c143`, and beta.3's twin `TICKET_production_debug_logging_unbounded.md` is **closed** by `fa0c143` + `c3604f9` — **verify, then close with evidence**) | 2026-08 |
-| `TICKET_knowledge_and_memory_architecture.md` | 🔵 RESEARCH, not scheduled | — | 2026-09-08 |
-| `TICKET_logged_in_screenshots_in_public_history.md` | OPEN — 👤 owner decision needed (rewrite vs accept) | — (exposure grows with time) | 2026-08-13 |
-| `TICKET_profile_lock_misreports_missing_dir.md` | OPEN | — (small) | 2026-08 |
-| `TICKET_reservation_ownership_converge_on_spent_by.md` | OPEN | 📌 placed as **Track 0.5** in `../README.md` (owner, 2026-09-15; to confirm at kickoff) | 2026-08-22 |
-| `TICKET_engine_behind_its_own_cef_branch_and_upstream_stable.md` | ⬜ UNASSIGNED | — (⭐ proposed as a track, likely Track 0; **target is an owner decision**) | 2026-09-24 |
-| `TICKET_auto_unlock_accepts_another_wallets_mnemonic.md` | ⬜ UNASSIGNED | — (🔑 **money**: a valid phrase from another wallet passes auto-unlock; from Wallet-Hardening) | 2026-09-25 |
-| `TICKET_confirmed_tx_never_rechecked_after_reorg.md` | ⬜ UNASSIGNED | — (money; medium, low probability; from Wallet-Hardening) | 2026-09-25 |
-| `TICKET_token_outputs_lost_if_crash_between_broadcast_and_record.md` | ⬜ UNASSIGNED | — (⭐ **settle before ordinals ship**; from Wallet-Hardening) | 2026-09-25 |
-| `TICKET_fast_relaunch_attaches_to_dying_wallet_or_fails_port_bind.md` | ⬜ UNASSIGNED | — (availability; from Wallet-Hardening FIX_B) | 2026-09-25 |
-| `TICKET_two_next_address_index_sources_can_reuse_addresses.md` | ⬜ UNASSIGNED | — (privacy; from Wallet-Hardening) | 2026-09-25 |
-| `TICKET_db_lock_held_across_await_is_unenforced.md` | ⬜ UNASSIGNED | — (hygiene; carries H-1/H-2/H-4 notes) | 2026-09-25 |
-| `TICKET_dead_cert_tx_builder_marks_coins_spent_on_404.md` | ⬜ UNASSIGNED | — (hygiene; dead code, grep-verified only) | 2026-09-25 |
-| `TICKET_final_mvp_efficiency_leftovers_never_scheduled.md` | ⬜ UNASSIGNED | — (five items; ⭐ fuzz testing's "post-launch" trigger has fired) | 2026-09-25 |
-| `TICKET_appcast_missing_minimum_system_version.md` | 🟡 leftover — 👤 **owner decision** | — (moved from beta.3; defect fixed `20aa750`) | 2026-08-17 |
-| `TICKET_brand_remaining_permission_prompts.md` | OPEN | — (moved from beta.3; 21 prompts still stock Chrome UI) | beta.3 |
-| `TICKET_brc121_beef_header_exceeds_100kb_and_payment_is_lost.md` | 🟡 leftover | — (moved from beta.3; HTTP 431 still retried; money) | beta.3 |
-| `TICKET_bulk_utxo_sync_truncates_at_20_per_address.md` | OPEN | — (moved from beta.3; ⚠️ **money, high**: wallet sees only 20 coins per address) | beta.3 |
-| `TICKET_cdp_port_open_in_release.md` | 🟡 leftover — checks only | — (moved from beta.3; macOS installed-build check + F12 row) | beta.3 |
-| `TICKET_cef_file_thread_ids_share_one_thread.md` | OPEN | — (moved from beta.3; leave until a stall is measured) | beta.3 |
-| `TICKET_createSignature_requires_counterparty.md` | OPEN | — (moved from beta.3; check against the spec first; signing code — invariant 3) | beta.3 |
-| `TICKET_edit_limits_modal_usability.md` | 🟡 leftover | — (moved from beta.3; item 4 needs a schema change) | beta.3 |
-| `TICKET_loopback_host_form_wallet_routing.md` | 🟡 leftover | — (moved from beta.3; rows W4/W6/W7/W8; money path) | beta.3 |
-| `TICKET_modal_info_tooltip_overflows_modal.md` | OPEN | — (moved from beta.3; low) | beta.3 |
-| `TICKET_signaction_response_not_brc100_shape.md` | 🟡 leftover | — (moved from beta.3; ⚠️ **money**: a fatal broadcast failure returns success) | beta.3 |
-| `TICKET_synced_outputs_store_a_fabricated_locking_script.md` | OPEN | — (moved from beta.3; ⭐ would fool the Track 1 classifier) | beta.3 |
-| `TICKET_transaction_row_can_sit_at_created_while_its_coin_is_on_chain.md` | OPEN | — (moved from beta.3; reasoned, not measured) | beta.3 |
-| `TICKET_wallet_bridge_plumbing_is_advertised_to_every_site.md` | OPEN | — (moved from beta.3; fingerprint surface; medium) | beta.3 |
-| `TICKET_wallet_cannot_shed_large_parents.md` | OPEN | — (moved from beta.3; money; medium → high) | beta.3 |
-| `TICKET_wallet_quiet_detector_blind_to_long_polls.md` | OPEN | — (moved from beta.3) | beta.3 |
+| `TICKET_e2e_specs_wrong_subject_and_never_run.md` | 📌 PROPOSED (G2) | **Background — instruments** | 2026-08-29 |
+| `TICKET_dapp_reachable_surface_is_a_denylist_not_an_allowlist.md` | 📌 PROPOSED (G2) | **B5-T5 Identity & privacy** — (⭐ suggest track 1) | 2026-09-19 |
+| `TICKET_brc100_consent_model_diverges_from_1sat_wallet_api.md` | 📌 PROPOSED (G2) | **B5-T2 1Sat Ordinals** — (⭐ suggest track 2) | 2026-09-21 |
+| `TICKET_derived_public_keys_have_no_prompt_and_can_match_across_sites.md` | 📌 PROPOSED (G2) | **B5-T5 Identity & privacy** | 2026-09-21 |
+| `TICKET_well_known_auth_returns_a_key_it_cannot_sign_for.md` | 📌 PROPOSED (G2) | **B5-T5 Identity & privacy** | 2026-09-21 |
+| `TICKET_brc121_client_has_no_body_transport_for_large_beef.md` | 📌 PROPOSED (G2) | **B5-T4 402 payments** — (decision at the microscope pass; waits on BRCs #261) | 2026-09-23 |
+| `TICKET_mkcert_dev_private_key_is_tracked_and_public.md` | 📌 PROPOSED (G2) | **Background — hygiene** — (🟡 low; regenerate, do NOT rewrite history) | 2026-09-23 |
+| `TICKET_chromium_default_debug_log_lands_in_install_root.md` | ✅ **FIXED `9559191`** (beta.4 release) | **✅ close — fixed `9559191`** | 2026-09-23 |
+| `TICKET_g1_gate_cannot_see_chromiums_own_log_target.md` | 📌 PROPOSED (G2) | **Background — instruments** — (⭐ the gate PASSED through the defect it was written for) | 2026-09-23 |
+| `TICKET_update_is_visible_when_it_should_not_be.md` | 📌 PROPOSED (G2) | **B5-T6 Browser shell** — (👤 owner-raised; ⭐ tiers 1+2 give Chrome's UX without Chrome's architecture) | 2026-09-24 |
+| `TICKET_wallet_backend_is_shared_across_os_accounts.md` | 📌 PROPOSED (G2) | **B5-T5 Identity & privacy** — (🔐 measured once on macOS; mechanism is code reading) | 2026-09-24 |
+| `TICKET_active_user_count_without_identifying_users.md` | 📌 PROPOSED (G2) | **❄️ Defer — research, not this release** | 2026-09-17 |
+| `TICKET_brc103_server_identity_unverified.md` | 📌 PROPOSED (G2) | **B5-T5 Identity & privacy** — (🔴 AuthFetch trusts the server's claimed key) | 2026-09-16 |
+| `TICKET_brc140_key_shares_vs_bip39.md` | 📌 PROPOSED (G2) | **B5-T3 Backup & sync (research phase)** — (🔬 research-and-decide) | 2026-09-16 |
+| `TICKET_menu_exit_closes_primary_not_the_clicked_window.md` | 📌 PROPOSED (G2) | **B5-T6 Browser shell** | beta.3 Phase 3.5 |
+| `TICKET_multiwindow_session_restore_loses_all_but_last_window.md` | 📌 PROPOSED (G2) | **B5-T6 Browser shell** | beta.3 Phase 3.5 |
+| `TICKET_split_view_needs_multi_visible_tab_model.md` | 📌 PROPOSED (G2) | **B5-T6 Browser shell** | beta.3 Phase 4 |
+| `TICKET_tab_pin_and_mute_need_model_changes.md` | 📌 PROPOSED (G2) | **B5-T6 Browser shell** | beta.3 Phase 4 |
+| `TICKET_window_scoped_work_uses_process_globals.md` | 📌 PROPOSED (G2) | **B5-T6 Browser shell** | beta.3 Phase 3 |
+| `TICKET_derivation_params_unbound_to_origin.md` | OPEN | **B5-T5 — ⚠️ duplicate of `derived_public_keys…`; merge** — (⚠️ **same source finding** as `derived_public_keys_have_no_prompt…` — likely a duplicate; merge at `G2`) | 2026-09-02 |
+| `TICKET_chrome_import_bookmarks_history_passwords.md` | 🅿️ DEFERRED to beta.5 | **B5-T6 Browser shell** — (cut from beta.3 Phase 6) | 2026-09-02 |
+| `TICKET_brc121_remint_on_retry.md` | OPEN *(⚠️ likely stale)* — deferred 2026-08-10 | **B5-T4 402 payments** — ✅ verified 2026-09-25: **still open, narrowed** (possibly-paid case; see file) — (real money; beta.3's `TICKET_brc121_paid_retry_aborts_and_mints_a_payment_each_time.md` was **closed** by Phase 11 item 11 — in-flight payment reuse — which likely closes this too. **Verify, then close with evidence**) | 2026-08 |
+| `TICKET_debug_log_unfiltered_in_production.md` | OPEN *(⚠️ likely stale)* | **Background — hygiene** — ✅ verified 2026-09-25: **still open, narrowed** (a few INFO URL lines; macOS log pruning) — (beta.3 `CRITICAL_UPDATES.md` reads it as fixed by `fa0c143`, and beta.3's twin `TICKET_production_debug_logging_unbounded.md` is **closed** by `fa0c143` + `c3604f9` — **verify, then close with evidence**) | 2026-08 |
+| `TICKET_knowledge_and_memory_architecture.md` | 🔵 RESEARCH, not scheduled | **❄️ Defer — research, not scheduled** | 2026-09-08 |
+| `TICKET_logged_in_screenshots_in_public_history.md` | OPEN — 👤 owner decision needed (rewrite vs accept) | **👤 owner decision (rewrite history vs accept)** — (exposure grows with time) | 2026-08-13 |
+| `TICKET_profile_lock_misreports_missing_dir.md` | OPEN | **B5-T6 Browser shell** — (small) | 2026-08 |
+| `TICKET_reservation_ownership_converge_on_spent_by.md` | OPEN | **B5-T1 Money path** — 📌 placed as **Track 0.5** in `../README.md` (owner, 2026-09-15; to confirm at kickoff) | 2026-08-22 |
+| `TICKET_engine_behind_its_own_cef_branch_and_upstream_stable.md` | 📌 PROPOSED (G2) | **B5-T0 Engine** — (⭐ proposed as a track, likely Track 0; **target is an owner decision**) | 2026-09-24 |
+| `TICKET_auto_unlock_accepts_another_wallets_mnemonic.md` | 📌 PROPOSED (G2) | **B5-T1 Money path** — (🔑 **money**: a valid phrase from another wallet passes auto-unlock; from Wallet-Hardening) | 2026-09-25 |
+| `TICKET_confirmed_tx_never_rechecked_after_reorg.md` | 📌 PROPOSED (G2) | **B5-T1 Money path** — (money; medium, low probability; from Wallet-Hardening) | 2026-09-25 |
+| `TICKET_token_outputs_lost_if_crash_between_broadcast_and_record.md` | 📌 PROPOSED (G2) | **B5-T2 1Sat Ordinals** — (⭐ **settle before ordinals ship**; from Wallet-Hardening) | 2026-09-25 |
+| `TICKET_fast_relaunch_attaches_to_dying_wallet_or_fails_port_bind.md` | 📌 PROPOSED (G2) | **B5-T6 Browser shell** — (availability; from Wallet-Hardening FIX_B) | 2026-09-25 |
+| `TICKET_two_next_address_index_sources_can_reuse_addresses.md` | 📌 PROPOSED (G2) | **B5-T5 Identity & privacy** — (privacy; from Wallet-Hardening) | 2026-09-25 |
+| `TICKET_db_lock_held_across_await_is_unenforced.md` | 📌 PROPOSED (G2) | **Background — instruments** — (hygiene; carries H-1/H-2/H-4 notes) | 2026-09-25 |
+| `TICKET_dead_cert_tx_builder_marks_coins_spent_on_404.md` | 📌 PROPOSED (G2) | **B5-T1 Money path** — (hygiene; dead code, grep-verified only) | 2026-09-25 |
+| `TICKET_final_mvp_efficiency_leftovers_never_scheduled.md` | 📌 PROPOSED (G2) | **Background — split at triage (fuzzing → instruments)** — (five items; ⭐ fuzz testing's "post-launch" trigger has fired) | 2026-09-25 |
+| `TICKET_appcast_missing_minimum_system_version.md` | 🟡 leftover — 👤 **owner decision** | **👤 owner decision — then close** — (moved from beta.3; defect fixed `20aa750`) | 2026-08-17 |
+| `TICKET_brand_remaining_permission_prompts.md` | OPEN | **B5-T6 Browser shell** — (moved from beta.3; 21 prompts still stock Chrome UI) | beta.3 |
+| `TICKET_brc121_beef_header_exceeds_100kb_and_payment_is_lost.md` | 🟡 leftover | **B5-T4 402 payments** — (moved from beta.3; HTTP 431 still retried; money) | beta.3 |
+| `TICKET_bulk_utxo_sync_truncates_at_20_per_address.md` | OPEN | **B5-T1 Money path** — (moved from beta.3; ⚠️ **money, high**: wallet sees only 20 coins per address) | beta.3 |
+| `TICKET_cdp_port_open_in_release.md` | 🟡 leftover — checks only | **Background — two release checks** — (moved from beta.3; macOS installed-build check + F12 row) | beta.3 |
+| `TICKET_cef_file_thread_ids_share_one_thread.md` | OPEN | **B5-T6 Browser shell (measure first)** — (moved from beta.3; leave until a stall is measured) | beta.3 |
+| `TICKET_createSignature_requires_counterparty.md` | OPEN | **B5-T5 Identity & privacy** — (moved from beta.3; check against the spec first; signing code — invariant 3) | beta.3 |
+| `TICKET_edit_limits_modal_usability.md` | 🟡 leftover | **B5-T6 Browser shell** — (moved from beta.3; item 4 needs a schema change) | beta.3 |
+| `TICKET_loopback_host_form_wallet_routing.md` | 🟡 leftover | **B5-T1 Money path** — (moved from beta.3; rows W4/W6/W7/W8; money path) | beta.3 |
+| `TICKET_modal_info_tooltip_overflows_modal.md` | OPEN | **B5-T6 Browser shell** — (moved from beta.3; low) | beta.3 |
+| `TICKET_signaction_response_not_brc100_shape.md` | 🟡 leftover | **B5-T1 Money path** — (moved from beta.3; ⚠️ **money**: a fatal broadcast failure returns success) | beta.3 |
+| `TICKET_synced_outputs_store_a_fabricated_locking_script.md` | OPEN | **B5-T1 Money path** — (moved from beta.3; ⭐ would fool the Track 1 classifier) | beta.3 |
+| `TICKET_transaction_row_can_sit_at_created_while_its_coin_is_on_chain.md` | OPEN | **B5-T1 Money path** — (moved from beta.3; reasoned, not measured) | beta.3 |
+| `TICKET_wallet_bridge_plumbing_is_advertised_to_every_site.md` | OPEN | **B5-T5 Identity & privacy** — (moved from beta.3; fingerprint surface; medium) | beta.3 |
+| `TICKET_wallet_cannot_shed_large_parents.md` | OPEN | **B5-T1 Money path** — (moved from beta.3; money; medium → high) | beta.3 |
+| `TICKET_wallet_quiet_detector_blind_to_long_polls.md` | OPEN | **B5-T6 Browser shell** — (moved from beta.3) | beta.3 |
+| `TICKET_brc121_release_restores_inputs_the_server_may_have_spent.md` | 📌 PROPOSED (G2) | **B5-T4 402 payments** — ❔ **unverified hypothesis**, money; ground-truth check against the chain is step 1 | 2026-09-25 |
 
-📏 **Reconciled 2026-09-25: 52 tickets, 52 rows.** 28 from the 2026-09-24 consolidation (19 with the
+📏 **Reconciled 2026-09-25: 53 tickets, 53 rows** (the 53rd filed during triage). 28 from the 2026-09-24 consolidation (19 with the
 old beta.4 folder, 1 loose, 1 from the old beta.5 folder, 6 from `development-docs/` root, 1 engine
 bump) · **16** still-open tickets moved from `../../0.4.0-beta.3/` after a file-by-file review · **7**
 from the Wallet-Hardening review · **1** from the Final-MVP-Sprint review.
