@@ -104,7 +104,7 @@ Every ticket in `tickets/` now names a track in the register's **Track** column 
 | Track | Goal, one line | Tickets | Existing material |
 |---|---|---|---|
 | **B5-T0 Engine** | Refresh CEF 150 (long-term branch) in-branch and ship the two queued engine fixes | 1 | `tickets/TICKET_engine_behind…`, `../DevOps-CICD/NEXT_CHROMIUM_BUILD.md` |
-| **B5-T1 Money path** | No path can spend what the wallet has not classified as money, and the coin/transaction record stays true to the chain | 10 | `track-1-money-path/utxo-safety-guard/`, `track-1-money-path/reqwest-tls-bump/` *(becomes a phase here)*, the reservation-ownership ticket |
+| **B5-T1 Money path** | No path can spend what the wallet has not classified as money, and the coin/transaction record stays true to the chain | 11 | `track-1-money-path/utxo-safety-guard/`, `track-1-money-path/reqwest-tls-bump/` *(becomes a phase here)*, the reservation-ownership ticket |
 | **B5-T2 1Sat Ordinals** | Hold, show, receive and deliberately transfer ordinals (BRC-147/150/165) | 2 | `track-2-1sat-ordinals/` |
 | **B5-T3 Backup & sync** | On-chain backup and multi-device restore in a standard, interoperable format — stable, conflict-free, efficient | 1 | `track-3-backup-sync/` ⭐ start at `BACKUP_HISTORY_OVERVIEW.md` |
 | **B5-T4 402 payments** | The x402 adapter over our BRC-121 client, plus the open 402 defects | 4 | `track-4-402-payments/X402_INTEGRATION.md` |

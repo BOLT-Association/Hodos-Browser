@@ -63,6 +63,18 @@ One paste box, not a form of fields. The sender's **Copy details** produces a si
 | T-A4 | A block whose `amountSatoshis` is edited upward ⇒ credited amount is still the chain's | trusting the field ⇒ inflated balance |
 | T-A5 | The parser is tested against output of `payment_claim_block`, not a hand-typed example | a hand-typed fixture drifts from the writer |
 
+## Card 2 — Scan my old addresses *(added 2026-09-25, 👤 owner)*
+
+**When to use this:** *"Someone may have paid an address I generated a long time ago."* After 90 days
+the wallet stops watching a generated address (the 90-day window stays — owner). This card is the
+rare-case safety net: one button, a progress line, and a result — *found N payments / nothing new*.
+
+⛔ **Blocked on the scan itself**, which is money-path work: `../tickets/TICKET_rescan_cannot_find_payments_to_generated_addresses.md` (B5-T1). Two gaps
+found 2026-09-25: today's `/wallet/rescan` scans BIP32 addresses while the wallet hands out **BRC-42**
+ones, and a restore from the on-chain backup **drops** old used addresses from the database. The scan
+therefore re-derives **by index up to the wallet's high-water mark**, not from database contents —
+which also removes the need for a large gap limit.
+
 ## Out of scope for this card
 
 Claiming non-PeerPay payments (paymail P2P, BRC-121). Receiving blocks automatically (link handlers, QR). Any change to

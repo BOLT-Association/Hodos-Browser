@@ -18,6 +18,7 @@ Tickets stay in `../tickets/` (planning note D11); this list mirrors the registe
 - [`TICKET_synced_outputs_store_a_fabricated_locking_script.md`](../tickets/TICKET_synced_outputs_store_a_fabricated_locking_script.md) — 🚨 Every output found by address sync stores a **fabricated** locking script
 - [`TICKET_transaction_row_can_sit_at_created_while_its_coin_is_on_chain.md`](../tickets/TICKET_transaction_row_can_sit_at_created_while_its_coin_is_on_chain.md) — A transaction row can sit at status `created` while its coin is on chain -- and nothing reconciles it
 - [`TICKET_wallet_cannot_shed_large_parents.md`](../tickets/TICKET_wallet_cannot_shed_large_parents.md) — The wallet has no way to shed a large parent, so a coin can stay unsendable forever
+- [`TICKET_rescan_cannot_find_payments_to_generated_addresses.md`](../tickets/TICKET_rescan_cannot_find_payments_to_generated_addresses.md) — 🔎 The wallet cannot find a late payment to an old generated address
 
 ## Existing material
 

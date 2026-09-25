@@ -111,8 +111,9 @@ existing links use it. Describe the **symptom or the defect**, not the fix:
 | `TICKET_wallet_cannot_shed_large_parents.md` | OPEN | **B5-T1 Money path** — (moved from beta.3; money; medium → high) | beta.3 |
 | `TICKET_wallet_quiet_detector_blind_to_long_polls.md` | OPEN | **B5-T6 Browser shell** — (moved from beta.3) | beta.3 |
 | `TICKET_brc121_release_restores_inputs_the_server_may_have_spent.md` | 📌 PROPOSED (G2) | **B5-T4 402 payments** — ❔ **unverified hypothesis**, money; ground-truth check against the chain is step 1 | 2026-09-25 |
+| `TICKET_rescan_cannot_find_payments_to_generated_addresses.md` | 📌 PROPOSED (G2) | **B5-T1 Money path** — the scan; its button is Tools-tab card 2 (T6). ⚠️ today's rescan scans BIP32 while generated addresses are BRC-42 | 2026-09-25 |
 
-📏 **Reconciled 2026-09-25: 53 tickets, 53 rows** (the 53rd filed during triage). 28 from the 2026-09-24 consolidation (19 with the
+📏 **Reconciled 2026-09-25: 54 tickets, 54 rows** (the last two filed during triage). 28 from the 2026-09-24 consolidation (19 with the
 old beta.4 folder, 1 loose, 1 from the old beta.5 folder, 6 from `development-docs/` root, 1 engine
 bump) · **16** still-open tickets moved from `../../0.4.0-beta.3/` after a file-by-file review · **7**
 from the Wallet-Hardening review · **1** from the Final-MVP-Sprint review.
