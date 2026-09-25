@@ -75,6 +75,11 @@ ones, and a restore from the on-chain backup **drops** old used addresses from t
 therefore re-derives **by index up to the wallet's high-water mark**, not from database contents —
 which also removes the need for a large gap limit.
 
+⚠️ **What this card can and cannot find** (owner, 2026-09-25): it scans addresses the wallet
+**generated for the user** (BRC-42 with counterparty = self, plus old BIP32 ones) — the only BRC-42
+keys that can be walked in sequence. A payment derived with **someone else's** key (PeerPay/BRC-29)
+cannot be found by any scan; that is card 1's job. The card's wording must say so plainly.
+
 ## Out of scope for this card
 
 Claiming non-PeerPay payments (paymail P2P, BRC-121). Receiving blocks automatically (link handlers, QR). Any change to

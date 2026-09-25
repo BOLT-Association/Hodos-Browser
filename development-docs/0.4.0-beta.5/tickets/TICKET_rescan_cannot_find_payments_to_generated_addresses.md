@@ -41,6 +41,24 @@ payment would land on. ⇒ After a restore, a scan of **what is in the database*
 ✅ The backup **does** carry the wallet's `current_index`, so the wallet still knows how far up the
 sequence it went.
 
+## ⭐ Scope decided by the owner, 2026-09-25
+
+**Build BOTH scan functions, and test both** — a **BIP32** sequential scan and a **BRC-42
+self-counterparty** sequential scan — even where a caller does not use one yet. Each is a
+separately tested function; the Tools-tab button and the post-restore scan are callers of them.
+
+⛔ **The limit that must be stated wherever this is used: BRC-42 can only be scanned sequentially
+when the counterparty is SELF.** A BRC-42 key is derived from *our key + the counterparty's key + an
+invoice number*. For addresses **we generate for the user** (`2-receive address-{index}`,
+counterparty = self) every input is known, so index 0, 1, 2… can be walked. For a key derived with
+**another party** — a PeerPay/BRC-29 payment someone sent us with their own key and random
+prefix/suffix — the inputs are not guessable, so **no scan can find it**. Those arrive through
+MessageBox, or by hand through Tools-tab card 1 (*Claim a payment*).
+
+⇒ **Scanning is not a general BRC-42 recovery tool.** It recovers exactly one thing: payments to
+addresses the wallet generated for the user and the user handed to someone. The UI and docs must
+not claim more.
+
 ## Proposed design (for the track's research to confirm)
 
 1. **The scan re-derives by index, not by database contents.** For each index from 0 up to the
