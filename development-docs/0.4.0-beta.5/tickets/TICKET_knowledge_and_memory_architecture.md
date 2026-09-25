@@ -1,5 +1,9 @@
 # Knowledge & memory architecture — where facts live, and what keeps them current
 
+> ✅ **CLOSED 2026-09-25 — adopted as policy.** 👤 Owner decided to adopt this, not defer it: the placement rule and
+> a cross-machine sharing protocol now live in `../../KNOWLEDGE_AND_MEMORY.md` (v1), announced to macOS in
+> `../MAC_RELAY_BETA5.md` round W-25a. This ticket's open questions are carried in that doc's §6.
+
 **Filed:** 2026-09-08, from an owner question at the close of beta.3 Phase 8.
 **Status:** 🔵 **RESEARCH — deliberately not scheduled.** Owner: *"I don't necessarily want to do
 this right now but maybe we should research it and start implementing it at the end of this sprint."*

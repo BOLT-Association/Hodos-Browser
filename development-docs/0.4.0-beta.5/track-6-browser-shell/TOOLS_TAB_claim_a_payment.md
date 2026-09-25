@@ -1,8 +1,8 @@
 # beta.5 — a Tools tab in the advanced wallet, starting with "Claim a payment"
 
 **Filed:** 2026-09-15, from beta.3 Phase 10d · **Owner:** Matthew Archbold · **Status:** 📋 OUTLINE — not scoped, not scheduled inside beta.5
-**Origin:** `../0.4.0-beta.3/TICKET_peerpay_message_exceeds_messagebox_limit.md` and
-`../0.4.0-beta.3/phase-10-critical-advisories/10d-peerpay-delivery/PHASE_CONTRACT.md` (claim box moved out of beta.3).
+**Origin:** `../../0.4.0-beta.3/TICKET_peerpay_message_exceeds_messagebox_limit.md` and
+`../../0.4.0-beta.3/phase-10-critical-advisories/10d-peerpay-delivery/PHASE_CONTRACT.md` (claim box moved out of beta.3).
 
 ## Owner decisions, 2026-09-15
 
@@ -13,7 +13,7 @@
    credit coins that are on chain and derive to this wallet's own keys — and the users who need it are the ones least
    likely to find a hidden control. Hidden features also drop out of testing.
 4. ⛔ **The input format is fixed already**: the claim tool reads exactly the block beta.3's Copy details writes —
-   `../0.4.0-beta.3/phase-10-critical-advisories/10d-peerpay-delivery/PAYMENT_CLAIM_BLOCK.md`, built only by
+   `../../0.4.0-beta.3/phase-10-critical-advisories/10d-peerpay-delivery/PAYMENT_CLAIM_BLOCK.md`, built only by
    `rust-wallet/src/handlers.rs :: payment_claim_block` and pinned by its golden-keys test. Do not redesign the fields
    here; blocks users copied from beta.3 onward must keep working.
 

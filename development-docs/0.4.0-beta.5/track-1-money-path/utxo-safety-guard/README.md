@@ -2,7 +2,7 @@
 
 **Opened:** 2026-08-29 (created at the beta.4 telescope pass — no prior research existed).
 **Status:** 🔭 SCOPE ONLY. No phase contracts, no design. The microscope pass writes those.
-**Standard:** `../../0.4.0-beta.3/HARNESS.md` + `../HARNESS_DELTA.md`.
+**Standard:** `../../../0.4.0-beta.3/HARNESS.md` + `../../HARNESS_DELTA.md`.
 
 ---
 
@@ -22,7 +22,7 @@ feature; it is a live defect that the ordinals feature would multiply.
 ## The verified findings — read by direct code inspection, 2026-08-29
 
 **Nothing files a 1-sat output into a protective basket.** Full detail in
-`../../0.4.0-beta.3/TICKET_token_outputs_destroyed_by_dust_paths.md` (⛔ read-only — another session
+`../../../0.4.0-beta.3/TICKET_token_outputs_destroyed_by_dust_paths.md` (⛔ read-only — another session
 owns beta.3).
 
 | # | Path | Trigger | What it does |
@@ -70,7 +70,7 @@ copies, and every later protocol would reopen all five paths.
 
 **Why one classifier rather than several:** BSV-20/21's model is **contested** — BRC-163 merged, BRC-175
 open and competing, same author, one day apart. A fungible classifier written today may encode the
-side that loses. See `../WATCH_fungibles.md`.
+side that loses. See `../../track-2-1sat-ordinals/WATCH_fungibles.md`.
 
 ## Candidate phases
 
@@ -80,14 +80,14 @@ side that loses. See `../WATCH_fungibles.md`.
 | **1.2** | Classification on ingest | Every output entering the wallet is classified once, at ingest, and the classification persists. |
 | **1.3** | Fail-closed enforcement | Each site in 1.1 either consults the classification, or carries a written reason it does not need to. |
 | **1.4** | Recovery and reconcile parity | The three files with zero `basket` references. **Most dangerous path** — it fires when the user is least able to notice a loss. |
-| **1.5** | The standing invariant | `R-NOSPEND` and `R-CLASSIFY` live and running at every later boundary (`../REGRESSION_ADDITIONS.md`). |
+| **1.5** | The standing invariant | `R-NOSPEND` and `R-CLASSIFY` live and running at every later boundary (`../../REGRESSION_ADDITIONS.md`). |
 
 ## In scope / out of scope
 
 | ✅ In | ❌ Out |
 |---|---|
 | Classification on ingest and its persistence | Inscription rendering, or any UI beyond what proves the classification |
-| Fail-closed refusal at every enumerated site | BSV-20/21 classifiers — contested, see `../WATCH_fungibles.md` |
+| Fail-closed refusal at every enumerated site | BSV-20/21 classifiers — contested, see `../../track-2-1sat-ordinals/WATCH_fungibles.md` |
 | Recovery / sweep / reconcile parity | Ordinal transfer, listing, purchase — track 2 |
 | `R-NOSPEND` + `R-CLASSIFY` as standing invariants | Token-spend permission classes — track 2.3 |
 | Deciding whether the beta.3 floor is kept as defence in depth | BRC-147/150/165 semantics beyond what the classifier needs |
@@ -112,7 +112,7 @@ almost nothing, and a guard whose regression row was never seen failing beforeha
 > 150, 165), then the BSV Association's **`wallet-toolbox` in TypeScript *and* Go**, then the other
 > **BSV SDKs**. Report where implementations agree — that is the convention — and ⭐ **where they
 > disagree, because that is the real design question.** ⚠️ There is no Rust implementation; we port
-> **patterns and semantics, never code.** Full instructions: `../README.md` §"Research questions owed".
+> **patterns and semantics, never code.** Full instructions: `../../README.md` §"Research questions owed".
 
 | Question | Why it needs the code in front of you |
 |---|---|
@@ -205,8 +205,8 @@ for a synced output, because it inspects the fabricated script. Do not count it 
 
 ## Links
 
-- `../README.md` — release scope and the three kickoff decisions
-- `../RELEASE_PLAN.md` — track-level breakdown and cross-track edges
-- `../REGRESSION_ADDITIONS.md` — `R-NOSPEND`, `R-CLASSIFY`, `R-RESTORE`
-- `../../0.4.0-beta.3/TICKET_token_outputs_destroyed_by_dust_paths.md` — ⛔ read-only
-- `../track-2-1sat-ordinals/README.md` — the rule this enforces was written there first
+- `../../README.md` — release scope and the three kickoff decisions
+- `../../RELEASE_PLAN.md` — track-level breakdown and cross-track edges
+- `../../REGRESSION_ADDITIONS.md` — `R-NOSPEND`, `R-CLASSIFY`, `R-RESTORE`
+- `../../../0.4.0-beta.3/TICKET_token_outputs_destroyed_by_dust_paths.md` — ⛔ read-only
+- `../../track-2-1sat-ordinals/README.md` — the rule this enforces was written there first

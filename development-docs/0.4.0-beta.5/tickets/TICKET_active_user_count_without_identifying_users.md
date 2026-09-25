@@ -1,5 +1,10 @@
 # 🔬 We cannot say how many people use Hodos, and the only number we have counts machines updating
 
+> 👤 **Owner direction, 2026-09-25 — in beta.5 (T5), and NOT our own design.** Adopt the **best-privacy existing
+> industry standard** — start by reading how Brave counts active users. No research-and-development of a new scheme.
+> ⭐ **Be honest about it:** write down exactly what the chosen scheme can and cannot reveal, so we know it and can tell
+> users plainly. If it is not the most private thing possible, say so; a redesign is a later, separate decision.
+
 **Found:** 2026-09-17, planning the Q4 marketing push. Download counts are the only user signal we
 have, and `Hodos/marketing/Metrics/DOWNLOAD_METRICS.md` says itself that they do not answer the
 question.

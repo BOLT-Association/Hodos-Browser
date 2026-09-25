@@ -5,7 +5,7 @@ Every claim is labelled VERIFIED (read the cited code/data) or INFERRED (reasone
 
 Re-verification pass 2026-08-22 evening: an independent second read of `backup.rs` (all 2,284 lines), the handlers.rs backup/recovery region, `task_backup.rs`, `migrations.rs`, `pushdrop.rs`, `crypto/pin.rs`, `crypto/brc42.rs` (header + ECDH/HMAC structure), and fresh read-only aggregates from the live DB confirmed every finding below. Corrections from that pass are marked **[v2]**: four column-level data-loss gaps added (§2), live-DB numbers refreshed (§4).
 
-Doc under review: `development-docs/0.4.0-beta.5/ONCHAIN_BACKUP_SYSTEM.md` (182 lines, read in full).
+Doc under review: `development-docs/0.4.0-beta.5/track-3-backup-sync/ONCHAIN_BACKUP_SYSTEM.md` (182 lines, read in full).
 
 ---
 
@@ -244,7 +244,7 @@ Error swallowing (`let _ =`):
 - `rust-wallet/src/database/helpers.rs` — 14-50 (master key derivation).
 - `rust-wallet/src/crypto/brc42.rs` — header + derivation function structure (1-130 region).
 - `rust-wallet/src/script/pushdrop.rs` — `encode` in full + decode structure.
-- `development-docs/0.4.0-beta.5/ONCHAIN_BACKUP_SYSTEM.md` — all 182 lines.
+- `development-docs/0.4.0-beta.5/track-3-backup-sync/ONCHAIN_BACKUP_SYSTEM.md` — all 182 lines.
 - Live DBs (read-only, aggregates only, secret columns excluded): `AppData/Roaming/HodosBrowser/wallet/wallet.db` and `AppData/Roaming/HodosBrowserDev/wallet/wallet.db`.
 
 ## NOT checked

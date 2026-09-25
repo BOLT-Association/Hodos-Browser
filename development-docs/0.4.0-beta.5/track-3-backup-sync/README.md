@@ -20,7 +20,7 @@ implement, test and learn — the draft follows the code, not the other way arou
 > **Where the design lives:** `Marston Enterprises/Standards/BRCs/drafts/wallet-backup-and-sync-onchain/`
 > — `wallet-backup-and-sync-onchain.md` (the BRC, revised 2026-08-19) and `DELTA_ANALYSIS.md` (why, with
 > the numbers and the decisions on record).
-> **Current implementation doc:** `../ONCHAIN_BACKUP_SYSTEM.md` — the five strips, triggers,
+> **Current implementation doc:** `ONCHAIN_BACKUP_SYSTEM.md` — the five strips, triggers,
 > dirty-flag, recovery flow. ~~Still accurate for what ships today~~ *[superseded 2026-08-23: that
 > doc has ≥ 6 verified factual errors — IMPLEMENTATION_PLAN.md §6.1. Cite code lines, not the doc,
 > until it is rewritten post-Phase 2.]* This work builds on the shipped system, doesn't
@@ -49,7 +49,7 @@ tables.]**
 
 **Why it's first.** The BRC now says the backup payload SHOULD be a **BRC-38** document (Ty Everett's
 *User Wallet Data Format*, written 2026 — no longer "reserved"). Our schema was *based on*
-wallet-toolbox but has drifted: we back up 18 tables (`../ONCHAIN_BACKUP_SYSTEM.md` § Included
+wallet-toolbox but has drifted: we back up 18 tables (`ONCHAIN_BACKUP_SYSTEM.md` § Included
 Tables), BRC-38 defines exactly 13 and **MUSTs that list with no extension slot**. If the gap is
 small, the rest of this plan proceeds as written. If it's large, **that is a big problem with a lot
 of work**, and the track has to start by identifying it clearly and planning from that — not
@@ -348,13 +348,19 @@ H6 (corruption), H7 (boundary restore), H9 (90-day soak).]*
 - `rust-wallet/src/database/` — last-backed-up state for diffing; `device_id` in settings;
   `sync_states` interaction
 - wherever the pre-spend path lives in `createAction` / `send_transaction` — the poll hook (Q1)
-- `../ONCHAIN_BACKUP_SYSTEM.md` — update once items land
+- `ONCHAIN_BACKUP_SYSTEM.md` — update once items land
 
 ## Related
 
 - BRC draft + analysis: `Marston Enterprises/Standards/BRCs/drafts/wallet-backup-and-sync-onchain/`
 - The revocation-registry design that prompted this ("write deltas, not snapshots"):
   `Marston Enterprises/Standards/BRCs/drafts/bbs-unlinkable-credentials/NOTES.md`
-- `../ONCHAIN_BACKUP_SYSTEM.md` — current implementation
+- `ONCHAIN_BACKUP_SYSTEM.md` — current implementation
 - `research/ONCHAIN_BACKUP_REVIEW.md`, `research/FIX_B_CRASH_SAFETY_SHUTDOWN_PLAN.md`, `research/FOLLOWUP_RECORD_BEFORE_BROADCAST_TOKENS.md` — moved here from `Wallet-Hardening/` 2026-09-25 (the rest of that folder is in `../../../archived-docs/Wallet-Hardening/`)
 - `BACKUP_HISTORY_OVERVIEW.md` — ⭐ **read first**: the consolidated history of every backup doc and what ships today (2026-09-25)
+
+## Tickets — beta.5 register (B5-T3)
+
+Tickets stay in `../tickets/`; this list mirrors the register's Track column (2026-09-25).
+
+- [`TICKET_brc140_key_shares_vs_bip39.md`](../tickets/TICKET_brc140_key_shares_vs_bip39.md) — 🔬 BRC-140 threshold key shares as an alternative to the BIP39 phrase — research and decide

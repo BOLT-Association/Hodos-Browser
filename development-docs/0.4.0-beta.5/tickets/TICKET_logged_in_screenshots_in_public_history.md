@@ -1,5 +1,10 @@
 # TICKET — logged-in session screenshots are in the PUBLIC repo's git history
 
+> ✅ **CLOSED 2026-09-25 — ACCEPTED RISK (owner, Option B).** 👤 *"The X timeline and handle and profile photo, I
+> don't care… those are public anyway."* No history rewrite. The blast radius measured that day (all four public tags
+> descend from `99e72aa`, 537 commits on top) made a rewrite far costlier than the exposure. Prevention stays: soak
+> screenshots are gitignored since `8eeb2b5`, and harnesses should write outside the repo.
+
 > ⏸️ **2026-09-25 — owner approved Option A, then execution was PAUSED for a re-decision.** Measured that day:
 > `99e72aa` is an ancestor of `release/0.4.0`, `release/main`, `release/staging` **and all four public tags**
 > `v0.4.0-beta.1` … `v0.4.0-beta.4` — the last is the public Latest — with **537** commits on top of it. A rewrite now

@@ -36,7 +36,7 @@ A PeerPay send either delivers its message or never leaves the wallet; a deliver
 - [ ] Wallet panel: one-line yellow banner while any `undeliverable` exists; the send's Activity row gets a yellow sub-line naming the cause ("message too large" / "relay unreachable") with **Retry** (rebuilds the message from the stored bytes, re-sends once, re-classifies) and **Copy details**
 - [ ] **Copy details copies the payment claim block** — format fixed in `PAYMENT_CLAIM_BLOCK.md` (BRC-100 `internalizeAction` field names: `txid`, `outputIndex`, `senderIdentityKey`, `derivationPrefix`, `derivationSuffix`, plus `amountSatoshis`, `recipientIdentityKey`, `type`, `version`), built only by `handlers.rs :: payment_claim_block`, pinned by a golden-keys test. 👤 Owner 2026-09-15: **whatever 10d emits is what beta.5's claim tool reads**
 - [ ] Housekeeping (backup) stays treasury-fee-exempt (already true, `D-6`); no new fee anywhere
-- [x] ~~❔ Claim box~~ — 👤 **moved to beta.5** (owner 2026-09-15): `../../../0.4.0-beta.5/TOOLS_TAB_claim_a_payment.md`, a visible Tools tab in the advanced wallet
+- [x] ~~❔ Claim box~~ — 👤 **moved to beta.5** (owner 2026-09-15): `../../../0.4.0-beta.5/track-6-browser-shell/TOOLS_TAB_claim_a_payment.md`, a visible Tools tab in the advanced wallet
 
 ## 3. Invariants preserved
 

@@ -3,15 +3,15 @@
 This folder contains feature research, design exploration, and implementation guides. These are **working plans**, not commitments or a roadmap.
 
 ⛔ **The root holds only living, cross-release documents** — `README.md`, `RELEASE_CYCLE.md`,
-`SCOPING_PROCESS.md`, `PRIOR_ART.md`, `MACOS_CATCHUP_PLAYBOOK.md`. Release-specific work lives in a
+`SCOPING_PROCESS.md`, `PRIOR_ART.md`, `MACOS_CATCHUP_PLAYBOOK.md`, `KNOWLEDGE_AND_MEMORY.md`. Release-specific work lives in a
 release folder (`0.4.0-beta.5/` is current); finished work lives in `archived-docs/`.
 
 ## Where things moved (2026-09-25)
 
 | Was | Now |
 |---|---|
-| `Final-MVP-Sprint/` | `archived-docs/Final-MVP-Sprint/` — backup lessons in `0.4.0-beta.5/track-4-onchain-backup-sync/BACKUP_HISTORY_OVERVIEW.md` |
-| `Wallet-Hardening/` | `archived-docs/Wallet-Hardening/`, except three docs the backup plan cites → `0.4.0-beta.5/track-4-onchain-backup-sync/research/` |
+| `Final-MVP-Sprint/` | `archived-docs/Final-MVP-Sprint/` — backup lessons in `0.4.0-beta.5/track-3-backup-sync/BACKUP_HISTORY_OVERVIEW.md` |
+| `Wallet-Hardening/` | `archived-docs/Wallet-Hardening/`, except three docs the backup plan cites → `0.4.0-beta.5/track-3-backup-sync/research/` |
 | `Dolphin Milk + Edwin Integration/` | `Future-Features/Dolphin Milk + Edwin Integration/` |
 | `0.4.0-beta.5/track-3-opns-naming/` | `Future-Features/Decentralized-Naming/OPNS_TRACK_SCOPE_beta5_deferred.md` — OpNS is out of beta.5 |
 | 16 open tickets in `0.4.0-beta.3/` | `0.4.0-beta.5/tickets/` |

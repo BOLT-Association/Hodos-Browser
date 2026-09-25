@@ -1,10 +1,10 @@
 # Track 0 — `reqwest` 0.11 → 0.12+ (the wallet's TLS certificate validator)
 
 **Opened:** 2026-09-15, by owner decision at the beta.3 Phase 9 dependency review
-(`../../DevOps-CICD/DEPENDENCY_VERIFICATION.md`, "Freshness review — 2026-09-14").
+(`../../../DevOps-CICD/DEPENDENCY_VERIFICATION.md`, "Freshness review — 2026-09-14").
 **Status:** 🔭 SCOPE + RESEARCH NOTES ONLY. No phase contract, no design. It needs a real scoping pass
-(`../../SCOPING_PROCESS.md`) before code — this file is the outline that pass starts from.
-**Standard:** `../../0.4.0-beta.3/HARNESS.md` + `../HARNESS_DELTA.md`.
+(`../../../SCOPING_PROCESS.md`) before code — this file is the outline that pass starts from.
+**Standard:** `../../../0.4.0-beta.3/HARNESS.md` + `../../HARNESS_DELTA.md`.
 **Placement:** 👤 **first in beta.5, ahead of the four settled tracks** (owner, 2026-09-15). The Guard → 1Sat →
 OpNS → Backup order is untouched; this sits in front of it because it is a dependency change on the money
 path, not an asset-layer feature, and beta.3's release verification should not absorb it.
@@ -80,7 +80,7 @@ The same move also clears **RUSTSEC-2026-0258** (`h2 0.3.27`, HTTP/2 unbounded e
 4. **`wallet-toolbox` (TypeScript/Go) — how do conforming wallets pin or verify server identity?** Per the
    root `CLAUDE.md` prior-art rule: check whether any BSV SDK layers certificate pinning or extra checks over
    plain TLS for ARC/WhatsOnChain. Expected answer: no, plain TLS with the platform store. Record it in
-   `../../PRIOR_ART.md` either way.
+   `../../../PRIOR_ART.md` either way.
 5. **Chromium's stance** is irrelevant here — the wallet is a separate Rust process with its own TLS; libcef's
    BoringSSL is not on this path (`DEPENDENCY_VERIFICATION.md`, symbol coexistence).
 
@@ -100,7 +100,7 @@ The same move also clears **RUSTSEC-2026-0258** (`h2 0.3.27`, HTTP/2 unbounded e
 `B4S0-A1` balance/UTXO parity before vs after · `B4S0-A2` broadcast + ARC status ladder unchanged · `B4S0-A3`
 AuthFetch/MessageBox round trip · `B4S0-A4` price fallback chain · `B4S0-A5` bad-certificate hosts refused
 (expired, wrong name, self-signed) · `B4S0-A6` `cargo audit` clean of the four ids. Standing rows from
-`../../0.4.0-beta.3/REGRESSION_SET.md` that this touches: `R-INTEXT` (unchanged, but the transport under it
+`../../../0.4.0-beta.3/REGRESSION_SET.md` that this touches: `R-INTEXT` (unchanged, but the transport under it
 moves), `R-PERIM` (T1), `R-DUST` (T1).
 
 ## Risks worth naming now
@@ -116,6 +116,6 @@ moves), `R-PERIM` (T1), `R-DUST` (T1).
 
 ## Related
 
-- `../../0.4.0-beta.3/TICKET_dependency_freshness_review.md` — the review that surfaced this
-- `../../DevOps-CICD/DEPENDENCY_VERIFICATION.md` — policy item 6: a review reports, a bump is its own change
+- `../../../0.4.0-beta.3/TICKET_dependency_freshness_review.md` — the review that surfaced this
+- `../../../DevOps-CICD/DEPENDENCY_VERIFICATION.md` — policy item 6: a review reports, a bump is its own change
 - Memory: `reference_arc_tx_status_ladder` (ANNOUNCED ≠ success), `project_cache_no_poison_on_failure`

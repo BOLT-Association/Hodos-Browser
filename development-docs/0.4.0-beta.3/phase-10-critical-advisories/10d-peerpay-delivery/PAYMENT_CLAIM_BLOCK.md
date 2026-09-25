@@ -1,7 +1,7 @@
 # The payment claim block — one format, written in beta.3, read in beta.5
 
 **Status:** ⭐ **CANONICAL.** Written by beta.3 Phase 10d's *Copy details* (sender side). Read by the beta.5 *Claim a
-payment* tool (receiver side, `../../../0.4.0-beta.5/TOOLS_TAB_claim_a_payment.md`). **Owner decision 2026-09-15:
+payment* tool (receiver side, `../../../0.4.0-beta.5/track-6-browser-shell/TOOLS_TAB_claim_a_payment.md`). **Owner decision 2026-09-15:
 whatever 10d emits is what beta.5 accepts.** Changing a field name here after beta.3 ships breaks every block a user has
 already copied — add fields, bump `version`, never rename.
 

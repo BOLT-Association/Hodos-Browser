@@ -168,5 +168,5 @@ is the cheapest negative control in the release and it is available today.
 | Considered | Verdict |
 |---|---|
 | A row asserting "ordinals display correctly" | Not an invariant — a feature. Belongs in track 2's evidence table, not the standing set. The standing set is for what must not break *later*. |
-| A row on fungible/BSV-21 handling | ⛔ Nothing to guard. Fungibles are deferred — see `WATCH_fungibles.md`. Adding a row for absent behaviour is how a set rots. |
+| A row on fungible/BSV-21 handling | ⛔ Nothing to guard. Fungibles are deferred — see `track-2-1sat-ordinals/WATCH_fungibles.md`. Adding a row for absent behaviour is how a set rots. |
 | A 1-satoshi value floor as a standing invariant | Rejected. That is beta.3's stopgap. Writing the stopgap into the standing set would freeze the wrong rule: **value is not the discriminator, classification is.** |

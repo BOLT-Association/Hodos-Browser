@@ -721,6 +721,8 @@ were being called "the identity key permission". Do not couple them —
 
 ## Context File Maintenance
 
+⭐ **Where a fact goes, and how both machines share it: `development-docs/KNOWLEDGE_AND_MEMORY.md`.** One rule: *if another person or agent would ever need it, it goes in the repo* — private agent memory holds only how you work with the owner and traps specific to your machine. A change to a shared rule doc gets a relay round naming it.
+
 **After each sprint, phase, or sub-phase:**
 1. Review this CLAUDE.md — Is it still accurate? Update Key Files table if architecture changed.
 2. Check the current release folder (`development-docs/0.4.0-beta.5/` — its `README.md` and `tickets/README.md`) and the per-layer `CLAUDE.md` files.
@@ -736,7 +738,7 @@ were being called "the identity key permission". Do not couple them —
 | `development-docs/0.4.0-beta.5/` | **Current release folder** (was `0.4.0-beta.4/` until 2026-09-24 — that version number was spent by a hotfix). Telescoped as the wallet asset layer: UTXO safety guard → 1Sat Ordinals → OpNS naming → on-chain backup & sync; the beta.5 track set is re-proposed at gate `G2` (`RELEASE_CYCLE.md`). Start at its `README.md`, then `TELESCOPE.md`. ⛔ Its harness is **inherited by reference** from `0.4.0-beta.3/HARNESS.md`; beta.5's additions are in `HARNESS_DELTA.md` / `REGRESSION_ADDITIONS.md` only |
 | `development-docs/architecture/` | Cross-layer architecture — the flows no single layer's `CLAUDE.md` owns. Rewritten against code 2026-08-03 (the prior contents described the deleted C++ permission engine). Three docs: `AUTO_APPROVE_ENGINE.md` (permission decision flow + Matrix C branch order), `IPC_BRIDGE.md` (the `wallet_call` process-message contract), `WALLET_API_MAP.md` (which endpoints are gated by which Rust dispatcher, and the shim surface). Inventory stays in the layer docs; these three carry only cross-layer flow. |
 | `archived-docs/FUTURE_AUTO_APPROVE_ENGINE_ARCHITECTURE.md` | The original "engine in Rust" vision doc. Largely **realized** by Phase 2.6 — read it as history, not as a plan |
-| `archived-docs/Final-MVP-Sprint/` | **Archived 2026-09-25** — sprint: testing, optimization, security, macOS port. History only; its backup lessons live in `development-docs/0.4.0-beta.5/track-4-onchain-backup-sync/BACKUP_HISTORY_OVERVIEW.md` |
+| `archived-docs/Final-MVP-Sprint/` | **Archived 2026-09-25** — sprint: testing, optimization, security, macOS port. History only; its backup lessons live in `development-docs/0.4.0-beta.5/track-3-backup-sync/BACKUP_HISTORY_OVERVIEW.md` |
 | `archived-docs/Final-MVP-Sprint/macos-port/` | macOS port history. ⭐ The **current** macOS brief is `development-docs/MACOS_CATCHUP_PLAYBOOK.md` |
 | `development-docs/Sigma-BRC121-Sprint/` | Sprint: BRC-100 surface completion. Phase folders are the authoritative status source — see the phase README in each |
 | `development-docs/Sigma-BRC121-Sprint/phase-2.6-engine-to-rust/` | The permission-engine port to Rust (sub-phases A–H) — the change that deleted the C++ `PermissionEngine`, `PermissionGate` and `SessionManager` |

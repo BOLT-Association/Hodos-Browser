@@ -119,10 +119,10 @@ that owns "the cross-cutting concerns" becomes the context that owns everything.
 
 | Context | Reads | ⛔ Does **not** read |
 |---|---|---|
-| **M1 Guard** | `track-1-utxo-safety-guard/README.md`, M0's output, `HARNESS_DELTA.md`, `REGRESSION_ADDITIONS.md`, the `rust-wallet` paths named in the track README | Tracks 2/3/4 folders. `WATCH_fungibles.md` beyond its one-line verdict |
-| **M2 1Sat** | `track-2-1sat-ordinals/` (both files), M0's output, BRC-147/150/159/160/165, `WATCH_fungibles.md` | Tracks 3/4 folders. The old naming research |
+| **M1 Guard** | `track-1-money-path/utxo-safety-guard/README.md`, M0's output, `HARNESS_DELTA.md`, `REGRESSION_ADDITIONS.md`, the `rust-wallet` paths named in the track README | Tracks 2/3/4 folders. `track-2-1sat-ordinals/WATCH_fungibles.md` beyond its one-line verdict |
+| **M2 1Sat** | `track-2-1sat-ordinals/` (both files), M0's output, BRC-147/150/159/160/165, `track-2-1sat-ordinals/WATCH_fungibles.md` | Tracks 3/4 folders. The old naming research |
 | **M3 OpNS** | `../Future-Features/Decentralized-Naming/OPNS_TRACK_SCOPE_beta5_deferred.md` (⛔ **out of this release** — planning note D4), `tokens/0174.md`, `Future-Features/Decentralized-Naming/` **once**, track 2's *outcomes* (not its folder) | Tracks 1/4 folders. The naming research a second time |
-| **M4 Backup** | `track-4-onchain-backup-sync/` (the plan is authoritative), M0's E3 answer, track 2's **measurement rows** | Tracks 1/2/3 folders |
+| **M4 Backup** | `track-3-backup-sync/` (the plan is authoritative), M0's E3 answer, track 2's **measurement rows** | Tracks 1/2/3 folders |
 
 **Each M-context produces:** phase contracts from `PHASE_CONTRACT_TEMPLATE.md`, and a short
 **findings note** listing anything that contradicts this telescope output. The findings notes are the
@@ -209,7 +209,7 @@ Written down so the closing pass has something to check rather than a mood to ma
 | 2 | Ordinals are a prerequisite for names | BRC-174 turns out not to need ordinal handling at all, and track 3 could have run earlier |
 | 3 | The backup size problem is ancestry depth, not media | **Explicitly a hypothesis.** E2's measurement settles it. If media dominates, track 4's phase 3 changes shape |
 | 4 | Four tracks fit in one release | The first honest phase-contract set says otherwise. **Cut from the back** — track 4's plan already stands alone and can slip to beta.5 without waste |
-| 5 | Fungibles can be deferred without cost | A partner or user need forces BSV-21 mid-release. Trigger 5 in `WATCH_fungibles.md` |
+| 5 | Fungibles can be deferred without cost | A partner or user need forces BSV-21 mid-release. Trigger 5 in `track-2-1sat-ordinals/WATCH_fungibles.md` |
 
 ⭐ **Belief 1 is the one to test first**, and 1.1 tests it on day one. If it is wrong, the release
 plan changes while it is still cheap to change.

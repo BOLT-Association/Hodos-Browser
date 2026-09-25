@@ -41,7 +41,7 @@ order"), **these win** until the cleanup below rewrites that text.
 |---|---|---|
 | D6 | **GitHub issues: one per phase** | Opened at G6, closed at G7 by the pushed commit; markdown stays the truth. `../RELEASE_CYCLE.md` v5 §4.1a. Trial, reviewed in the AAR (`AAR_NOTES.md`) |
 | D7 | **Release notes / social posts reuse the G1 mission** | 👤 The mission paragraph is the release announcement, plus bullets per track at promote time |
-| D8 | **BSV-21 is T2's FIRST research question, not a late review** | Most 1Sat activity today is BSV-21 fungible tokens. Re-check BRC-163 vs BRC-175 (`WATCH_fungibles.md`) and how the **current** 1Sat SDK handles BSV-21. Protection is already covered: a BSV-21 transfer is a 1-sat inscribed output, so T1's guard classifies it as a token |
+| D8 | **BSV-21 is T2's FIRST research question, not a late review** | Most 1Sat activity today is BSV-21 fungible tokens. Re-check BRC-163 vs BRC-175 (`track-2-1sat-ordinals/WATCH_fungibles.md`) and how the **current** 1Sat SDK handles BSV-21. Protection is already covered: a BSV-21 transfer is a 1-sat inscribed output, so T1's guard classifies it as a token |
 | D9 | **Active-user count is in beta.5** | A phase in T5 — count users **without identifying them** (👤 needed for marketing and fundraising) |
 | D10 | **Next-release intake folder exists** | `../0.4.0-beta.6/` — first ticket: the CI/CD pipeline review |
 | D11 | **Tickets stay in `tickets/`** | The register's Track column is the assignment; each track's scope doc links its tickets. A ticket becomes a phase or item at G3 |
@@ -61,9 +61,9 @@ order"), **these win** until the cleanup below rewrites that text.
 
 ### Backup track — its history is consolidated ✅
 
-⭐ **Read `track-4-onchain-backup-sync/BACKUP_HISTORY_OVERVIEW.md` first** (2026-09-25). One agent
+⭐ **Read `track-3-backup-sync/BACKUP_HISTORY_OVERVIEW.md` first** (2026-09-25). One agent
 mapped every backup doc — the 2026-04-11 double-spend incident, the efficiency plan, the July backup
-review, `ONCHAIN_BACKUP_SYSTEM.md`, the track's plan and research — against today's code, and wrote a
+review, `track-3-backup-sync/ONCHAIN_BACKUP_SYSTEM.md`, the track's plan and research — against today's code, and wrote a
 single overview: what ships, what was fixed, what contradicts what, and what the research must answer.
 👤 **The bar the whole system must clear: stable, no conflicts, efficient.** If we cannot do both
 conflict-free and efficient, the design is not ready. ⚠️ The overview's own verdict: **not shown
@@ -78,7 +78,7 @@ and delta sizes have never been measured.
 | Open tickets in `../0.4.0-beta.3/` | File-by-file review of all 51: **16 open → moved to `tickets/`**; **17 that read "open" but were fixed → stamped closed with evidence**, left in beta.3. See `tickets/README.md` |
 | `Final-MVP-Sprint/` | Backup inputs captured in the overview; five unscheduled leftovers → one ticket; folder archived to `../../archived-docs/Final-MVP-Sprint/`; `CLAUDE.md` pointers updated |
 | `Dolphin Milk + Edwin Integration/` | Moved to `../Future-Features/` |
-| `Wallet-Hardening/` | Reviewed: 7 open items → 7 tickets; the 3 docs the backup plan still cites → `track-4-onchain-backup-sync/research/`; the rest archived to `../../archived-docs/Wallet-Hardening/` |
+| `Wallet-Hardening/` | Reviewed: 7 open items → 7 tickets; the 3 docs the backup plan still cites → `track-3-backup-sync/research/`; the rest archived to `../../archived-docs/Wallet-Hardening/` |
 | `../BSV-Tokens/` | Kept; the ordinals track now opens with *re-fetch first, BSV-Tokens is background* |
 | `track-3-opns-naming/` | Moved to `../Future-Features/Decentralized-Naming/OPNS_TRACK_SCOPE_beta5_deferred.md` (D4) |
 | Every move | Pointer sweep across the repo, including every `CLAUDE.md`, code comments and CI files |
@@ -104,20 +104,20 @@ Every ticket in `tickets/` now names a track in the register's **Track** column 
 | Track | Goal, one line | Tickets | Existing material |
 |---|---|---|---|
 | **B5-T0 Engine** | Refresh CEF 150 (long-term branch) in-branch and ship the two queued engine fixes | 1 | `tickets/TICKET_engine_behind…`, `../DevOps-CICD/NEXT_CHROMIUM_BUILD.md` |
-| **B5-T1 Money path** | No path can spend what the wallet has not classified as money, and the coin/transaction record stays true to the chain | 10 | `track-1-utxo-safety-guard/`, `track-0-reqwest-tls-bump/` *(becomes a phase here)*, the reservation-ownership ticket |
+| **B5-T1 Money path** | No path can spend what the wallet has not classified as money, and the coin/transaction record stays true to the chain | 10 | `track-1-money-path/utxo-safety-guard/`, `track-1-money-path/reqwest-tls-bump/` *(becomes a phase here)*, the reservation-ownership ticket |
 | **B5-T2 1Sat Ordinals** | Hold, show, receive and deliberately transfer ordinals (BRC-147/150/165) | 2 | `track-2-1sat-ordinals/` |
-| **B5-T3 Backup & sync** | On-chain backup and multi-device restore in a standard, interoperable format — stable, conflict-free, efficient | 1 | `track-4-onchain-backup-sync/` ⭐ start at `BACKUP_HISTORY_OVERVIEW.md` |
-| **B5-T4 402 payments** | The x402 adapter over our BRC-121 client, plus the open 402 defects | 4 | `X402_INTEGRATION.md` |
+| **B5-T3 Backup & sync** | On-chain backup and multi-device restore in a standard, interoperable format — stable, conflict-free, efficient | 1 | `track-3-backup-sync/` ⭐ start at `BACKUP_HISTORY_OVERVIEW.md` |
+| **B5-T4 402 payments** | The x402 adapter over our BRC-121 client, plus the open 402 defects | 4 | `track-4-402-payments/X402_INTEGRATION.md` |
 | **B5-T5 Identity & privacy** | A site gets only the keys, identity and wallet surface the user chose to give it; servers prove who they are (BRC-103/104); count users without identifying them | 10 | — |
-| **B5-T6 Browser shell** | Multi-window, tabs, import, update visibility and consent-UI defects | 14 | `TOOLS_TAB_claim_a_payment.md` (outline) |
+| **B5-T6 Browser shell** | Multi-window, tabs, import, update visibility and consent-UI defects | 14 | `track-6-browser-shell/TOOLS_TAB_claim_a_payment.md` (outline) |
 | *Background* | Agent-run instruments and hygiene — **not a track** | 7 | — |
-| *Closed / owner decision / defer* | Chromium `debug.log` ✅ closed · Big Sur feed ✅ closed · screenshots in public history ⏸️ owner re-decision · knowledge & memory architecture ❄️ deferred | 4 |
+| *Closed / owner decision / defer* | Chromium `debug.log` ✅ closed · Big Sur feed ✅ closed · screenshots in public history ✅ closed (accepted risk) · knowledge & memory architecture ✅ adopted as `../KNOWLEDGE_AND_MEMORY.md` | 4 |
 
 ⚠️ **7 tracks is above the 4–5 guideline.** That is a **feasibility (G5.5)** question, answered in
 owner-hours, not now. Recommendation already on record: cut from the back — `T6`, then `T4`.
 
-⚠️ **Folder numbers do not match yet** (the backup folder is still `track-4-…`, and T4/T5/T6 have no
-folder). Renamed when each track's scope doc is written, so pointers move once.
+✅ **Folders match the tracks** (reorganised 2026-09-25): `track-0-engine/` … `track-6-browser-shell/`, each
+with an index `README.md` listing its tickets; tickets themselves stay in `tickets/` (D11).
 
 **Still owed to close G2** (per `../RELEASE_CYCLE.md` §2): for each track, a **scope doc** with its
 **integration check** (what invariant could it break; what does it touch that we did not write; what
@@ -176,12 +176,12 @@ beta.3 is browser-shell work — overlays, DPI, window identity, logging, the tr
 
 | # | Track | Folder | One-line goal |
 |---|---|---|---|
-| **0** | **`reqwest` 0.11 → 0.12+** — the wallet's TLS certificate validator | `track-0-reqwest-tls-bump/` | Every outbound HTTPS call validates the server with a library that has no open advisories, without changing what the wallet sends or signs. 👤 **Added 2026-09-15 by owner decision** from the beta.3 Phase 9 dependency review; sits *ahead of* the settled 1–4 order because it is a money-path dependency change, not an asset-layer feature |
+| **0** | **`reqwest` 0.11 → 0.12+** — the wallet's TLS certificate validator | `track-1-money-path/reqwest-tls-bump/` | Every outbound HTTPS call validates the server with a library that has no open advisories, without changing what the wallet sends or signs. 👤 **Added 2026-09-15 by owner decision** from the beta.3 Phase 9 dependency review; sits *ahead of* the settled 1–4 order because it is a money-path dependency change, not an asset-layer feature |
 | **0.5** | **UTXO reservation ownership** — `tickets/TICKET_reservation_ownership_converge_on_spent_by.md` | *(folder at its microscope pass)* | Reservations are owned by a transaction row (`spent_by`), not a placeholder string, converging on wallet-toolbox. 👤 Placed here 2026-09-15: the ticket forbids doing it in beta.3 (it reorders `create_action_internal`), and track 1's classification seam touches the same `output_repo` exclusion logic, so it should land **before** the guard, not under it. Owner to confirm at the beta.4 kickoff |
-| 1 | **UTXO safety guard** | `track-1-utxo-safety-guard/` | No path — automatic or manual — can spend an output the wallet has not classified as spendable |
+| 1 | **UTXO safety guard** | `track-1-money-path/utxo-safety-guard/` | No path — automatic or manual — can spend an output the wallet has not classified as spendable |
 | 2 | **1Sat Ordinals** | `track-2-1sat-ordinals/` | Hold, display, receive and deliberately transfer 1Sat ordinals to BRC-147 + BRC-150 |
 | 3 | **OpNS unique names** | `../Future-Features/Decentralized-Naming/OPNS_TRACK_SCOPE_beta5_deferred.md` (⛔ **out of this release** — planning note D4) | Resolve and register OpNS names against BRC-174, with a live overlay proof-of-concept |
-| 4 | **On-chain backup & sync** | `track-4-onchain-backup-sync/` | Delta-chain backup measured against real token workloads, multi-device sync |
+| 4 | **On-chain backup & sync** | `track-3-backup-sync/` | Delta-chain backup measured against real token workloads, multi-device sync |
 | — | Tickets | `tickets/` | Reviewed and assigned into tracks by the owner, not worked ad hoc |
 
 ## Why this order — settled, do not relitigate
@@ -243,7 +243,7 @@ longer exist, and BSV-21 is out of the ordinals folder name per §2 of the kicko
 | Was | Now |
 |---|---|
 | `development-docs/1SatOrdinals-BSV21/` | `0.4.0-beta.5/track-2-1sat-ordinals/` |
-| `development-docs/Onchain-Backup-and-Sync/` | `0.4.0-beta.5/track-4-onchain-backup-sync/` |
+| `development-docs/Onchain-Backup-and-Sync/` | `0.4.0-beta.5/track-3-backup-sync/` |
 
 Cross-references rewritten in `development-docs/README.md`, the moved
 `TRACK_KICKOFF_PROMPT.md`, and four `research/*.md` files. Verified: **zero stale references remain
@@ -259,10 +259,10 @@ belongs to whoever next touches beta.3.
 
 | Folder | State |
 |---|---|
-| `track-1-utxo-safety-guard/` | ⬜ **New. Scope only** (`README.md`). No prior research existed; track 1 was created at this kickoff. |
+| `track-1-money-path/utxo-safety-guard/` | ⬜ **New. Scope only** (`README.md`). No prior research existed; track 1 was created at this kickoff. |
 | `track-2-1sat-ordinals/` | 🟡 Carried in: `README.md` (scope + the 2026-08-05 BRC-147/150 decision) and `RESEARCH_FINDINGS.md` (protocol mechanics, provider APIs, indexer infrastructure). Both predate the guard work — read against `TELESCOPE.md` before trusting scope claims. |
 | `../Future-Features/Decentralized-Naming/OPNS_TRACK_SCOPE_beta5_deferred.md` (⛔ **out of this release** — planning note D4) | ⬜ **New. Scope only.** ⛔ A new naming track doc is **required** — see below. |
-| `track-4-onchain-backup-sync/` | 🟢 Carried in and **authoritative**: `IMPLEMENTATION_PLAN.md` (8 phases, D1–D15 decisions, two adversarial reviews, owner sign-offs), `README.md`, `ADVERSARIAL_REVIEW.md`, `research/`. ⛔ **Not to be redesigned.** |
+| `track-3-backup-sync/` | 🟢 Carried in and **authoritative**: `IMPLEMENTATION_PLAN.md` (8 phases, D1–D15 decisions, two adversarial reviews, owner sign-offs), `README.md`, `ADVERSARIAL_REVIEW.md`, `research/`. ⛔ **Not to be redesigned.** |
 
 ⛔ **`Future-Features/Decentralized-Naming/`** (README, `OPNS_REVIEW.md`, `OPNS_RESOLVER_SCOPE.md`,
 Xanaverse review) **predates BRC-174 and will be archived.** It stays where it is, is read **once**
@@ -275,14 +275,14 @@ on the merged BRC, not on the old research.
 |---|---|
 | **BRC-174** (ours, OpNS) | **MERGED** 2026-08-28 as `tokens/0174.md`, zero review comments. The development base for track 3. ⚠️ Merging is publication, **not endorsement** — §4 and §10.1 are unimplemented by anyone. |
 | **Collectables** — BRC-147, 150, 159, 160, 165 | All merged and mutually coherent. **Safe to build on.** This is track 2's foundation. |
-| **Fungibles** — BRC-163 vs BRC-175 | 🔴 **Contested. Do not build on.** See `WATCH_fungibles.md` for the state and the explicit re-check gate. |
+| **Fungibles** — BRC-163 vs BRC-175 | 🔴 **Contested. Do not build on.** See `track-2-1sat-ordinals/WATCH_fungibles.md` for the state and the explicit re-check gate. |
 | **BSV-21 encodings** | Two exist: BRC-161 (JSON) and BRC-162 (binary/CBOR). Relevant only if the fungibles gate ever opens. |
 
 ## Verified code findings carried in — do not re-derive
 
 Read by direct inspection of `rust-wallet` on 2026-08-29. Full detail in
 `0.4.0-beta.3/TICKET_token_outputs_destroyed_by_dust_paths.md` (read-only) and in
-`track-1-utxo-safety-guard/README.md`.
+`track-1-money-path/utxo-safety-guard/README.md`.
 
 **Nothing files a 1-sat output into a protective basket, and three paths treat it as spendable:**
 

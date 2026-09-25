@@ -9,7 +9,7 @@
 
 ## What happens
 
-The non-backup half of `../track-4-onchain-backup-sync/research/FIX_B_CRASH_SAFETY_SHUTDOWN_PLAN.md`:
+The non-backup half of `../track-3-backup-sync/research/FIX_B_CRASH_SAFETY_SHUTDOWN_PLAN.md`:
 (1) `/health` reports healthy while the wallet is exiting, so a quick relaunch can adopt a wallet that
 is about to disappear; (2) a new wallet that loses the port race exits instead of retrying; (3) the
 updater hardcodes release ports — ⚠️ root `CLAUDE.md`: *never hardcode ports; use the `PortConfig.h` helpers*.

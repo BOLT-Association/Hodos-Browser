@@ -81,8 +81,8 @@ existing links use it. Describe the **symptom or the defect**, not the fix:
 | `TICKET_chrome_import_bookmarks_history_passwords.md` | 🅿️ DEFERRED to beta.5 | **B5-T6 Browser shell** — (cut from beta.3 Phase 6) | 2026-09-02 |
 | `TICKET_brc121_remint_on_retry.md` | OPEN *(⚠️ likely stale)* — deferred 2026-08-10 | **B5-T4 402 payments** — ✅ verified 2026-09-25: **still open, narrowed** (possibly-paid case; see file) — (real money; beta.3's `TICKET_brc121_paid_retry_aborts_and_mints_a_payment_each_time.md` was **closed** by Phase 11 item 11 — in-flight payment reuse — which likely closes this too. **Verify, then close with evidence**) | 2026-08 |
 | `TICKET_debug_log_unfiltered_in_production.md` | OPEN *(⚠️ likely stale)* | **Background — hygiene** — ✅ verified 2026-09-25: **still open, narrowed** (a few INFO URL lines; macOS log pruning) — (beta.3 `CRITICAL_UPDATES.md` reads it as fixed by `fa0c143`, and beta.3's twin `TICKET_production_debug_logging_unbounded.md` is **closed** by `fa0c143` + `c3604f9` — **verify, then close with evidence**) | 2026-08 |
-| `TICKET_knowledge_and_memory_architecture.md` | 🔵 RESEARCH, not scheduled | **❄️ Defer — research, not scheduled** | 2026-09-08 |
-| `TICKET_logged_in_screenshots_in_public_history.md` | ⏸️ **owner decision re-opened 2026-09-25** | — (the rewrite's blast radius grew: all four public tags incl. `v0.4.0-beta.4` now descend from the bad commit; see the note at the top of the file) | 2026-08-13 |
+| `TICKET_knowledge_and_memory_architecture.md` | ✅ **CLOSED 2026-09-25 — adopted** | — (now `../../KNOWLEDGE_AND_MEMORY.md`; open items in its §6) | 2026-09-08 |
+| `TICKET_logged_in_screenshots_in_public_history.md` | ✅ **CLOSED 2026-09-25 — accepted risk** | — (owner: content is public anyway; no history rewrite) | 2026-08-13 |
 | `TICKET_profile_lock_misreports_missing_dir.md` | OPEN | **B5-T6 Browser shell** — (small) | 2026-08 |
 | `TICKET_reservation_ownership_converge_on_spent_by.md` | OPEN | **B5-T1 Money path** — 📌 placed as **Track 0.5** in `../README.md` (owner, 2026-09-15; to confirm at kickoff) | 2026-08-22 |
 | `TICKET_engine_behind_its_own_cef_branch_and_upstream_stable.md` | 📌 PROPOSED (G2) | **B5-T0 Engine** — (⭐ proposed as a track, likely Track 0; **target is an owner decision**) | 2026-09-24 |
@@ -116,7 +116,7 @@ existing links use it. Describe the **symptom or the defect**, not the fix:
 old beta.4 folder, 1 loose, 1 from the old beta.5 folder, 6 from `development-docs/` root, 1 engine
 bump) · **16** still-open tickets moved from `../../0.4.0-beta.3/` after a file-by-file review · **7**
 from the Wallet-Hardening review · **1** from the Final-MVP-Sprint review.
-`../TOOLS_TAB_claim_a_payment.md` is a **feature outline with recorded owner decisions**, not a
+`../track-6-browser-shell/TOOLS_TAB_claim_a_payment.md` is a **feature outline with recorded owner decisions**, not a
 ticket, and stays at the release root — a beta.3 phase contract links to it there.
 
 📏 **The beta.3 review, for the record:** of 51 files, 16 were open (moved here), **17 read "open" but

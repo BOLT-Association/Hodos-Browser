@@ -214,7 +214,7 @@ Retired at f37adfe. The sprint itself lives on at
 Retired at f37adfe; **the rest of the folder followed on 2026-09-25**, after a review that turned its
 still-open work into tickets in `development-docs/0.4.0-beta.5/tickets/`. Three docs the backup plan
 still cites stayed **live** and moved to
-`development-docs/0.4.0-beta.5/track-4-onchain-backup-sync/research/`: `ONCHAIN_BACKUP_REVIEW.md`,
+`development-docs/0.4.0-beta.5/track-3-backup-sync/research/`: `ONCHAIN_BACKUP_REVIEW.md`,
 `FIX_B_CRASH_SAFETY_SHUTDOWN_PLAN.md`, `FOLLOWUP_RECORD_BEFORE_BROADCAST_TOKENS.md`.
 
 Added 2026-09-25: `README.md` (the H-register), `WALLET_HARDENING_ROADMAP.md` (WS1 done; WS2/WS3 →

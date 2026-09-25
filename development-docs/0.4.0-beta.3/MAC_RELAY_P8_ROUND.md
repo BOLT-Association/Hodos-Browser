@@ -92,7 +92,7 @@ against non-standard scripts is untrue for the dominant ingest path (comment cor
 ⭐ **Not urgent, and not a live money bug**: all three observed cases are 1-satoshi, which this phase
 just excluded from every spend path. It is filed for **beta.4 sprint 1**, whose classifier would read
 the fabrication and mark everything `Spendable` without ever erroring. Notes are already in
-`0.4.0-beta.5/track-1-utxo-safety-guard/README.md` and `REGRESSION_ADDITIONS.md`.
+`0.4.0-beta.5/track-1-money-path/utxo-safety-guard/README.md` and `REGRESSION_ADDITIONS.md`.
 
 ## M6 — ⚠️ Phase 8 is a three-ticket bundle; one is closed
 

@@ -161,7 +161,7 @@ code:
 - ⚠️ Phase 1 left three test fixtures in `%APPDATA%\HodosBrowserDev\` —
   `Profile_7.orphaned-1756000000`, `Profile_8`, `Profile_9.orphaned-1787756666`. Inert; remove when
   convenient.
-- ⛔ Never commit `development-docs/0.4.0-beta.5/X402_INTEGRATION.md` or
+- ⛔ Never commit `development-docs/0.4.0-beta.5/track-4-402-payments/X402_INTEGRATION.md` or
   `development-docs/Onchain-Backup-and-Sync/*` — the owner's parallel work. Stash/pop around a rebase.
 
 ## 7. Carried from Phase 1, not part of this phase

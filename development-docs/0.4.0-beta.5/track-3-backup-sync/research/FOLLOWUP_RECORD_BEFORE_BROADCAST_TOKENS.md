@@ -3,7 +3,7 @@
 > **Status:** FUTURE thread — captured 2026-07-13, not scheduled. **No action needed for the
 > current 0.4.0 build.** Trigger to revisit: when we add **non-self-derivable token outputs**
 > (1Sat ordinals, BSV21, richer cert PushDrops). Extends
-> [`FIX_B_CRASH_SAFETY_SHUTDOWN_PLAN.md`](./FIX_B_CRASH_SAFETY_SHUTDOWN_PLAN.md).
+> [`FIX_B_CRASH_SAFETY_SHUTDOWN_PLAN.md`](FIX_B_CRASH_SAFETY_SHUTDOWN_PLAN.md).
 
 ## The thread
 Does every action write its outputs to the DB **before** broadcasting (a write-ahead

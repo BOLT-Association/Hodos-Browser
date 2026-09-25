@@ -98,4 +98,4 @@ carries it has been measured against the transport's limit."* That row already e
 - ts-stack PR #569: `https://github.com/bsv-blockchain/ts-stack/pull/569`
 - Our reading of #569: the same folder, `NOTES.md` §8
 - Our budget: `rust-wallet/src/handlers.rs`, the `P11-11-A7` comment above `large_parent_bytes()`'s 402 sibling
-- `../X402_INTEGRATION.md` — the product-level record of which 402 flavour Hodos speaks
+- `../track-4-402-payments/X402_INTEGRATION.md` — the product-level record of which 402 flavour Hodos speaks

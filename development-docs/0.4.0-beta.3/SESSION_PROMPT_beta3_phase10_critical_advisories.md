@@ -39,7 +39,7 @@ sub-folders. Read `../SPRINT_PLAN.md` §4/§4.1 for how 10–13 were re-cut.
    `project_beta3_windows_mac_deconfliction_protocol`, `reference_arc_tx_status_ladder`,
    `feedback_own_work_is_the_weakest_link`. ⛔ `NOTES_parallel_work.md` is untracked on purpose — read it, never
    commit it. Never `git checkout` / `switch` here; `git branch --show-current` (must be `0.4.0`) before any writing
-   git command. `development-docs/0.4.0-beta.5/X402_INTEGRATION.md` may carry the owner's uncommitted edits — leave it out of
+   git command. `development-docs/0.4.0-beta.5/track-4-402-payments/X402_INTEGRATION.md` may carry the owner's uncommitted edits — leave it out of
    every commit.
 4. **Relay rule**: every commit that touches `cef-native/**` C++ gets a row in the current relay round naming the
    files (10b touches the shared `HttpRequestInterceptor.cpp`). Open a new Windows round at the top of

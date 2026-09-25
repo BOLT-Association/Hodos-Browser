@@ -79,7 +79,7 @@ maintainer, is worth something on its own when we are already submitting BRCs in
 ## What already protects us, and how that shapes the decision
 
 The wallet already has BIP39 + BIP32 + BRC-42 derivation and gap-limit recovery working, and beta.5
-track 4 (`../track-4-onchain-backup-sync/`) is already the place where backup and recovery get
+track 4 (`../track-3-backup-sync/`) is already the place where backup and recovery get
 worked. **So this is an addition to a working path, never a replacement.** Whatever we do, `reveal_mnemonic`
 and mnemonic recovery stay — a user who already wrote down twelve words must not be stranded.
 
@@ -126,7 +126,7 @@ as the same wallet recovered from its phrase"* is the row for `../REGRESSION_ADD
 ## Links
 
 - `Marston Enterprises/Standards/BRCs/reference/key-derivation/0140.md` — the spec, in our tree
-- `../track-4-onchain-backup-sync/` — the track that owns backup and recovery
+- `../track-3-backup-sync/` — the track that owns backup and recovery
 - `rust-wallet/src/json_storage.rs`, `recovery.rs`, `backup.rs` — what exists today
 - `Marston Enterprises/Hodos/Marketing/Profiles/bsv/deggen.md` — the author, and why his opinion of our
   backup BRC matters

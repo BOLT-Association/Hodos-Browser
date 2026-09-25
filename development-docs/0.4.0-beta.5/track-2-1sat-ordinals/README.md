@@ -14,7 +14,7 @@
    dependency:** nothing is built on `BSV-Tokens/` research until it has been re-checked against
    current sources.
 0b. ⭐ **BSV-21 is the FIRST research question** (owner, 2026-09-25 — planning note D8): most 1Sat activity
-   today is BSV-21 fungible tokens. Re-check `../WATCH_fungibles.md` (BRC-163 vs BRC-175) and the current SDK's
+   today is BSV-21 fungible tokens. Re-check `WATCH_fungibles.md` (BRC-163 vs BRC-175) and the current SDK's
    BSV-21 handling before designing anything; the old "review phase last" ordering is superseded.
 1. **`development-docs/BSV-Tokens/` — all seven documents.** Pre-existing research this track builds
    on. **Per-file trust ratings are at the bottom of this document** ("Existing research to
@@ -127,3 +127,11 @@ Flagged so the design-decision phase actually researches them (do **not** hardco
 
 When this track activates, extract the trusted raw research into `research-extracted/` here, and
 consider moving the whole `BSV-Tokens/` folder in at that time.
+
+## Tickets — beta.5 register (B5-T2)
+
+Tickets stay in `../tickets/`; this list mirrors the register's Track column (2026-09-25).
+
+- [`TICKET_brc100_consent_model_diverges_from_1sat_wallet_api.md`](../tickets/TICKET_brc100_consent_model_diverges_from_1sat_wallet_api.md) — 📖 A peer BRC-100 wallet deleted the auto-approve layer we still rely on, and its callers reach us by design
+- [`TICKET_token_outputs_lost_if_crash_between_broadcast_and_record.md`](../tickets/TICKET_token_outputs_lost_if_crash_between_broadcast_and_record.md) — 💥 A crash between broadcast and record would permanently lose the wallet's record of an ordinal
+- Also: `WATCH_fungibles.md` (this folder) — the BSV-21 / fungible-token watch; BSV-21 is this track's **first** research question (D8)

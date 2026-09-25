@@ -10,7 +10,7 @@
 ## What happens
 
 Outputs are recorded **after** broadcast. That is safe only for outputs the wallet can **re-derive**
-from its own keys. Source: `../track-4-onchain-backup-sync/research/FOLLOWUP_RECORD_BEFORE_BROADCAST_TOKENS.md`,
+from its own keys. Source: `../track-3-backup-sync/research/FOLLOWUP_RECORD_BEFORE_BROADCAST_TOKENS.md`,
 whose stated revisit trigger was *"when we add non-self-derivable token outputs"*.
 
 ## Why it matters

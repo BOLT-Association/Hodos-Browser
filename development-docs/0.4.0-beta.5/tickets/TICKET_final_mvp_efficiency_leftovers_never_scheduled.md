@@ -6,7 +6,7 @@
 
 > ⚠️ **Method note.** **Doc reading only.** The checkbox state was read from the two plans below; I did
 > not re-verify against code that the unchecked items are still undone. The backup-related items in
-> the same plans are captured in `../track-4-onchain-backup-sync/BACKUP_HISTORY_OVERVIEW.md` and are
+> the same plans are captured in `../track-3-backup-sync/BACKUP_HISTORY_OVERVIEW.md` and are
 > **not** repeated here.
 
 ---

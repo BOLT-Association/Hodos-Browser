@@ -8,7 +8,7 @@ contracts, no file-level design. That is the microscope pass's output, and writi
 mean writing it twice — once uninformed. If you are tempted to specify an interface, put the
 *question* in the track's "Owed to microscope" table instead.
 
-**Order — settled:** **0 `reqwest` TLS bump (👤 added 2026-09-15, first)** → **0.5 UTXO reservation ownership** (👤 placed 2026-09-15, owner to confirm at kickoff; `tickets/TICKET_reservation_ownership_converge_on_spent_by.md`) → 1 Guard → 2 1Sat → 3 OpNS → 4 Backup → tickets. Reasoning in `README.md`; track 0's outline and research notes in `track-0-reqwest-tls-bump/README.md` — it needs its own scoping pass before any code.
+**Order — settled:** **0 `reqwest` TLS bump (👤 added 2026-09-15, first)** → **0.5 UTXO reservation ownership** (👤 placed 2026-09-15, owner to confirm at kickoff; `tickets/TICKET_reservation_ownership_converge_on_spent_by.md`) → 1 Guard → 2 1Sat → 3 OpNS → 4 Backup → tickets. Reasoning in `README.md`; track 0's outline and research notes in `track-1-money-path/reqwest-tls-bump/README.md` — it needs its own scoping pass before any code.
 
 ---
 
@@ -44,7 +44,7 @@ second exclusion system.
 | ✅ In | ❌ Out |
 |---|---|
 | Classification on ingest, and its persistence | Inscription *rendering* or any UI beyond what proves the classification |
-| Fail-closed refusal at every enumerated site | BSV-20/21 classifiers (contested — see `WATCH_fungibles.md`) |
+| Fail-closed refusal at every enumerated site | BSV-20/21 classifiers (contested — see `track-2-1sat-ordinals/WATCH_fungibles.md`) |
 | Recovery/sweep/reconcile parity | Ordinal transfer, listing, or purchase — that is track 2 |
 | The standing "no automatic path spends an unclassified output" invariant | Permission classes for token spends — track 2 |
 
@@ -98,10 +98,10 @@ The phase doc must record, as findings rather than as a plan:
 - the answer to that question, with the evidence for it;
 - **the testing problem** — most 1Sat/BSV21 apps ship their own wallets, so we may have **nothing to
   test against**. A capability we cannot test is not a capability we can claim;
-- the state of the BRC-163 / BRC-175 dispute at the time of review (`WATCH_fungibles.md`).
+- the state of the BRC-163 / BRC-175 dispute at the time of review (`track-2-1sat-ordinals/WATCH_fungibles.md`).
 
 ⛔ **Fungibles are deferred with a watch note, not dropped.** No fungible classifier, no fungible
-basket semantics, in this release. Re-check only if the gate in `WATCH_fungibles.md` opens.
+basket semantics, in this release. Re-check only if the gate in `track-2-1sat-ordinals/WATCH_fungibles.md` opens.
 
 ### In scope / out of scope
 
@@ -175,7 +175,7 @@ finding the parts that do not survive contact.
 **Prerequisite:** tracks 2 and 3 — for the workload, not for the code. Deltas exist to solve
 token-heavy wallets, and BRC-150 provenance rows are that workload.
 
-⛔ **`track-4-onchain-backup-sync/IMPLEMENTATION_PLAN.md` stands and is NOT to be redesigned.**
+⛔ **`track-3-backup-sync/IMPLEMENTATION_PLAN.md` stands and is NOT to be redesigned.**
 8 phases, decisions D1–D15, two adversarial reviews, owner sign-offs recorded. The microscope pass
 for this track **reconciles** that plan against what tracks 1–3 actually built. It does not rewrite
 it. If a track 1–3 outcome breaks a D-decision, that is a finding to surface, not a licence to
@@ -200,7 +200,7 @@ harness §8 exists to catch. Track 2's provenance rows are the measurement subje
 | ✅ In | ❌ Out |
 |---|---|
 | Executing `IMPLEMENTATION_PLAN.md`'s phases | Redesigning the plan, the delta format, or D1–D15 |
-| Measuring real token rows and sizing against them | The BRC draft — its timing is a research question (format-first vs code-first; see `track-4-onchain-backup-sync/BACKUP_HISTORY_OVERVIEW.md` §8(c)) |
+| Measuring real token rows and sizing against them | The BRC draft — its timing is a research question (format-first vs code-first; see `track-3-backup-sync/BACKUP_HISTORY_OVERVIEW.md` §8(c)) |
 | Reconciling the plan against tracks 1–3 outcomes | Anything the plan already marked out of scope |
 
 ### Owed to microscope

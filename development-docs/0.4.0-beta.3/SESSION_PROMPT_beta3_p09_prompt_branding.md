@@ -126,7 +126,7 @@ I sign off: the implementation, the evidence table filled in with **measured** r
   ⛔ `cargo build` fails "Access is denied" while the dev wallet runs — stop that PID by path.
 - ⚠️ The notification overlay is **keep-alive**: after a frontend change, restart the dev
   browser or it keeps serving the old JS.
-- ⛔ Never commit `development-docs/0.4.0-beta.5/X402_INTEGRATION.md` or
+- ⛔ Never commit `development-docs/0.4.0-beta.5/track-4-402-payments/X402_INTEGRATION.md` or
   `development-docs/Onchain-Backup-and-Sync/*` — my parallel work. Stash / pop around a rebase.
 - The P0.8 demo tunnel and fixture server are **stopped**; that hostname is dead. If this phase
   needs a real HTTPS origin, the recipe is in `test-fixtures/manifest-dapp/README.md` and **I**
