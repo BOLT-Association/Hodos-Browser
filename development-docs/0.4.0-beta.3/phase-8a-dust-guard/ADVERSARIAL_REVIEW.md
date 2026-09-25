@@ -103,7 +103,7 @@ gap is not named anywhere. That is the overclaim pattern this sprint keeps catch
 people's documents.
 
 ⚠️ **And the missing gate is exactly the one BRC-147 names.** Rule 2, already quoted in
-`0.4.0-beta.4/sprint-2-1sat-ordinals/README.md`: *"a general 'pay' or auto-pay grant **MUST NOT**
+`0.4.0-beta.5/track-2-1sat-ordinals/README.md`: *"a general 'pay' or auto-pay grant **MUST NOT**
 authorize spending them"* — and *"this must be enforced in the Rust permission engine, not just the
 UI."* Today `hodos_permission_engine` has no notion of a token-carrying input, so a site holding a
 payment grant is not stopped from naming one. **That enforcement is beta.4 sprint 1 work**, not a

@@ -3,7 +3,7 @@
 **Workstream:** WS2 (continued) · **Added:** 2026-08-30, by owner decision during the Phase 3 kickoff
 **Status:** 🟢 **LANDED 2026-09-01 — fixed at the CAUSE.** Overlay ownership follows the window that asked. `Z1`/`Z2`/`Z3`/`Z4`/`Z5`/`A3`/`A7` GREEN with their REDs observed, `Z5` and the show path owner-confirmed by hand; `A4` SPLIT (§5.0.1, K17). ⬜ Regression set at the 3.5 → 4 boundary still owed. · **Owner:** Matthew · **Platform:** Windows only
 **Standard:** `../HARNESS.md`. Measurements: `../phase-3-window-identity/MEASUREMENTS.md` M5, M6, M9.3, M9.4 + §1 below.
-**Parent ticket:** `../../0.4.0-beta.4/tickets/TICKET_window_scoped_work_uses_process_globals.md`
+**Parent ticket:** `../../0.4.0-beta.5/tickets/TICKET_window_scoped_work_uses_process_globals.md`
 
 ---
 

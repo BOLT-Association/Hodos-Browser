@@ -3,7 +3,7 @@
 //! Shared machinery for the `reconcile_spent_inputs` primitive that fixes both the
 //! regular-send `"Missing inputs"` stuck-spend loop and the backup-token divergence.
 //! Built in behavior-neutral phases (see
-//! `development-docs/Wallet-Hardening/RECONCILE_PHASE2_DESIGN.md` §6):
+//! `archived-docs/Wallet-Hardening/RECONCILE_PHASE2_DESIGN.md` §6):
 //!   - **c1 (this commit):** [`check_outpoint_spent`] — the authoritative,
 //!     cross-validated "is this outpoint spent?" check. Extracted from the inline
 //!     single-WoC block in `do_onchain_backup` (`handlers.rs`) and hardened.

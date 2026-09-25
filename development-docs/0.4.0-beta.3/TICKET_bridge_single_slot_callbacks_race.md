@@ -1,5 +1,7 @@
 # TICKET — the wallet bridge's single-slot callbacks lose replies when two calls overlap
 
+> ✅ **CLOSED — 2026-09-25 open-ticket review.** Evidence: Phase 8c contract: zero per-call `window.on*` slots remain. ⚠️ The status line below was stale; this note supersedes it.
+
 **Filed:** 2026-08-26, during beta.3 Phase 2a (`phase-2-logging-syncio/PHASE_CONTRACT.md`)
 **Severity:** ⚠️ correctness — spurious user-visible failures; **not** money-losing
 **Status:** OPEN — `getBalance` fixed, the rest of the pattern is not

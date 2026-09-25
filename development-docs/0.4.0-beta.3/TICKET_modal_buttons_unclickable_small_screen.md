@@ -1,5 +1,7 @@
 # Modal buttons are unclickable on a small screen, clickable on a large monitor
 
+> ✅ **CLOSED — 2026-09-25 open-ticket review.** Evidence: `0a7d43b` (Phase 1); owner confirmed on screen (Phase 11 item 6). ⚠️ The status line below was stale; this note supersedes it.
+
 **Status:** 🔴 **OPEN — verified 2026-08-31.** Phase 1's `a3d8202` touched **only** `WalletDashboard.css`, a different surface; the modal is untouched. Labelled 2026-08-31 (had no status line).
 **Sprint:** 📌 **Phase 3.5 (layout), not Phase 10** — moved 2026-08-31. Same subsystem and the SAME T3 rig (two windows, two monitors, mixed-DPI matrix cell #9) that `P3.5-A3` already requires.
 

@@ -4,7 +4,7 @@
 **Was:** 🟢 **CONFIRMED 2026-09-02** — all five open questions decided by the owner (§6). §4 rows `A1`/`A2` **GREEN**, `A4` RED **captured pre-fix** — see `MEASUREMENTS.md`
 **Owner:** Matthew · **Platform:** Windows (macOS relayed, not claimed)
 **Standard:** `../HARNESS.md`. Inherits the beta.3 harness in full.
-**Ticket:** `../TICKET_loopback_host_form_wallet_routing.md` (W0 · W1 · W2' · W3 of §5.2)
+**Ticket:** `development-docs/0.4.0-beta.5/tickets/TICKET_loopback_host_form_wallet_routing.md` (W0 · W1 · W2' · W3 of §5.2)
 
 ---
 

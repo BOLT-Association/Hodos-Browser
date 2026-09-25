@@ -1,5 +1,7 @@
 # TICKET — a PeerPay message can exceed MessageBox's 1 MiB cap, so the payment lands on chain but the recipient is never told
 
+> ✅ **CLOSED — 2026-09-25 open-ticket review.** Evidence: Phase 10d (`ed51099`); the header still read SCHEDULED. ⚠️ The status line below was stale; this note supersedes it.
+
 **Filed:** 2026-09-15, during beta.3 Phase 10a `P10a-A5` · **Owner:** Matthew Archbold · **Status:** 📌 **SCHEDULED as beta.3 Phase 10d** (`phase-10-critical-advisories/10d-peerpay-delivery/PHASE_CONTRACT.md`), ordered 10a → 10d → 10b → 10c by the owner 2026-09-15 — **measured**, not a code reading
 
 > ⚠️ **Corrections after the first diagnosis (2026-09-15, later the same day, measured):** the sender had **zero**

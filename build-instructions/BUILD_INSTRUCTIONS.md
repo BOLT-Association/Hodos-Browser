@@ -456,7 +456,7 @@ The following directories/files are gitignored and must be set up locally:
 
 ### Multi-Platform Support
 - ✅ **Windows**: Full feature parity (current primary platform)
-- 🟡 **macOS**: Foundation complete (window, overlays, tabs). Feature parity sprint in progress. See `development-docs/Final-MVP-Sprint/macos-port/MACOS-PORT-HANDOVER.md`
+- 🟡 **macOS**: Foundation complete (window, overlays, tabs). Feature parity sprint in progress. See `archived-docs/Final-MVP-Sprint/macos-port/MACOS-PORT-HANDOVER.md`
 - 🟡 **Linux**: CEF with GTK integration (future)
 - 🟡 **Mobile**: React Native with native modules (future)
 

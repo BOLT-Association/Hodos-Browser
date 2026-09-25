@@ -1,5 +1,7 @@
 # Long-lived surfaces snapshot their state at browser start and are never told it changed
 
+> ✅ **CLOSED — 2026-09-25 open-ticket review.** Evidence: Phase 11 item 8 (`2502381`). ⚠️ The status line below was stale; this note supersedes it.
+
 **Status:** ❔ **NEEDS OWNER REVIEW** — filed unscheduled; scope unclear. Labelled 2026-08-31 by the triage pass; see `TICKET_TRIAGE_2026-08-31.md`.
 **Sprint:** 📌 Phase 10 (UI/layout leftovers) — bundled 2026-08-31.
 

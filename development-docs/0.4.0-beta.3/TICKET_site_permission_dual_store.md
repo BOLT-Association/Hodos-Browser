@@ -1,5 +1,7 @@
 # Site permission decisions are written to two stores, and the wrong one governs
 
+> ✅ **CLOSED — 2026-09-25 open-ticket review.** Evidence: `8874232` (7d R4); the clipboard residual is disclosed on the panel. ⚠️ The status line below was stale; this note supersedes it.
+
 **Opened 2026-08-24**, found while wiring the loopback prompt in Phase 0.9.
 **Status:** 🔵 OPEN. Affects **location, notifications, clipboard** — shipped today.
 **Sprint:** 📌 Phase 7 (consent surface) — bundled 2026-08-31.

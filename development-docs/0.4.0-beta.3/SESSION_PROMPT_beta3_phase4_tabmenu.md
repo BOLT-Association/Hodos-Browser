@@ -29,7 +29,7 @@ to this branch.**
 `TabManager::ReorderTabs`, needs an insert index), **close other tabs**, **close tabs to the right**
 (both loop `TabManager::CloseTab`). Plus **mic/camera verification on Windows**.
 
-**OUT — 👤 owner decision, already ticketed** (`0.4.0-beta.4/tickets/TICKET_tab_pin_and_mute_need_model_changes.md`):
+**OUT — 👤 owner decision, already ticketed** (`0.4.0-beta.5/tickets/TICKET_tab_pin_and_mute_need_model_changes.md`):
 ⛔ pin · ⛔ mute tab · ⛔ mute site — 📏 `Tab` has neither a `pinned` nor a `muted` field, and pin
 persistence would touch `session.json`, which carries an open defect.
 ⛔ **macOS** — cannot be run from the Windows box. Relay it; never report it as passed.

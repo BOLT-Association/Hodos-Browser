@@ -19,7 +19,7 @@ practice: they live here.
 `qr-codes/` was at `frontend/public/qr-test.html`, `qr-test-bip21.html` and `qr-images/`. It was
 being **bundled into the shipped browser** — test pages served to real users. Moved here 2026-08-15
 and image paths made relative so the folder is self-contained. Nothing in the app referenced them;
-`development-docs/QR_SCAN_OVERVIEW.md` is the only other mention.
+`archived-docs/QR_SCAN_OVERVIEW.md` is the only other mention.
 
 ## Still to build
 
@@ -70,6 +70,6 @@ ever contain a `.mp4`, `.mov`, `.fbr`, or Premiere scratch file.
 ## Related
 
 - `development-docs/1SatOrdinals-BSV21/` — gates the ordinals demo
-- `development-docs/QR_SCAN_OVERVIEW.md` — what the QR pages are testing against
+- `archived-docs/QR_SCAN_OVERVIEW.md` — what the QR pages are testing against
 - `archived-docs/Sigma-BRC121-Sprint/` — where these demos were originally specified, including the
   four-pillar comprehensive-flow narrative

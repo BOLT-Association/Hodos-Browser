@@ -322,7 +322,7 @@ half slots in behind it.
 ⭐ **The policy, in the owner's words (2026-08-31):** *"work through our current phases and then
 consolidate these tickets at the end."* We add items faster than we close them; that is accepted and
 is the owner's to manage. ⛔ So phases 7–10 are a **holding pattern, not a queue anyone pulls from** —
-and per `0.4.0-beta.4/tickets/README.md`, a ticket is not work until the owner assigns it.
+and per `0.4.0-beta.5/tickets/README.md`, a ticket is not work until the owner assigns it.
 
 #### The bundles
 

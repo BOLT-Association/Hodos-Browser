@@ -1,5 +1,7 @@
 # Quiet mode grants protocol + basket access beyond what the manifest declared
 
+> ✅ **CLOSED — 2026-09-25 open-ticket review.** Evidence: `118c2af`, `bddd312` (Phase 7c). ⚠️ The status line below was stale; this note supersedes it.
+
 **Status:** 🔴 **OPEN — verified 2026-08-31.** V25 made the default *configurable*; `migrations.rs :: migrate_v24_to_v25` states narrowing quiet mode to what a manifest declared is "the open follow-up". Labelled 2026-08-31 (had no status line).
 **Sprint:** 📌 Phase 7 (consent surface) — bundled 2026-08-31.
 

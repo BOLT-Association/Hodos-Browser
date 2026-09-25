@@ -173,7 +173,7 @@ What's next for this session:
 2. If helping Track B: start with #10 (keyboard shortcuts) or #11 (click-outside detection)
 3. If starting Multi-Window: begin with #21 (BrowserWindow macOS members)
 
-Progress file: development-docs/Final-MVP-Sprint/macos-port/PROGRESS.md
+Progress file: archived-docs/Final-MVP-Sprint/macos-port/PROGRESS.md
 GitHub tracking: Issue #31 (pinned)
 Branch: macos-port/http-backend (Track A complete, uncommitted changes ready to commit)
 ```

@@ -1,5 +1,7 @@
 # A paywalled article took 41 seconds, minted three payments, and showed the user nothing
 
+> ✅ **CLOSED — 2026-09-25 open-ticket review.** Evidence: beta.3 Phase 11 item 11, rows A1–A8 (`07eb946` … `44d2304`, `1ec1b8f`, `2aed026`). ⚠️ The status line below was stale; this note supersedes it.
+
 **Found:** 2026-09-16, payment sitting, by the owner reading a real 402-paywalled article at
 `now.bsvblockchain.tech`. **Status:** 🔴 OPEN — **diagnosed 2026-09-17, not yet fixed.**
 **Severity:** high (user-visible, money path).

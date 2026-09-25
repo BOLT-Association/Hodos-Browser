@@ -1,5 +1,7 @@
 # A manifest's description can misdescribe the protocol it is attached to
 
+> ✅ **CLOSED — 2026-09-25 open-ticket review.** Evidence: `3afe5d0` (P7b-A5); the 7c contract records it closed by 7b. ⚠️ The status line below was stale; this note supersedes it.
+
 **Status:** ❔ **NEEDS OWNER REVIEW** — unclear whether P0.8's BRC-73 work closed it. Labelled 2026-08-31 by the triage pass; see `TICKET_TRIAGE_2026-08-31.md`.
 **Sprint:** 📌 Phase 7 (consent surface) — bundled 2026-08-31.
 

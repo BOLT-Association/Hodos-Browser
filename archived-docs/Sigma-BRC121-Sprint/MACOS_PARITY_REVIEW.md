@@ -51,7 +51,7 @@ code. See Open Questions.
 
 ## Why this doc exists
 
-The existing macOS port (`development-docs/Final-MVP-Sprint/macos-port/`:
+The existing macOS port (`archived-docs/Final-MVP-Sprint/macos-port/`:
 `MACOS-PORT-HANDOVER.md`, `PROGRESS.md`, `Track-B-UI-Overlays.md`) is dated
 **2026-04-21** — *before* almost all of the BRC-121 sprint. Phases **1.5
 (permission UX), 2 (window.CWI shim), 2.5 (IPC bridge), and 2.6 (engine→Rust)**
@@ -61,7 +61,7 @@ has been built or tested on macOS.
 This review captures the **macOS delta introduced by the BRC-121 sprint** —
 what phases 0/1/2 changed in the C++ layer that the April port doesn't cover —
 so the macOS build can be brought to parity. It is a companion to (NOT a
-replacement for) the `Final-MVP-Sprint/macos-port/` tracking; cross-reference
+replacement for) the `archived-docs/Final-MVP-Sprint/macos-port/` tracking; cross-reference
 that for the broader port status and the established macOS patterns.
 
 **Sequencing:** done now, against the current Windows-verified tree, BEFORE
@@ -95,7 +95,7 @@ IPC code. Git history keeps the old code reachable either way.
 
 ## Methodology (for the review session)
 
-1. Read `Final-MVP-Sprint/macos-port/` first — establish the April baseline +
+1. Read `archived-docs/Final-MVP-Sprint/macos-port/` first — establish the April baseline +
    the established macOS patterns (NSWindow/NSPanel, NSWindowDelegate close,
    Core Animation OSR, libcurl via SyncHttpClient, event forwarding).
 2. For each sprint phase (`phase-0*`, `phase-1*`, `phase-2*`), read the
@@ -298,6 +298,6 @@ the knowledge that these surfaces were reviewed.
 
 ## Related
 
-- `Final-MVP-Sprint/macos-port/` — the April baseline + established patterns (reuse)
+- `archived-docs/Final-MVP-Sprint/macos-port/` — the April baseline + established patterns (reuse)
 - `phase-2.6-engine-to-rust/PHASE_2_6_ENGINE_TO_RUST.md` — 2.6 plan (each sub-phase had a macOS done-when criterion that was deferred)
 - Root `CLAUDE.md` — Invariant #9 (macOS cross-platform readiness), overlay lifecycle (Windows vs macOS), CEF input patterns

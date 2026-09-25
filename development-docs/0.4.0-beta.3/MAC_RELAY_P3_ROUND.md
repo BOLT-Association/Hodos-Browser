@@ -119,7 +119,7 @@ own gate with its own baseline, not a widened `G11`.
 `extern` declarations; corrected to ~110, and then the tool measured 60 for the two patterns it
 matches. Baseline with the tool.
 
-Ticket for the remainder: `../0.4.0-beta.4/tickets/TICKET_window_scoped_work_uses_process_globals.md`.
+Ticket for the remainder: `../0.4.0-beta.5/tickets/TICKET_window_scoped_work_uses_process_globals.md`.
 
 ---
 

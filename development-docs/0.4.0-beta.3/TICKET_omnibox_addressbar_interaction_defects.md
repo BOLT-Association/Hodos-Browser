@@ -1,5 +1,7 @@
 # Omnibox / address-bar interaction — four defects, one of them from a test user
 
+> ✅ **CLOSED — 2026-09-25 open-ticket review.** Evidence: items 1–4 fixed (`2a89264`, `5114043`, `6da7cd1`, `b6fbc05`). ⚠️ The status line below was stale; this note supersedes it.
+
 **Status:** 🔴 **OPEN — recorded 2026-08-31, not investigated.** Four owner/test-user observations, captured verbatim during the Phase 3.5 kickoff. ⛔ **None reproduced, none instrumented, no cause established for any of them.**
 **Sprint:** 📌 **Not Phase 3.5.** Recorded here because Phase 3.5 is editing the omnibox create/show path and the owner asked whether these were already in scope. 📏 **They are not** — see "Overlap with Phase 3.5" below. Needs owner assignment.
 

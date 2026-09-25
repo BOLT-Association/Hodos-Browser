@@ -42,7 +42,7 @@ Fingerprint farbling shipped **broken in every release from `v0.3.0-beta.1` to
 `std::hash<std::string>(url)`, so the "randomised" fingerprint was a per-URL **constant** —
 identical across launches, across profiles, and across users. That is not weak farbling; it
 is a precomputable, browser-identifying tag applied on top of the native values, i.e. worse
-than shipping nothing. Full write-up: `development-docs/TICKET_farbling_constant_seed_shipped.md`.
+than shipping nothing. Full write-up: `archived-docs/tickets/TICKET_farbling_constant_seed_shipped.md`.
 
 It survived nine months of releases for one reason: **the bug is invisible to any
 single-session check, and every check anyone ran was single-session.** The farbled value
@@ -241,7 +241,7 @@ before the flip.
 
 ## 7. Related
 
-- `development-docs/TICKET_farbling_constant_seed_shipped.md` — the shipped bug
+- `archived-docs/tickets/TICKET_farbling_constant_seed_shipped.md` — the shipped bug
 - `development-docs/0.4.0/chromium-rebuild/PLAN_farbling_blink.md` — C2/C3 and the migration
 - `development-docs/0.4.0/chromium-rebuild/farbling_canvas_check.py` — the three harness
   defects this project actually hit, documented at the top of the file

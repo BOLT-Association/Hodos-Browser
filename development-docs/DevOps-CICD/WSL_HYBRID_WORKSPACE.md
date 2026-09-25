@@ -4,7 +4,7 @@
 **Status:** 📋 Planned — execute when not mid-sprint
 **Trigger:** Edwin's recall pipeline can't read Windows-side content efficiently — measured 200× slowdown via WSL2's 9P bridge (1m43s for a search against the 500-file Hodos-Browser repo vs 0.53s for the same search against an ext4-native dir).
 **Owner:** DevOps/CI-CD · **Covers:** dev environment architecture, repo location strategy, sync automation
-**Companion docs:** `../Dolphin Milk + Edwin Integration/INTEGRATION_PLAN_v1.md` (Edwin angle), `../Dolphin Milk + Edwin Integration/EDWIN_SETUP_FEEDBACK_FOR_JAKE.md` (the measurement the strategy is responding to)
+**Companion docs:** `../Future-Features/Dolphin Milk + Edwin Integration/INTEGRATION_PLAN_v1.md` (Edwin angle), `../Future-Features/Dolphin Milk + Edwin Integration/EDWIN_SETUP_FEEDBACK_FOR_JAKE.md` (the measurement the strategy is responding to)
 
 ---
 
@@ -87,7 +87,7 @@ For the "I'm mid-edit and want Edwin to see it RIGHT NOW" case: manual `git add 
 | **Hodos-Browser** | `C:\Users\archb\Hodos-Browser` ✓ canonical | Stays Windows. + WSL mirror at `~/repos/Hodos-Browser/` | `git clone <remote> ~/repos/Hodos-Browser` |
 | **hodos-brand** (or marketing repo — naming TBD) | `C:\Users\archb\Marston Enterprises\hodos-brand\` ? | WSL canonical at `~/repos/hodos-brand/` | Pilot first — smallest repo, best to learn the workflow on |
 | **Marston Enterprises** (business docs, contracts, planning) | `C:\Users\archb\Marston Enterprises\` | WSL canonical at `~/repos/marston-enterprises/` | Needs a private GitHub repo first if not already; high sensitivity content — confirm key-rotation policy first |
-| **Dolphin Milk + Edwin Integration notes** | `C:\Users\archb\Hodos-Browser\development-docs\Dolphin Milk + Edwin Integration\` | Subset of Hodos-Browser; stays where it is. WSL Edwin reads via the Hodos-Browser mirror. | No separate repo |
+| **Dolphin Milk + Edwin Integration notes** | `C:\Users\archb\Hodos-Browser\development-docs\Future-Features\Dolphin Milk + Edwin Integration\` | Subset of Hodos-Browser; stays where it is. WSL Edwin reads via the Hodos-Browser mirror. | No separate repo |
 | **API_KEYS.md / admin notes** | `C:\Users\archb\Marston Enterprises\admin\` | WSL canonical; private repo or encrypted (TBD) | Sensitive — wait for explicit decision on key storage strategy before migrating |
 | **BRCs, ts-sdk, arc, runar, BSV repos** | Already `~/repos/` in WSL ✓ | No-op | Already correct |
 | **edwinpai, ~/.shad, ~/qmd** | Already WSL ✓ | No-op | Already correct |

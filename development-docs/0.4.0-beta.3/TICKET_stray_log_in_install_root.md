@@ -1,5 +1,7 @@
 # TICKET — 44 raw `ofstream("debug_output.log")` writes land a log INSIDE `{app}`, the one place the silent updater forbids
 
+> ✅ **CLOSED — 2026-09-25 open-ticket review.** Evidence: owed row verified absent on the signed build (`MAC_RELAY_BETA3.md`); the `{app}` leftover was ticketed separately and fixed in `9559191`. ⚠️ The status line below was stale; this note supersedes it.
+
 **Filed:** 2026-08-17, investigating the "everything bogged down" incident
 **Severity:** ~~🚨 **can SILENTLY abort silent auto-update** (confirmed mechanism)~~ → see §0 —
 **wallet financial data written into the install root, outside every logging control**

@@ -99,7 +99,7 @@ These cost real time on 2026-09-17/18. Ignoring them will cost it again.
    (`HUMAN_TEST_QUEUE.md`), not an agent claim. ⚠️ Item 2 may land here — if it does, say so early
    rather than producing three greens that do not mean what they say.
 7. ⛔ **Commit by pathspec, never by directory.** The owner keeps uncommitted work in
-   `development-docs/` (e.g. `X402_INTEGRATION.md`, `0.4.0-beta.4/tickets/`). `git add -- <dir>` has
+   `development-docs/` (e.g. `X402_INTEGRATION.md`, `0.4.0-beta.5/tickets/`). `git add -- <dir>` has
    already swept his edits into one of my commits once.
 8. ⛔ **PowerShell here-strings (`@'…'@`) do not work in this shell**, and backticks inside a
    double-quoted `python -c` are eaten by bash. Write a `.ps1` or use a heredoc into `python -`.

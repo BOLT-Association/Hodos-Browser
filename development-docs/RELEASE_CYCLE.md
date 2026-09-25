@@ -1,6 +1,6 @@
 # The release cycle
 
-**Created:** 2026-09-24, out of the beta.3 cycle's AAR (`0.4.0-beta.3/AAR.md`). **Version: v3.**
+**Created:** 2026-09-24, out of the beta.3 cycle's AAR (`0.4.0-beta.3/AAR.md`). **Version: v4.**
 ⭐ **This document is an output of every AAR.** It is expected to change each cycle; when it does,
 the AAR that changed it says so (§7).
 
@@ -81,7 +81,7 @@ Read top to bottom. Every row produces something; nothing is "thinking about it"
 | # | Step | The question it answers | Produces | Gate |
 |---|---|---|---|---|
 | 1 | **Orientation — the project** | What is Hodos? Three layers, invariants, principles | *(read only)* root `CLAUDE.md` | G0 |
-| 2 | **Orientation — higher** | What constrains us? Engine pin, signing chain, BRC specs we conform to | notes in the release README | G0 |
+| 2 | **Orientation — higher** | What constrains us? Engine pin, signing chain — and ⭐ **ecosystem currency** (§3.1a): the BRCs, reference SDKs and peer wallets/apps we must stay compatible with, **fetched fresh** | notes in the release README | G0 |
 | 3 | **Orientation — adjacent** | What is the other platform doing? What is live in the field? What are users running? | notes | G0 |
 | 4 | **Orientation — ourselves** | ⭐ What did we learn last cycle? What is already open? | **last AAR read** + ticket inventory | G0 |
 | 5 | **Standing serialization** | ⭐ **What must be serial, and why?** (known before any ticket — §3.6) | the constraint list, restated | G0 |
@@ -177,6 +177,21 @@ apply to small work — a single ticket does not get a four-stage run.
 ### 3.1 Situation — orientation
 Steps 1–5 of §1. ⭐ The last AAR and the open ticket inventory are **required inputs**, not optional
 reading.
+
+### 3.1a ⭐ Ecosystem currency — compatibility is a top product priority
+
+👤 Owner, 2026-09-25: we build inside a set of standard protocols (BRCs) and alongside other wallets
+and apps we must work with. ⇒ **Orientation step 2 answers three questions every cycle, from sources
+fetched that week:**
+
+| # | Question | Examples |
+|---|---|---|
+| 1 | **Which standards** does this cycle's work touch, and what does their **current** text say? | BRCs — including recently revised ones (wallet DB format, export/import) |
+| 2 | **Which reference SDKs** define correct behaviour, and what are their **current** versions? | `wallet-toolbox` (TypeScript and Go), the 1Sat SDK |
+| 3 | **Which peer wallets and apps** must we interoperate with, and has anything changed in how they behave? | the apps our users move between |
+
+⛔ **Never trust our copies.** Every doc in this repo predates the ecosystem's latest changes. Every
+track's research then **starts** by re-fetching the specs and SDKs it depends on, before any design.
 
 ### 3.2 Mission
 One paragraph, plain words, repeatable from memory.
@@ -405,6 +420,11 @@ increments. ⛔ No silent edits.
   boundary per phase** (§4.6); **contract weight per rung** (§0) — an item gets a row, not a document.
   Root `CLAUDE.md` gained **working rule 8** (never hand the owner a bare identifier) and rule 7 now
   says *cycle* rather than the retired *sprint*.
+- **v4 — 2026-09-25**, 👤 owner approval: **ecosystem currency** added to orientation step 2 (§1,
+  §3.1a) — the BRCs, reference SDKs and peer wallets/apps we must stay compatible with, fetched fresh
+  every cycle, and every track's research starts by re-fetching them. Why: compatibility is a top
+  product priority, and our copies of specs and SDKs go stale within days (the 1Sat SDK and the wallet
+  DB/export BRCs both changed in the week before beta.5 planning).
 - **v2 — 2026-09-24**, 👤 owner review of v1: the **cycle contract with gates** (§2) — *"it should
   always go back to one master document checked off as a gate"*; the **human-readable planning
   table** (§1); **kaleidoscope at track OPEN as well as close** (§4.2) — *"shouldn't we look for

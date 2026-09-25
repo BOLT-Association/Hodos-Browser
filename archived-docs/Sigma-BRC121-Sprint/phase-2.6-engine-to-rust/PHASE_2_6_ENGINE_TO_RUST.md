@@ -455,7 +455,7 @@ Same shape as 2.6-C, targeting `/proveCertificate` (non-sensitive fields).
 - `cef-native/src/handlers/simple_handler.cpp` (IPC bridge becomes thinner; 202 handler + modal dispatch + X-User-Approved re-issue is the entire shim-traffic path)
 - `rust-wallet/src/main.rs` (drops shadow route, drops `engine_flags` field from AppState)
 - `development-docs/architecture/AUTO_APPROVE_ENGINE.md` (rewritten to describe Rust engine state-of-world)
-- `development-docs/FUTURE_AUTO_APPROVE_ENGINE_ARCHITECTURE.md` (marked HISTORICAL — closure note pointing to 2.6 close memory)
+- `archived-docs/FUTURE_AUTO_APPROVE_ENGINE_ARCHITECTURE.md` (marked HISTORICAL — closure note pointing to 2.6 close memory)
 - `CLAUDE.md` "Key Files" table updated to reflect Rust engine ownership
 
 **Done when:**

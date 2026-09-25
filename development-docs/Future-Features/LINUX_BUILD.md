@@ -12,7 +12,7 @@ Native Linux build of Hodos Browser. 3 distinct early users have asked for it as
 
 Two real constraints:
 
-1. **macOS port is the current second-platform investment.** Sprint folder `Final-MVP-Sprint/macos-port/` is the active work. Adding a third platform before the second stabilizes is asking for divergence between the two non-Windows ports.
+1. **macOS port is the current second-platform investment.** Sprint folder `archived-docs/Final-MVP-Sprint/macos-port/` is the active work. Adding a third platform before the second stabilizes is asking for divergence between the two non-Windows ports.
 2. **Real engineering surface is large.** CEF on Linux, GTK/Qt overlay layer, libsecret/GNOME-Keyring + KWallet replacement for the DPAPI (Windows) / macOS Keychain (stubbed) path in `rust-wallet/src/crypto/dpapi.rs`, adblock-engine cross-compile, frontend build target verification, and packaging (.deb / .rpm / AppImage / flatpak — at least one). See `EFFORT_MATRIX.md` for the dimension breakdown.
 
 ## Revisit trigger
@@ -32,5 +32,5 @@ Promote to RESEARCH (and then NEXT QUARTER) when **either**:
 
 - `marketing/intelligence/USER_SIGNALS.md` — the demand log entry (2026-05-11).
 - `marketing/intelligence/EFFORT_MATRIX.md#linux-build` — full effort scoring.
-- `Final-MVP-Sprint/macos-port/` — the second-platform precedent that gates this work.
+- `archived-docs/Final-MVP-Sprint/macos-port/` — the second-platform precedent that gates this work.
 - Root `CLAUDE.md` invariant #9 — "All new C++ code must use `#ifdef _WIN32` / `#elif defined(__APPLE__)` platform conditionals" — when Linux work begins, this pattern extends to `#elif defined(__linux__)`.

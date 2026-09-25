@@ -136,7 +136,7 @@ measured.
 | The 210-cell vendor matrix | The first pass proved vendor **demos** cannot decide anything: Chrome 0.9, Hodos 0.9, and Hodos launched with `--enable-automation` also **0.9**, because the reCAPTCHA demo's score is a *sample*. A demo is configured to succeed and has no money behind the decision |
 | Adblock exceptions for reCAPTCHA / hCaptcha / Arkose / GeeTest | ⚠️ The gap is **real** — `hodos-unbreak.txt` has **Cloudflare only**. But scriptlets measured **not** to be patching anything on live captcha pages, so adding them now is a fix for a cause measured clean. ⇒ add only if `P13-M` step 3 points here |
 | The `Sec-CH-UA` brand (`Hodos;v=150`) | Engine fix, queued in `DevOps-CICD/NEXT_CHROMIUM_BUILD.md` PART 2. ⚠️ **Nothing has been observed to fail because of it** |
-| The wallet-bridge globals | `../TICKET_wallet_bridge_plumbing_is_advertised_to_every_site.md` — a **privacy** ticket, not a bot-detection one |
+| The wallet-bridge globals | `development-docs/0.4.0-beta.5/tickets/TICKET_wallet_bridge_plumbing_is_advertised_to_every_site.md` — a **privacy** ticket, not a bot-detection one |
 | Audio, slider, rotate, queue, PoW | §4, below the line |
 
 ---

@@ -143,7 +143,7 @@ two copies with one bundle id on one Mac; LaunchServices picked the other. A rig
 The updated beta.4 did open later from the test path (07:27:46 → gone 07:27:59, **no crash-reporter activity**), but
 launchd recorded no exit reason and I did not watch that quit ⇒ **not** claimed as the signed-build clean-quit proof.
 
-## §2 — 🔐 The bug it exposed → `development-docs/0.4.0-beta.4/tickets/TICKET_wallet_backend_is_shared_across_os_accounts.md`
+## §2 — 🔐 The bug it exposed → `development-docs/0.4.0-beta.5/tickets/TICKET_wallet_backend_is_shared_across_os_accounts.md`
 
 ⭐ Loopback ports are **machine-wide** on macOS and Windows. Measured on this Mac:
 - During beta.29's run in the test account **no `hodos-wallet` from the test bundle ever appeared** — it adopted the

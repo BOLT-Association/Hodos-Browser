@@ -1,5 +1,7 @@
 # `createAction` accepts an EMPTY `lockingScript`, builds an output with no spending conditions, broadcasts it, and reports success
 
+> ✅ **CLOSED — 2026-09-25 open-ticket review.** Evidence: `10b2916` part C; `ERR_EMPTY_LOCKING_SCRIPT` is in code; shipped in `v0.4.0-beta.4`. ⚠️ The status line below was stale; this note supersedes it.
+
 **Found:** 2026-09-19 during the `W5`/`R-GOLD` sitting, by reading the **chain** rather than our own
 response. **Status:** OPEN — measured, **not fixed**. 👤 **Production money-path code: asking before
 changing** (root `CLAUDE.md` invariant 13).

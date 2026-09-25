@@ -1,5 +1,7 @@
 # TICKET — the connect modal has two views of one consent, and they drift
 
+> ✅ **CLOSED — 2026-09-25 open-ticket review.** Evidence: `3afe5d0` merged the two views (7b). ⚠️ The owner pixel review in the 7b sign-off is still unticked. ⚠️ The status line below was stale; this note supersedes it.
+
 **Status:** ❔ **NEEDS OWNER REVIEW** — P0.8 rewrote much of this surface — is the drift closed, or just moved? Labelled 2026-08-31 by the triage pass; see `TICKET_TRIAGE_2026-08-31.md`.
 **Sprint:** 📌 Phase 7 (consent surface) — bundled 2026-08-31.
 

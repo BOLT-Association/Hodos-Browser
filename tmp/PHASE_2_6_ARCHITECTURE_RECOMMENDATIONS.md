@@ -11,7 +11,7 @@ Phase 2.6 should ship as a **dual-layer Rust crate** — a pure `permission_engi
 ## What I read
 
 Read end-to-end and cited:
-- `development-docs/FUTURE_AUTO_APPROVE_ENGINE_ARCHITECTURE.md` (vision, full)
+- `archived-docs/FUTURE_AUTO_APPROVE_ENGINE_ARCHITECTURE.md` (vision, full)
 - `development-docs/architecture/AUTO_APPROVE_ENGINE.md` (full)
 - `development-docs/architecture/WALLET_API_MAP.md` (full — 13 clusters, 95 endpoints)
 - `development-docs/Sigma-BRC121-Sprint/phase-2-window-cwi-shim/COMMIT_6_DESIGN.md` (full — the seam reference)

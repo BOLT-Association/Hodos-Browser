@@ -458,7 +458,7 @@ jobs:
               echo "Promoted **without** proving per-user fingerprint unlinkability. Expected on"
               echo "any M136 build, where farbling is inert by construction and the fail-closed"
               echo "path is the intended behaviour — see"
-              echo "\`development-docs/TICKET_farbling_constant_seed_shipped.md\`."
+              echo "\`archived-docs/tickets/TICKET_farbling_constant_seed_shipped.md\`."
             } >> "$GITHUB_STEP_SUMMARY"
           else
             echo "FARBLING_GATE_WAIVED=false" >> "$GITHUB_ENV"

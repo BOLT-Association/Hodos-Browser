@@ -3,7 +3,7 @@ r"""farbling_seed_rotation_check.py — the ONLY check that catches the constant
 
 ## Why this exists, and why nothing cheaper will do
 
-The shipped fingerprint bug (`development-docs/TICKET_farbling_constant_seed_shipped.md`)
+The shipped fingerprint bug (`archived-docs/tickets/TICKET_farbling_constant_seed_shipped.md`)
 survived in **every release since the feature was written**. Not because nobody tested it,
 but because every check anyone ran was a **same-session** check, and the bug passed all of
 them: the farbled value differed from the exempt value, was stable across reads, and was
@@ -1140,7 +1140,7 @@ def main():
         print("RESULT: %d FAILED -> %s" % (len(failures), ", ".join(sorted(set(failures)))))
         print("If 'seed A != seed B' is the failure, the farbled value does not depend on "
               "the profile seed — that is the constant-seed class. See "
-              "development-docs/TICKET_farbling_constant_seed_shipped.md.")
+              "archived-docs/tickets/TICKET_farbling_constant_seed_shipped.md.")
         return 1
     print("RESULT: all seed-rotation contracts hold "
           "(unlinkability + determinism, both controls stable)")

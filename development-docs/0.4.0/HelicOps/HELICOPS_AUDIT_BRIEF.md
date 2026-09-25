@@ -131,13 +131,13 @@ To avoid you re-deriving what's written down, here's where material lives. **Rem
 | Rust wallet layer overview | `rust-wallet/CLAUDE.md` |
 | Rust wallet source modules (endpoint groups, types, constants, external APIs) | `rust-wallet/src/CLAUDE.md` |
 | Build guides | `build-instructions/BUILD_INSTRUCTIONS.md`, `WINDOWS_BUILD_INSTRUCTIONS.md`, `MACOS_BUILD_INSTRUCTIONS.md` |
-| Sprint-level context | `development-docs/Final-MVP-Sprint/` (AI-HANDOFF.md, SECURITY_MINDSET.md, OPTIMIZATION_PRIORITIES.md, TESTING_GUIDE.md, post-beta3-cleanup.md, backup-double-spend-incident-2026-04-11.md) |
+| Sprint-level context | `archived-docs/Final-MVP-Sprint/` (AI-HANDOFF.md, SECURITY_MINDSET.md, OPTIMIZATION_PRIORITIES.md, TESTING_GUIDE.md, post-beta3-cleanup.md, backup-double-spend-incident-2026-04-11.md) |
 | UX / wallet phases | `development-docs/UX_UI/` (phase-0 through phase-5) |
 | Roadmap / research | `development-docs/Future-Features/`, `development-docs/BSV-Tokens/` |
 | Known bugs | `development-docs/MVP_BETA_ISSUES.md`, `RECOVERY_BALANCE_BUG_INVESTIGATION.md`, `NOSEND_TWOPHASE_INVESTIGATION.md` |
 | Chain-truth / fee / miner handling | `development-docs/CHAIN_TRUTH_HARDENING_RESEARCH.md`, `MINER_RESPONSE_HANDLER_AND_SELF_HEAL.md` |
 | Ecosystem comparison | `development-docs/BSV_RUST_ECOSYSTEM_COMPARISON.md`, `BSV_BROWSER_COMPARISON.md` |
-| macOS port tracking | `development-docs/Final-MVP-Sprint/macos-port/` |
+| macOS port tracking | `archived-docs/Final-MVP-Sprint/macos-port/` |
 | BRC-100 implementation notes | `archived-docs/BRC100_IMPLEMENTATION_GUIDE.md` |
 | BRC-42 key-derivation privacy | `archived-docs/BRC42_PRIVACY_EXPLANATION.md` |
 | BRC-33 message relay | `archived-docs/BRC33_MESSAGE_RELAY_IMPLEMENTATION_GUIDE.md` |

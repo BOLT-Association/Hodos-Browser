@@ -1,5 +1,7 @@
 # `--disable-features=Autofill` is a no-op
 
+> ✅ **CLOSED — 2026-09-25 open-ticket review.** Evidence: Phase 11 item 9 (`176be33`). ⚠️ The status line below was stale; this note supersedes it.
+
 **Status:** ❔ **NEEDS OWNER REVIEW** — `simple_app.cpp` DOES append `disable-features=Autofill,…`; whether it is still a no-op needs a runtime check. Labelled 2026-08-31 by the triage pass; see `TICKET_TRIAGE_2026-08-31.md`.
 **Sprint:** 📌 Phase 10 (UI/layout leftovers) — bundled 2026-08-31.
 

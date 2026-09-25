@@ -431,7 +431,7 @@ Highest fingerprint value first. All paths are `third_party/blink/renderer/...`.
 > the wrong renderer process/document), so the renderer-side pull fixes both at once. This needs its
 > own ticket regardless, because it is live in production today while P4d is several phases away.
 >
-> 🎫 **Ticket opened: `development-docs/TICKET_farbling_constant_seed_shipped.md`.** Confirmed in every
+> 🎫 **Ticket opened: `archived-docs/tickets/TICKET_farbling_constant_seed_shipped.md`.** Confirmed in every
 > released build from `v0.3.0-beta.1` to `v0.3.0-beta.29` (current public Latest) — farbling has never
 > worked. ⚠️ **The pull does NOT reach shipped users**: releases are M136, the pull is CEF-150 fork
 > code. The release line needs the separate ~5-line **fail-closed** fix (drop the `std::hash(url)`

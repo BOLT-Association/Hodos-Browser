@@ -9,7 +9,7 @@ what a dead end looked like — is worth keeping.
 > `archived-docs/` with the comment *"already in repo, no longer tracking
 > changes"*. That comment is no longer true: only **22** files are tracked —
 > the ones `git mv`'d in from tracked locations at 28f23c8 and f37adfe
-> (`Final-MVP-Sprint/`, `Wallet-Hardening/`, `Future-Features/`, plus five
+> (`archived-docs/Final-MVP-Sprint/`, `Wallet-Hardening/`, `Future-Features/`, plus five
 > root docs). The other ~175 predate the ignore rule and exist **only in a
 > local working copy.** This index and its `git add -f` are tracked so the
 > record survives even where the files do not. Whether to un-ignore the folder
@@ -195,10 +195,10 @@ add its row in the same commit.
 
 ---
 
-## `Final-MVP-Sprint/` (6 files)
+## `archived-docs/Final-MVP-Sprint/` (6 files)
 
 Retired at f37adfe. The sprint itself lives on at
-`development-docs/Final-MVP-Sprint/`; these are the parts that concluded.
+`archived-docs/Final-MVP-Sprint/`; these are the parts that concluded.
 
 | Doc | Reason archived |
 |-----|-----------------|
@@ -209,11 +209,19 @@ Retired at f37adfe. The sprint itself lives on at
 | `macos-port/PROGRESS.md` | macOS port progress dashboard; a running log, superseded by the memory files. |
 | `macos-port/Track-B-UI-Overlays.md` | Assigns macOS overlay work that is now all implemented (14 overlays, Windows/macOS parity). |
 
-## `Wallet-Hardening/` (8 files)
+## `Wallet-Hardening/` (14 files)
 
-Retired at f37adfe. The live hardening docs (`WALLET_HARDENING_ROADMAP.md`,
-`RECONCILE_PHASE2_DESIGN.md`, `FIX_B_CRASH_SAFETY_SHUTDOWN_PLAN.md`) stayed in
-`development-docs/`; their inbound links were repointed here.
+Retired at f37adfe; **the rest of the folder followed on 2026-09-25**, after a review that turned its
+still-open work into tickets in `development-docs/0.4.0-beta.5/tickets/`. Three docs the backup plan
+still cites stayed **live** and moved to
+`development-docs/0.4.0-beta.5/track-4-onchain-backup-sync/research/`: `ONCHAIN_BACKUP_REVIEW.md`,
+`FIX_B_CRASH_SAFETY_SHUTDOWN_PLAN.md`, `FOLLOWUP_RECORD_BEFORE_BROADCAST_TOKENS.md`.
+
+Added 2026-09-25: `README.md` (the H-register), `WALLET_HARDENING_ROADMAP.md` (WS1 done; WS2/WS3 →
+tickets), `RECONCILE_PHASE2_DESIGN.md` (done), `MAC_KEYCHAIN_CROSSCONTAMINATION_FIX.md` (done; its
+lesson 5 → `TICKET_auto_unlock_accepts_another_wallets_mnemonic.md`), `FOLLOWUP_REORG_HANDLING.md`
+(→ `TICKET_confirmed_tx_never_rechecked_after_reorg.md`), `FOLLOWUP_NEXT_INDEX_UNIFICATION.md`
+(→ `TICKET_two_next_address_index_sources_can_reuse_addresses.md`).
 
 | Doc | Reason archived |
 |-----|-----------------|

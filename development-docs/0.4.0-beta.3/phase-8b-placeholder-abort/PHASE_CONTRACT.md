@@ -125,7 +125,7 @@ also why `A1` matters: the new failure path has never been exercised live.
 ## 6. Out of scope
 
 `Ok(0)` count-checking (§8) · the reservation-ownership refactor
-(`../TICKET_reservation_ownership_converge_on_spent_by.md`) · the BRC-121 paid-retry audit the ticket
+(`../../0.4.0-beta.5/tickets/TICKET_reservation_ownership_converge_on_spent_by.md`) · the BRC-121 paid-retry audit the ticket
 §5.3 asks for — ⚠️ **not done**, see §8.
 
 ## 7. Rollback

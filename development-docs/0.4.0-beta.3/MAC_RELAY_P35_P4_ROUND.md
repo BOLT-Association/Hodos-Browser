@@ -115,7 +115,7 @@ macOS-only failure mode with no Windows analogue, so it cannot be inferred from 
   when needed but normally I just have that mac laptop by itself."* ⇒ the **mixed-DPI** case Phase 3.5
   tested does not arise for you in normal use, and no Mac DPI rig needs standing up. ⚠️ The
   **multi-window** case still does — Cmd+N needs no second monitor.
-- 🎫 Three new beta.4 tickets came out of this round, all filed under `0.4.0-beta.4/tickets/`. Two are
+- 🎫 Three new beta.4 tickets came out of this round, all filed under `0.4.0-beta.5/tickets/`. Two are
   ⚠️ **cross-platform by nature and unassessed on macOS**: multi-window session restore keeps only the
   last window's tabs, and menu → Exit closes the *primary* window rather than the one clicked. The
   macOS Exit path takes a different arm (`ShowQuitConfirmationAndShutdown()`) and **may not have the

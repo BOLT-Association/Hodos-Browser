@@ -15,7 +15,7 @@ Start beta.3 Phase 7d — the **management** half of the consent surface. Phase 
 *connect* half; this is the screen the user visits afterwards.
 
 ⛔ Run the kickoff before any code. Read, in this order:
-1. `development-docs/0.4.0-beta.3/TICKET_edit_limits_modal_usability.md` — **five** items
+1. `development-docs/0.4.0-beta.5/tickets/TICKET_edit_limits_modal_usability.md` — **five** items
 2. `development-docs/0.4.0-beta.3/TICKET_site_permission_dual_store.md`
 3. `development-docs/0.4.0-beta.3/phase-7-consent-surface/PHASE_CONTRACT.md` §0.1 row **R4**
 4. `development-docs/0.4.0-beta.3/phase-7c-quiet-mode/PHASE_CONTRACT.md` §5.3 and §9.2

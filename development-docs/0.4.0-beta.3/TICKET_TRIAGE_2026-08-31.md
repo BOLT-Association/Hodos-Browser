@@ -89,7 +89,7 @@ Not settled by a cheap check; each needs a judgement I should not make alone.
 
 ## What I did NOT do
 
-- ⛔ **Did not move anything into `0.4.0-beta.4/tickets/`.** That folder is a **review queue** and its
+- ⛔ **Did not move anything into `0.4.0-beta.5/tickets/`.** That folder is a **review queue** and its
   README is explicit: *"a ticket is not work until the owner has assigned it to a sprint."* Moving the
   11 open ones is the owner's call, not a tidy-up.
 - ⛔ **Did not re-verify the ✅ rows against their original defects.** A landed fix is not a proven

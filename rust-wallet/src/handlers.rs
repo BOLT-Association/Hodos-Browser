@@ -8111,7 +8111,7 @@ pub struct SignActionResponse {
     // lists it. `SignActionOptions.send_with` is parsed and then never read by
     // sign_action — the feature does not work — so emitting a result array for it
     // would be inventing a value. Reported, not fixed:
-    // development-docs/0.4.0-beta.3/TICKET_signaction_response_not_brc100_shape.md §11.
+    // development-docs/0.4.0-beta.5/tickets/TICKET_signaction_response_not_brc100_shape.md §11.
 }
 
 impl SignActionResponse {
@@ -10221,7 +10221,7 @@ mod sign_action_response_shape_tests {
     // wallet returned no BEEF to submit", because @bsv/sdk's HTTPWalletJSON hands
     // the parsed JSON straight to the caller and `result.tx` was undefined.
     // The money was already spent. Ticket:
-    // development-docs/0.4.0-beta.3/TICKET_signaction_response_not_brc100_shape.md
+    // development-docs/0.4.0-beta.5/tickets/TICKET_signaction_response_not_brc100_shape.md
     //
     // 🔴 NEGATIVE CONTROL: delete the `tx` field from SignActionResponse (or its
     // `hex::decode` at the construction site) and `tx_is_present_as_a_byte_array`
@@ -15754,7 +15754,7 @@ async fn fetch_onchain_backup(
     // TODO: WoC's address-unspent index can lag 30s-5min behind chain. During the
     // propagation window of a NEW backup, this query may return the OLD (superseded)
     // marker. Recovery would then decrypt the stale backup payload. See incident report:
-    // development-docs/Final-MVP-Sprint/backup-double-spend-incident-2026-04-11.md § "Bug A also affects RECOVERY"
+    // archived-docs/Final-MVP-Sprint/backup-double-spend-incident-2026-04-11.md § "Bug A also affects RECOVERY"
     let utxo_url = format!(
         "https://api.whatsonchain.com/v1/bsv/main/address/{}/unspent/all",
         backup_address

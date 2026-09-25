@@ -210,7 +210,7 @@ ls HodosBrowserShell.app/Contents/Frameworks/
 
 ## ✅ Step 5: Run HodosBrowser
 
-> **Note:** On Windows, the C++ shell auto-launches the Rust wallet and adblock engine. On macOS, auto-launch is not yet implemented (it's part of the macOS feature parity sprint — see `development-docs/Final-MVP-Sprint/macos-port/MACOS-PORT-HANDOVER.md`). For now, you need to start them manually. If you don't need to see their logs, you can still run them in the background.
+> **Note:** On Windows, the C++ shell auto-launches the Rust wallet and adblock engine. On macOS, auto-launch is not yet implemented (it's part of the macOS feature parity sprint — see `archived-docs/Final-MVP-Sprint/macos-port/MACOS-PORT-HANDOVER.md`). For now, you need to start them manually. If you don't need to see their logs, you can still run them in the background.
 
 You need **three terminals** running simultaneously (four if you also want adblock):
 
@@ -395,7 +395,7 @@ curl http://127.0.0.1:5137
 
 The macOS C++ layer needs additional work for full feature parity. The Rust wallet and adblock engine are fully cross-platform and work identically on macOS.
 
-For the complete gap analysis and sprint plan, see: **`development-docs/Final-MVP-Sprint/macos-port/MACOS-PORT-HANDOVER.md`**
+For the complete gap analysis and sprint plan, see: **`archived-docs/Final-MVP-Sprint/macos-port/MACOS-PORT-HANDOVER.md`**
 
 Key gaps: 6 missing overlay types, HTTP singleton porting (WinHTTP → libcurl), process auto-launch, multi-window support, keyboard shortcuts (Cmd vs Ctrl).
 
@@ -589,7 +589,7 @@ The current build has **development-only** settings:
 The macOS C++ layer has foundational support (window, tabs, 5 overlays, rendering) but is behind Windows on features added in Sprints 8-13. The Rust wallet and React frontend work identically on both platforms.
 
 **For the complete feature gap analysis, sprint plan, and implementation guide, see:**
-**`development-docs/Final-MVP-Sprint/macos-port/MACOS-PORT-HANDOVER.md`**
+**`archived-docs/Final-MVP-Sprint/macos-port/MACOS-PORT-HANDOVER.md`**
 
 ---
 

@@ -1,5 +1,7 @@
 # 🎫 If the wallet backend dies, the browser never notices, never restarts it, and tells the user "no wallet"
 
+> ✅ **CLOSED — 2026-09-25 open-ticket review.** Evidence: Phase 8d (`821af44`, `17f9e28`; macOS `8e553e7`). ⚠️ The status line below was stale; this note supersedes it.
+
 **Found:** 2026-09-01, while diagnosing a dApp payment failure on the owner's installed build
 **Status:** 🟡 **ASSIGNED — Phase 8, after 8c closes** (owner call 2026-09-12) · **Sprint:** beta.3.
 Phase 8 (money-path correctness) is its home because this is the availability half of the same work.

@@ -345,4 +345,4 @@ This becomes the demo site for the video and the reference implementation for de
 
 ### Related Hodos Docs
 - Developer auth guide: `development-docs/BRC103_SIGMA_AUTH_GUIDE.md`
-- QR scan overview: `development-docs/QR_SCAN_OVERVIEW.md` (BIP21 extension for paymail/identity key)
+- QR scan overview: `archived-docs/QR_SCAN_OVERVIEW.md` (BIP21 extension for paymail/identity key)

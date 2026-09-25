@@ -87,7 +87,7 @@ cd cef-native
 
 ### What's Next
 
-Current and upcoming work is tracked in the Active sprint status table in `CLAUDE.md` and under `development-docs/` (`Sigma-BRC121-Sprint/`, `Final-MVP-Sprint/`, `DevOps-CICD/`).
+Current and upcoming work is tracked in the Active sprint status table in `CLAUDE.md` and under `development-docs/` (`Sigma-BRC121-Sprint/`, `archived-docs/Final-MVP-Sprint/`, `DevOps-CICD/`).
 
 ---
 

@@ -80,7 +80,7 @@ After those two are investigated and fixed (or triaged as post-release), the pla
 - `frontend/src/components/WalletPanel.tsx` (WoC link via `tab_create` IPC)
 - `rust-wallet/src/monitor/task_check_for_proofs.rs` (3-oracle quorum + 5-min rollback)
 - `frontend/src/components/TabBar.tsx` (mac tab-bar top inset)
-- `development-docs/Final-MVP-Sprint/AI-HANDOFF.md` (this entry)
+- `archived-docs/Final-MVP-Sprint/AI-HANDOFF.md` (this entry)
 
 **Commits (post-beta3-cleanup):**
 - `b820a02` macOS: fix Cloudflare Turnstile infinite-loop on whatsonchain
@@ -135,8 +135,8 @@ Trace shows that clicking a tab-close button on the legacy webview's tab trigger
 4. Logged as new P4 #13: cookie consent banner blocking (Brave parity via EasyList Cookie filter list) — `post-beta3-cleanup.md` updated
 
 **Files changed:**
-- `development-docs/Final-MVP-Sprint/AI-HANDOFF.md` (this entry)
-- `development-docs/Final-MVP-Sprint/post-beta3-cleanup.md` (added P4 #13)
+- `archived-docs/Final-MVP-Sprint/AI-HANDOFF.md` (this entry)
+- `archived-docs/Final-MVP-Sprint/post-beta3-cleanup.md` (added P4 #13)
 
 ---
 
@@ -218,7 +218,7 @@ Share the diagnostic output with the user. Include:
 - `cef-native/cef_browser_shell_mac.mm` — legacy webview creation (~line 4000), `MainWindowDelegate::windowShouldClose:` (~line 1974)
 - `cef-native/src/core/WindowManager_mac.mm` — `BrowserWindowDelegate::windowShouldClose:`
 - `cef-native/src/core/TabManager_mac.mm` — tab lifecycle on macOS
-- Bug tracker: `development-docs/Final-MVP-Sprint/post-beta3-cleanup.md`
+- Bug tracker: `archived-docs/Final-MVP-Sprint/post-beta3-cleanup.md`
 
 #### Troubleshooting
 - **Permission denied on launch:** `chmod +x HodosBrowserShell.app/Contents/MacOS/HodosBrowserShell`
@@ -228,7 +228,7 @@ Share the diagnostic output with the user. Include:
 - **No debug_output.log:** Check `~/Library/Application Support/HodosBrowser/` exists. If not, the app never got far enough to create it.
 
 **Files changed:**
-- `development-docs/Final-MVP-Sprint/AI-HANDOFF.md` (this entry)
+- `archived-docs/Final-MVP-Sprint/AI-HANDOFF.md` (this entry)
 
 ---
 
@@ -263,7 +263,7 @@ Share the diagnostic output with the user. Include:
 - `rust-wallet/src/monitor/mod.rs`, `task_purge.rs` (task registration + BEEF compaction)
 - `rust-wallet/src/handlers.rs`, `main.rs` (consolidate-dust endpoint)
 - `frontend/src/components/TransactionForm.tsx`, `WalletPanel.tsx` (UX fixes)
-- `development-docs/Final-MVP-Sprint/wallet-efficiency-and-bsv-alignment.md` (checklist update)
+- `archived-docs/Final-MVP-Sprint/wallet-efficiency-and-bsv-alignment.md` (checklist update)
 
 ---
 
@@ -293,7 +293,7 @@ Share the diagnostic output with the user. Include:
 ### 2026-03-09 — Project Lead / Claude — Sprint Setup
 
 **What was done:**
-- Created `Final-MVP-Sprint/` folder with sprint documentation
+- Created `archived-docs/Final-MVP-Sprint/` folder with sprint documentation
 - `TESTING_GUIDE.md` — 7-tier exploration mission guide for manual testing
 - `OPTIMIZATION_PRIORITIES.md` — before/after testing optimization sequencing
 - `SECURITY_MINDSET.md` — security philosophy, current posture, dev watch list
@@ -314,7 +314,7 @@ Share the diagnostic output with the user. Include:
 - **All**: Archive `frontend-ui-ux-cleanup-optimization.md` and `data-storage-and-encryption-review.md` (content captured in sprint docs)
 
 **Files changed:**
-- `development-docs/Final-MVP-Sprint/` (new folder, 6 files)
+- `archived-docs/Final-MVP-Sprint/` (new folder, 6 files)
 - `rust-wallet/src/main.rs`, `rust-wallet/src/crypto/dpapi.rs`, `rust-wallet/src/bin/extract_master_key.rs`, `rust-wallet/Cargo.toml`
 - `adblock-engine/src/engine.rs`
 - `CLAUDE.md`, `README.md`, `PROJECT_OVERVIEW.md` (reference updates)

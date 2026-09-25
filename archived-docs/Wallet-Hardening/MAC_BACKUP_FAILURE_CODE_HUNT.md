@@ -9,7 +9,7 @@ diagnose only, no fixes, no backups, analyze a COPY of the DB.**
 The owner's Mac wallet: manual "Backup Now" FAILED on beta.27, and running it AGAIN did NOT recover.
 **Two things are likely BOTH true:** (a) the wallet's backup has been diverged since ~April 15 — a
 PRE-EXISTING condition from the **April 11 backup double-spend cascade incident**
-(`development-docs/Final-MVP-Sprint/backup-double-spend-incident-2026-04-11.md`), which predates all our
+(`archived-docs/Final-MVP-Sprint/backup-double-spend-incident-2026-04-11.md`), which predates all our
 July reconcile work; AND (b) running "Backup Now" under our new **c5b Step 1.5 sweep** today may have
 **permanently made it worse** by marking a still-good backup token spent. Your job is to determine which
 arm actually fired, using the DB + today's log. Do not assume — the code hunt gives a mechanism, the

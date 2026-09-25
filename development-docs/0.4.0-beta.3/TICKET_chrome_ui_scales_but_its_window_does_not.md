@@ -1,5 +1,7 @@
 # Browser chrome scales but its window doesn't — header content is clipped
 
+> ✅ **CLOSED — 2026-09-25 open-ticket review.** Evidence: Phase 11 item 7 (`15fd152`, `a4a198a`, `d1feb7e`). ⚠️ The status line below was stale; this note supersedes it.
+
 **Status:** ❔ **NEEDS OWNER REVIEW** — is it superseded by Phase 1's DPI work, or genuinely distinct? Labelled 2026-08-31 by the triage pass; see `TICKET_TRIAGE_2026-08-31.md`.
 **Sprint:** 📌 **Phase 3.5 (layout), not Phase 10** — moved 2026-08-31, same rig as above. ❔ Still needs the owner's call on whether Phase 1's DPI work superseded it.
 

@@ -1,8 +1,10 @@
 # 🚨 1-sat token outputs are destroyed by an automatic daily task (and two other paths)
 
+> ✅ **CLOSED — 2026-09-25 open-ticket review.** Evidence: `383bf4f` (Phase 8a floor); relay P8 M6 records it closed. ⭐ The **full classification guard** remains beta.5 Track 1 — that is scope, not this ticket. ⚠️ The status line below was stale; this note supersedes it.
+
 **Found 2026-08-29**, during beta.4 scoping, while reading the prerequisites for the 1Sat Ordinals
 sprint. Not found by a failure — found by reading `monitor/` after noticing that
-`0.4.0-beta.4/sprint-2-1sat-ordinals/README.md` already states the rule ("a 1-sat ordinal caught by ordinary coin
+`0.4.0-beta.5/track-2-1sat-ordinals/README.md` already states the rule ("a 1-sat ordinal caught by ordinary coin
 selection is a **permanently destroyed asset**... treat this with the same seriousness as the
 privacy-perimeter gates") while no code enforces it.
 
@@ -137,7 +139,7 @@ Per `HARNESS.md`, a fix is not done until the gate is shown able to fail:
 ## Links
 
 - Full beta.4 context and the classification-guard scope:
-  `development-docs/0.4.0-beta.4/SESSION_PROMPT_beta4_kickoff.md` §5.
+  `archived-docs/0.4.0-beta.4-planning/SESSION_PROMPT_beta4_kickoff.md` §5.
 - The rule this violates was already written down in
-  `development-docs/0.4.0-beta.4/sprint-2-1sat-ordinals/README.md` ("Two rules from BRC-147 that are load-bearing for
+  `development-docs/0.4.0-beta.5/track-2-1sat-ordinals/README.md` ("Two rules from BRC-147 that are load-bearing for
   us", rule 2).

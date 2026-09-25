@@ -1,6 +1,6 @@
 # Phase 0.5 — money path & trust boundary · PHASE CONTRACT
 
-**Workstream:** WS5(a) · **Ticket:** `../TICKET_loopback_host_form_wallet_routing.md` §6.2, §7.1, §7.3
+**Workstream:** WS5(a) · **Ticket:** `development-docs/0.4.0-beta.5/tickets/TICKET_loopback_host_form_wallet_routing.md` §6.2, §7.1, §7.3
 **Status:** 🟠 NOT SIGNED OFF — **all known blockers closed; awaiting owner sign-off.** Findings 4, 5 and 6 are fixed and GREEN with REDs run in-session (§4j); the first panel's 3 criticals remain MEASURED and closed. ✅ **§4k — the new critical found 2026-08-19 — is FIXED and GREEN with RED (`81c054c`)**. ✅ **Windows side DONE** (all 4 panel-#3 blockers + pay402, panel re-run complete — relay round 2026-08-21c). ✅ **macOS `wallet_call` SSRF (`P0.5-S1` / the relay's E1, the last macOS-only blocker) FIXED cross-platform, GREEN+RED — §4x** (`d462083`, Mac round 2026-08-21d); the C++ suite now builds+runs on macOS (206/205-pass/1-skip); all 3 macOS parity checks PASS; M1 self-nav code-closed. **Still owed for full sign-off (owner-gated):** the live-browser S1 probe (isolation-blocked here), two open macOS correctness bugs (brc100_auth role string; `wallet_delete_cancel` `__APPLE__` arm), and the E3 scoped macOS-overlay adversarial pass. 🔴 **E3 DONE (Mac 2026-08-22)** — it surfaced a **HIGH/blocker-candidate, `P0.5-B1` §4y: self-nav role-guard asymmetry** (the `ee8f836` self-nav gate covers only `add_domain_permission*`; ~5 sibling BRC-100 overlay IPC arms — `grant_scoped_permission`/`approve_cert_fields`/reveal/invalidate — are ungated and write persistent grants for an attacker-chosen domain from a self-navved tab; cross-platform, CODE_READING). ✅ **`P0.5-B1` FIXED 2026-08-22, GREEN+RED, owner-approved** — one Layer-2 role choke (`IpcAuth.h` predicates) in `OnProcessMessageReceived`; unit test `ipc_role_guard_test` (9); live T3 approval smoke on a dev build still owed. E3 lens (a) close-prevention = LOW parity nit only (mac focus-loss is more protective; seed overlay has no click-outside monitor); lens (c) transport clean (E1 method sink CLOSED-verified; one LOW `REDIR_PROTOCOLS` hardening). Repair prompt: `../SESSION_PROMPT_beta3_p05_repair.md` · **Opened:** 2026-08-18 · **Amended:** 2026-08-19 (§4a–§4c, §5a), 2026-08-19 **repair scope** (§2, §4 split into 0.5a/0.5b, §4e–§4g, §5b, §6) · **Platforms:** both (Rust = one binary; the C++ gates are cross-platform)
 **Standard:** `../HARNESS.md`.
 
@@ -349,7 +349,7 @@ the image name `HodosBrowser.exe`; and `cargo build … | grep` **discards the e
 `Finished` line is the evidence, not `$?`.
 
 *(Unrelated, observed in the same port scan: **CDP 9222 is LISTENING on the production browser** —
-`../TICKET_cdp_port_open_in_release.md`, now observed live rather than inferred. Not this phase.)*
+`development-docs/0.4.0-beta.5/tickets/TICKET_cdp_port_open_in_release.md`, now observed live rather than inferred. Not this phase.)*
 
 ### 4i. 🟢 LIVE RUN — the whole 0.5a table, GREEN and RED, same day, same machine
 
@@ -1281,7 +1281,7 @@ from scratch.
   `find("127.0.0.1:5137")`, which `localhost:8000` also failed, and the port-agnostic behaviour is
   deliberate and documented at `:1931-1937`. The defect is the **policy**, not a missed unification.
   → **Phase 5 (W0)**, where the parsed `IsWalletOrigin()` predicate lands.
-  ⛔ `../TICKET_loopback_host_form_wallet_routing.md:537-539`'s "the rest of that function is sound"
+  ⛔ `development-docs/0.4.0-beta.5/tickets/TICKET_loopback_host_form_wallet_routing.md:537-539`'s "the rest of that function is sound"
   is true for the suffix shape and **false for the port dimension** — correct it there.
 - **Finding 8 — `opaque-origin.invalid` is one shared, *approvable* trust identity**
   (`simple_handler.cpp:2087`). It **cannot become trusted** (verified against every loopback

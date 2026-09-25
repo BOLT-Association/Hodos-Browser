@@ -87,7 +87,7 @@ means:
 1. **Cross-site use of another app's level-0 key.** A connected (approved) site can silently sign, HMAC, encrypt or
    decrypt under a level-0 protocol another app uses — e.g. produce signatures "as the user" for `xanaverse`.
 2. **Linkability.** Level-0 keys are identical on every site. ⚠️ Not introduced by this fix — `getPublicKey` already
-   has it; see `0.4.0-beta.4/tickets/TICKET_derived_public_keys_have_no_prompt_and_can_match_across_sites.md`,
+   has it; see `0.4.0-beta.5/tickets/TICKET_derived_public_keys_have_no_prompt_and_can_match_across_sites.md`,
    which also confirms `wallet-toolbox` skips the prompt at level 0 even for public-key revelation.
 
 **Why it stands:** BRC-43 defines level 0 as open; apps are to use level 1/2 for anything sensitive, and the reference
@@ -119,5 +119,5 @@ site is already approved at a higher level. Re-introducing it would add friction
 
 **The mitigation is the beta.4 plan** (owner): every site sends its public key as the counterparty; the wallet
 records that key alongside how each key was derived; and it checks on every derivation that **no two sites are using
-the same public key**. See `0.4.0-beta.4/tickets/TICKET_derived_public_keys_have_no_prompt_and_can_match_across_sites.md`.
+the same public key**. See `0.4.0-beta.5/tickets/TICKET_derived_public_keys_have_no_prompt_and_can_match_across_sites.md`.
 Two sites deliberately coordinating to share a key is the residual that plan detects.

@@ -293,4 +293,4 @@ After a `2xx` from the upstream retry the handler fires the gold pill, calls
 - `rust-wallet/CLAUDE.md` — endpoint roster, migration ledger, default limits
 - `cef-native/src/core/CLAUDE.md` — gold-pill chain, interceptor internals
 - `development-docs/Sigma-BRC121-Sprint/phase-2.6-engine-to-rust/` — the port that produced this architecture
-- `development-docs/FUTURE_AUTO_APPROVE_ENGINE_ARCHITECTURE.md` — the original vision doc; read as history, it is now largely realized
+- `archived-docs/FUTURE_AUTO_APPROVE_ENGINE_ARCHITECTURE.md` — the original vision doc; read as history, it is now largely realized

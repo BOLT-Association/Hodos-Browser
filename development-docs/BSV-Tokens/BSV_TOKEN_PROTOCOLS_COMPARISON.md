@@ -545,7 +545,7 @@ The question asked: *should the backup token move from PushDrop to BSV-21 to be 
 2. **The wrapper is noise.** Cost is ~99.9% raw bytes. An ord envelope (+57 B) is *larger* than `OP_DROP` (+34 B).
 3. **PushDrop is the correct choice on semantics.** It is spendable, so each backup **spends the previous one** — recycling the sats and chaining the history. `OP_RETURN` would be 34 B cheaper and would break that. (It also means we hold exactly one live pair, so the UTXO-set objection to PushDrop doesn't apply to us.)
 
-**Real levers, in order:** the planned strips (`outputs` alone is 48.8% of the payload), delta/incremental backups instead of a full snapshot each cycle, or hash-commitment with off-chain storage (~800× cheaper, but buys a data-availability problem). See `Final-MVP-Sprint/wallet-backup-efficiency-plan.md`.
+**Real levers, in order:** the planned strips (`outputs` alone is 48.8% of the payload), delta/incremental backups instead of a full snapshot each cycle, or hash-commitment with off-chain storage (~800× cheaper, but buys a data-availability problem). See `archived-docs/Final-MVP-Sprint/wallet-backup-efficiency-plan.md`.
 
 **Also settled:** BRC-226 (Miner-Enforced Resale-Royalty Covenant Tokens, PushDrop + OP_PUSH_TX, added 2026-07-30) is **not** needed for BSV-21 and is **no help** for the backup — no resale semantics, larger script, same byte cost. Its value to us is as **precedent**: a worked, accepted example of covenant enforcement on standard rails.
 

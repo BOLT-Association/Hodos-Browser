@@ -458,7 +458,7 @@ cmake --build . --config Release
 ## 🚀 Next Steps
 
 - For macOS build instructions, see `MACOS_BUILD_INSTRUCTIONS.md`
-- For macOS porting work, see `development-docs/Final-MVP-Sprint/macos-port/MACOS-PORT-HANDOVER.md`
+- For macOS porting work, see `archived-docs/Final-MVP-Sprint/macos-port/MACOS-PORT-HANDOVER.md`
 - For development workflow, see `PROJECT_OVERVIEW.md`
 - For project architecture, see root `CLAUDE.md`
 

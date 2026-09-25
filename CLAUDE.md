@@ -179,7 +179,7 @@ Do it explicitly: turn the feature off (config toggle, stub the call, revert the
 2. another asserted only that canvas methods report `[native code]`, which is true the instant the old JS is deleted, whether or not any replacement works;
 3. a third drove the wrong **browser** — Hodos's header and ~14 overlays are separate CEF browsers that CDP all reports as `type:"page"` — which faked an "intermittent per-session bug" in code that was fine.
 
-Each one looked rigorous. A negative control would have caught all three in minutes. Related: the shipped fingerprint bug survived in **every release since the feature was written**, because every check anyone ran was a same-session check that the bug passed — see `development-docs/TICKET_farbling_constant_seed_shipped.md`.
+Each one looked rigorous. A negative control would have caught all three in minutes. Related: the shipped fingerprint bug survived in **every release since the feature was written**, because every check anyone ran was a same-session check that the bug passed — see `archived-docs/tickets/TICKET_farbling_constant_seed_shipped.md`.
 
 Corollary for privacy/security features: also assert the test is measuring the intended **subject** (right process, right browser, right document), not just the intended value.
 
@@ -723,7 +723,7 @@ were being called "the identity key permission". Do not couple them —
 
 **After each sprint, phase, or sub-phase:**
 1. Review this CLAUDE.md — Is it still accurate? Update Key Files table if architecture changed.
-2. Check sprint-specific CLAUDE.md in `development-docs/Final-MVP-Sprint/` or `development-docs/Sigma-BRC121-Sprint/`.
+2. Check the current release folder (`development-docs/0.4.0-beta.5/` — its `README.md` and `tickets/README.md`) and the per-layer `CLAUDE.md` files.
 3. Add new patterns/gotchas to the relevant context file.
 
 **Goal:** Context files should always reflect current reality. They're the institutional memory that lets any AI (or human) pick up where the last session left off.
@@ -733,11 +733,11 @@ were being called "the identity key permission". Do not couple them —
 | Folder | Purpose |
 |--------|---------|
 | `development-docs/SCOPING_PROCESS.md` | The four-stage scoping procedure (Scope → Telescope → Microscope → Telescope-close). Owned by the `sprint-scoper` agent. See the section near the top of this file |
-| `development-docs/0.4.0-beta.4/` | **Current sprint — the wallet asset layer.** Four sprints in a settled order: UTXO safety guard → 1Sat Ordinals → OpNS naming → on-chain backup & sync. Start at its `README.md`, then `TELESCOPE.md`. ⛔ Its harness is **inherited by reference** from `0.4.0-beta.3/HARNESS.md`; beta.4's additions are in `HARNESS_DELTA.md` / `REGRESSION_ADDITIONS.md` only |
+| `development-docs/0.4.0-beta.5/` | **Current release folder** (was `0.4.0-beta.4/` until 2026-09-24 — that version number was spent by a hotfix). Telescoped as the wallet asset layer: UTXO safety guard → 1Sat Ordinals → OpNS naming → on-chain backup & sync; the beta.5 track set is re-proposed at gate `G2` (`RELEASE_CYCLE.md`). Start at its `README.md`, then `TELESCOPE.md`. ⛔ Its harness is **inherited by reference** from `0.4.0-beta.3/HARNESS.md`; beta.5's additions are in `HARNESS_DELTA.md` / `REGRESSION_ADDITIONS.md` only |
 | `development-docs/architecture/` | Cross-layer architecture — the flows no single layer's `CLAUDE.md` owns. Rewritten against code 2026-08-03 (the prior contents described the deleted C++ permission engine). Three docs: `AUTO_APPROVE_ENGINE.md` (permission decision flow + Matrix C branch order), `IPC_BRIDGE.md` (the `wallet_call` process-message contract), `WALLET_API_MAP.md` (which endpoints are gated by which Rust dispatcher, and the shim surface). Inventory stays in the layer docs; these three carry only cross-layer flow. |
-| `development-docs/FUTURE_AUTO_APPROVE_ENGINE_ARCHITECTURE.md` | The original "engine in Rust" vision doc. Largely **realized** by Phase 2.6 — read it as history, not as a plan |
-| `development-docs/Final-MVP-Sprint/` | Sprint: testing, optimization, security, macOS port |
-| `development-docs/Final-MVP-Sprint/macos-port/` | macOS port tracking: progress, handover docs, archived milestones |
+| `archived-docs/FUTURE_AUTO_APPROVE_ENGINE_ARCHITECTURE.md` | The original "engine in Rust" vision doc. Largely **realized** by Phase 2.6 — read it as history, not as a plan |
+| `archived-docs/Final-MVP-Sprint/` | **Archived 2026-09-25** — sprint: testing, optimization, security, macOS port. History only; its backup lessons live in `development-docs/0.4.0-beta.5/track-4-onchain-backup-sync/BACKUP_HISTORY_OVERVIEW.md` |
+| `archived-docs/Final-MVP-Sprint/macos-port/` | macOS port history. ⭐ The **current** macOS brief is `development-docs/MACOS_CATCHUP_PLAYBOOK.md` |
 | `development-docs/Sigma-BRC121-Sprint/` | Sprint: BRC-100 surface completion. Phase folders are the authoritative status source — see the phase README in each |
 | `development-docs/Sigma-BRC121-Sprint/phase-2.6-engine-to-rust/` | The permission-engine port to Rust (sub-phases A–H) — the change that deleted the C++ `PermissionEngine`, `PermissionGate` and `SessionManager` |
 | `development-docs/Sigma-BRC121-Sprint/phase-4-demos/` | Phase 4 (demos); absorbed Phase 1.5 Step 7 |

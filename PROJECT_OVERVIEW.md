@@ -177,7 +177,7 @@ Overlay HWND globals and their close/destroy semantics: `cef-native/CLAUDE.md` a
 overlays with `NSWindowDelegate` close handling, and event forwarding, alongside `TabManager_mac.mm`,
 `WindowManager_mac.mm` and `my_overlay_render_handler.mm`. Build system supports macOS via CMake.
 Per-file Windows/macOS parity tables: `cef-native/src/handlers/CLAUDE.md` and
-`cef-native/src/core/CLAUDE.md`. Port history: `development-docs/Final-MVP-Sprint/macos-port/`.
+`cef-native/src/core/CLAUDE.md`. Port history: `archived-docs/Final-MVP-Sprint/macos-port/`.
 
 ---
 

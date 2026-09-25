@@ -1,5 +1,7 @@
 # A failed placeholder→txid resolution is swallowed, and the transaction broadcasts anyway
 
+> ✅ **CLOSED — 2026-09-25 open-ticket review.** Evidence: `c0894da`; live row done in `a18e465`. ⚠️ The status line below was stale; this note supersedes it.
+
 **Status:** 🔴 **OPEN — verified 2026-08-31.** The proof placeholders are still present in `rust-wallet/src/handlers.rs`. Labelled 2026-08-31 (had no status line).
 **Sprint:** 📌 Phase 8 (money-path correctness) — bundled 2026-08-31.
 
@@ -104,11 +106,11 @@ this test proves nothing.
 ## 7. Out of scope
 
 - Changing what the reservation *is* — that is the separate convergence ticket,
-  `../TICKET_reservation_ownership_converge_on_spent_by.md`. This ticket is a strictly local fix
+  `../0.4.0-beta.5/tickets/TICKET_reservation_ownership_converge_on_spent_by.md`. This ticket is a strictly local fix
   that is worth doing whether or not that refactor ever happens.
 
 ## 8. Related
 
 - `phase-0.7-utxo-reservation-leak/PHASE_CONTRACT.md` §3a — where this was found.
 - `TICKET_createaction_strands_utxos_on_error.md` — the leak this sits behind.
-- `../TICKET_reservation_ownership_converge_on_spent_by.md` — the structural fix.
+- `../0.4.0-beta.5/tickets/TICKET_reservation_ownership_converge_on_spent_by.md` — the structural fix.

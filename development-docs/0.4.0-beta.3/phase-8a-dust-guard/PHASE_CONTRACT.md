@@ -140,7 +140,7 @@ pulls it in is the **lazy-consolidation pass** (`:7325-7341`), capped at `max_ex
 ### 0.7 ⚠️ `D-7` — Dead doc link, cited twice
 
 `development-docs/1SatOrdinals-BSV21/README.md` **does not exist**. The rule lives at
-`development-docs/0.4.0-beta.4/sprint-2-1sat-ordinals/README.md:38` ("Two rules from BRC-147 that are
+`development-docs/0.4.0-beta.5/track-2-1sat-ordinals/README.md:38` ("Two rules from BRC-147 that are
 load-bearing for us"). Rule 2 read and confirmed — it says exactly what the ticket says it says,
 including *"a general 'pay' or auto-pay grant **MUST NOT** authorize spending them"* and
 *"permanently destroyed asset"*. The path is stale in **both** `TICKET_...dust_paths.md:142` and

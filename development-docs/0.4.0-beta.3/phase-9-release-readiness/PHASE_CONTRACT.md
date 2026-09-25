@@ -1,9 +1,9 @@
 # Phase 9 — release readiness · PHASE CONTRACT
 
 **Workstream:** promotion blockers + DevOps hygiene (`../SPRINT_PLAN.md` §4.1, Phase 9 bundle)
-**Tickets:** `../TICKET_cdp_port_open_in_release.md` · `../TICKET_engine_pins_are_branches_not_tags.md` ·
+**Tickets:** `development-docs/0.4.0-beta.5/tickets/TICKET_cdp_port_open_in_release.md` · `../TICKET_engine_pins_are_branches_not_tags.md` ·
 `../TICKET_farbling_gate_engine_binding.md` · `../TICKET_dependency_freshness_review.md` ·
-(🍎 Mac, relayed) `../TICKET_appcast_missing_minimum_system_version.md` ·
+(🍎 Mac, relayed) `development-docs/0.4.0-beta.5/tickets/TICKET_appcast_missing_minimum_system_version.md` ·
 (⛔ not here — `INSTALL_TEST_BATCH.md` I5) `../TICKET_stray_log_in_install_root.md`
 **Status:** ✅ **SIGNED OFF (Windows) 2026-09-14** — kickoff `fba4c7a`; ticket 2 `3b2a0c5`; ticket 1 D2+D3 `67a9ab6`, D4 `df90e5d`; ticket 3 harness `3769455` + gate `43e4b90` (rule 6); ticket 4 `6be6409`. 🍎 **Pending Mac:** the 🚦 appcast blocker and the CDP `.mm` mirror (`MAC_RELAY_BETA3.md` round 2026-09-14b). ⏳ **Owed:** `I8` (install batch) and the owner's right-click on the wallet overlay (`P9-A3` T3 half). 👤 owner answered §8 (all seven, recorded there).
 **Opened:** 2026-09-14 · **Owner:** Matthew Archbold · **Platforms:** Windows for every commit here; macOS owes the two

@@ -6224,7 +6224,7 @@ If the rebase stops on a conflict, the likely files and how to resolve them:
 | `development-docs/0.4.0/MACOS_PORT_0_4_0.md` | **Yours wins.** Windows does not edit it. |
 | `cef-native/src/handlers/simple_handler.cpp`, `simple_render_process_handler.cpp` | Windows touched **only** the farbling seed block in the render handler (fail-closed, landed 2026-08-08 — you should already have it). If you see a conflict here, take **both** changes; they are in different functions. |
 | `frontend/src/components/PrivacyShieldPanel.tsx`, `components/settings/PrivacySettings.tsx` | Windows softened the fingerprint copy. **Take Windows' version** unless you changed the same strings. |
-| `development-docs/X402_INTEGRATION.md` | **Do not touch.** Concurrent work on another machine. |
+| `development-docs/0.4.0-beta.5/X402_INTEGRATION.md` | **Do not touch.** Concurrent work on another machine. |
 
 ### Step 2 — read what changed
 
@@ -6350,7 +6350,7 @@ each have passed with the feature entirely absent.
 
 The fail-closed fix removes the `std::hash(url)` fallback seed. That seed never reached the renderer, so
 farbling ran on a per-URL **constant** — identical for every user, i.e. a browser-*identifying*
-fingerprint, worse than none (ticket: `development-docs/TICKET_farbling_constant_seed_shipped.md`).
+fingerprint, worse than none (ticket: `archived-docs/tickets/TICKET_farbling_constant_seed_shipped.md`).
 Fail-closed means "no seed ⇒ inject nothing".
 
 Because Mac is on **M136**, the JS path is *all* Mac has — so **after this change Mac has no farbling at
