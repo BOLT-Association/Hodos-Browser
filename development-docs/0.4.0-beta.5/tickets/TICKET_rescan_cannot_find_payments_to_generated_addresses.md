@@ -55,6 +55,12 @@ counterparty = self) every input is known, so index 0, 1, 2… can be walked. Fo
 prefix/suffix — the inputs are not guessable, so **no scan can find it**. Those arrive through
 MessageBox, or by hand through Tools-tab card 1 (*Claim a payment*).
 
+🚨 **Owner, 2026-09-25 — the phantom-coin cause is the most important part of this ticket.** BRC-42
+scanning was switched off because it *created phantom coins where backup change outputs sit*. That
+cause is **fixed at its root, not bypassed** — take the time: research it properly, reproduce it,
+and write negative controls that go red when the fix is removed. A money-path row in a state no code
+expects is trip-wire 1 of root `CLAUDE.md` rule 7.
+
 ⇒ **Scanning is not a general BRC-42 recovery tool.** It recovers exactly one thing: payments to
 addresses the wallet generated for the user and the user handed to someone. The UI and docs must
 not claim more.
