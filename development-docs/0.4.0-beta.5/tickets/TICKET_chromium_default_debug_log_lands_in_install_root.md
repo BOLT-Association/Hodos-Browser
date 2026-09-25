@@ -1,5 +1,7 @@
 # TICKET — Chromium's default `debug.log` lands in `{app}`, because two lines log before `CefInitialize`
 
+> ✅ **CLOSED 2026-09-25 (owner).** Fixed by `9559191` and shipped in the public `v0.4.0-beta.4`.
+
 **Filed:** 2026-09-23, by the `I4` row of `INSTALL_TEST_BATCH.md`, run against the **real signed
 `v0.4.0-beta.3` draft installer**. **Severity:** 🟡 low — hygiene, not privacy and not update-integrity.
 👤 **Owner accepted it for beta.3 and asked for it to be carried here** rather than fixing on the RC.

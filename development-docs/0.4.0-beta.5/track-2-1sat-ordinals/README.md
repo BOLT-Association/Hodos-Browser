@@ -13,6 +13,9 @@
    too. Everything in this repo, including items 1–2, predates those changes. **Background, not a
    dependency:** nothing is built on `BSV-Tokens/` research until it has been re-checked against
    current sources.
+0b. ⭐ **BSV-21 is the FIRST research question** (owner, 2026-09-25 — planning note D8): most 1Sat activity
+   today is BSV-21 fungible tokens. Re-check `../WATCH_fungibles.md` (BRC-163 vs BRC-175) and the current SDK's
+   BSV-21 handling before designing anything; the old "review phase last" ordering is superseded.
 1. **`development-docs/BSV-Tokens/` — all seven documents.** Pre-existing research this track builds
    on. **Per-file trust ratings are at the bottom of this document** ("Existing research to
    evaluate") — two are marked do-not-trust and one must be redone from scratch. Read the ratings

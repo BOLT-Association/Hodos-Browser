@@ -1,6 +1,6 @@
 # The release cycle
 
-**Created:** 2026-09-24, out of the beta.3 cycle's AAR (`0.4.0-beta.3/AAR.md`). **Version: v4.**
+**Created:** 2026-09-24, out of the beta.3 cycle's AAR (`0.4.0-beta.3/AAR.md`). **Version: v5.**
 ⭐ **This document is an output of every AAR.** It is expected to change each cycle; when it does,
 the AAR that changed it says so (§7).
 
@@ -146,10 +146,11 @@ unchecked step as a checked one.
 - [ ] **G5 — Comms plan set and serialization mapped.** Relay opened; lead named; constraints listed
 - [ ] **G5.5 — ⭐ FEASIBILITY.** 👤 *Is this too big?* — answered with numbers, not a vibe (§3.7)
 - [ ] **G6 — 👤 PLANNING CLOSED.** Owner sign-off. ⇒ **execution may begin**
+      ⭐ **At G6: open one GitHub issue per phase** on `origin`, each linking its phase contract (§4.1a)
 
 ### Execution gates *(per track — the detail lives in the phase contracts)*
 
-- [ ] **G7 — Each phase closed**: evidence table complete · every assertion has a **negative
+- [ ] **G7 — Each phase closed**: its **GitHub issue closed** by the pushed commit that closes it (§4.1a) · evidence table complete · every assertion has a **negative
       control** · **adversarial review of the evidence** done · `AAR_NOTES.md` swept
 - [ ] **G8 — Each track closed**: **kaleidoscope(close)** · regression at the boundary ·
       ⭐ *does anything we learned change what the next track should do?*
@@ -294,6 +295,21 @@ because deferring felt free. It was not free; the cost moved, and grew.
 ### 4.1 The phase contract
 Carries the items, acceptance assertions, evidence table, and the checks below.
 
+### 4.1a ⭐ GitHub issues — the tracking layer, one per phase *(v5, trial in beta.5)*
+
+👤 Owner, 2026-09-25. **Markdown stays the source of truth** — tickets, phase contracts and evidence
+live in the repo. **GitHub issues are the tracking layer on top**, for two reasons: linking work to
+code, and a place future developers (and their AI tools) expect to look.
+
+| Rule | |
+|---|---|
+| **Grain** | ⛔ **One issue per phase.** Not per ticket, not per item — items stay rows in the contract |
+| **When created** | At **G6** (planning closed), when phases are stable. Earlier, they churn |
+| **Content** | Title = the phase id **and its plain-language subject** (working rule 8); body = a link to the phase contract. No detail duplicated — the contract is the truth |
+| **Commits** | Reference the issue (`Refs #N`); the commit that closes the phase uses `Closes #N` |
+| **Close** | At **G7**, when the phase is signed off and **pushed**. The contract's sign-off carries the checkbox |
+| **Review** | ⭐ The beta.5 AAR judges whether this earned its keep — keep, change or drop |
+
 ### 4.2 Where each check belongs
 
 | Check | Where | The question |
@@ -420,6 +436,9 @@ increments. ⛔ No silent edits.
   boundary per phase** (§4.6); **contract weight per rung** (§0) — an item gets a row, not a document.
   Root `CLAUDE.md` gained **working rule 8** (never hand the owner a bare identifier) and rule 7 now
   says *cycle* rather than the retired *sprint*.
+- **v5 — 2026-09-25**, 👤 owner approval: **GitHub issues as a tracking layer, one per phase** (§4.1a) —
+  opened at G6, closed at G7 by the pushed commit; markdown stays the source of truth. A trial for
+  beta.5, reviewed in its AAR.
 - **v4 — 2026-09-25**, 👤 owner approval: **ecosystem currency** added to orientation step 2 (§1,
   §3.1a) — the BRCs, reference SDKs and peer wallets/apps we must stay compatible with, fetched fresh
   every cycle, and every track's research starts by re-fetching them. Why: compatibility is a top

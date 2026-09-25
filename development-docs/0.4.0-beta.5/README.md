@@ -35,6 +35,17 @@ order"), **these win** until the cleanup below rewrites that text.
 | D4 | **OpNS is out of this release** | Its track folder moves to `Future-Features/Decentralized-Naming/`. A different naming system may be researched later; it is R&D too large for this cycle |
 | D5 | **Every ticket lands in a track** | Each becomes a phase, sub-phase or item inside a track, or is closed (fixed / duplicate / stale) or deferred with a re-check condition. The groupings proposed at G0 become tracks: **identity & privacy** is a real track (incl. BRC-103/104 server identity verification and `/.well-known/auth`); **browser shell** is a candidate track; **instruments & hygiene** are background items, not a track |
 
+### Decided 2026-09-25 (second round)
+
+| # | Decision | Detail |
+|---|---|---|
+| D6 | **GitHub issues: one per phase** | Opened at G6, closed at G7 by the pushed commit; markdown stays the truth. `../RELEASE_CYCLE.md` v5 §4.1a. Trial, reviewed in the AAR (`AAR_NOTES.md`) |
+| D7 | **Release notes / social posts reuse the G1 mission** | 👤 The mission paragraph is the release announcement, plus bullets per track at promote time |
+| D8 | **BSV-21 is T2's FIRST research question, not a late review** | Most 1Sat activity today is BSV-21 fungible tokens. Re-check BRC-163 vs BRC-175 (`WATCH_fungibles.md`) and how the **current** 1Sat SDK handles BSV-21. Protection is already covered: a BSV-21 transfer is a 1-sat inscribed output, so T1's guard classifies it as a token |
+| D9 | **Active-user count is in beta.5** | A phase in T5 — count users **without identifying them** (👤 needed for marketing and fundraising) |
+| D10 | **Next-release intake folder exists** | `../0.4.0-beta.6/` — first ticket: the CI/CD pipeline review |
+| D11 | **Tickets stay in `tickets/`** | The register's Track column is the assignment; each track's scope doc links its tickets. A ticket becomes a phase or item at G3 |
+
 ### ⭐ Research step one, for every track — the ecosystem is current, our copies are not
 
 - **Re-fetch the current SDKs, libraries and specs before any design. Never trust our copies** — every
@@ -97,10 +108,10 @@ Every ticket in `tickets/` now names a track in the register's **Track** column 
 | **B5-T2 1Sat Ordinals** | Hold, show, receive and deliberately transfer ordinals (BRC-147/150/165) | 2 | `track-2-1sat-ordinals/` |
 | **B5-T3 Backup & sync** | On-chain backup and multi-device restore in a standard, interoperable format — stable, conflict-free, efficient | 1 | `track-4-onchain-backup-sync/` ⭐ start at `BACKUP_HISTORY_OVERVIEW.md` |
 | **B5-T4 402 payments** | The x402 adapter over our BRC-121 client, plus the open 402 defects | 4 | `X402_INTEGRATION.md` |
-| **B5-T5 Identity & privacy** | A site gets only the keys, identity and wallet surface the user chose to give it; servers prove who they are (BRC-103/104) | 9 | — |
+| **B5-T5 Identity & privacy** | A site gets only the keys, identity and wallet surface the user chose to give it; servers prove who they are (BRC-103/104); count users without identifying them | 10 | — |
 | **B5-T6 Browser shell** | Multi-window, tabs, import, update visibility and consent-UI defects | 14 | `TOOLS_TAB_claim_a_payment.md` (outline) |
 | *Background* | Agent-run instruments and hygiene — **not a track** | 7 | — |
-| *Owner decision / close / defer* | Screenshots in public history · Big Sur feed item · close the fixed Chromium `debug.log` ticket · defer 2 research tickets | 5 | — |
+| *Closed / owner decision / defer* | Chromium `debug.log` ✅ closed · Big Sur feed ✅ closed · screenshots in public history ⏸️ owner re-decision · knowledge & memory architecture ❄️ deferred | 4 |
 
 ⚠️ **7 tracks is above the 4–5 guideline.** That is a **feasibility (G5.5)** question, answered in
 owner-hours, not now. Recommendation already on record: cut from the back — `T6`, then `T4`.

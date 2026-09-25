@@ -65,11 +65,11 @@ existing links use it. Describe the **symptom or the defect**, not the fix:
 | `TICKET_well_known_auth_returns_a_key_it_cannot_sign_for.md` | 📌 PROPOSED (G2) | **B5-T5 Identity & privacy** | 2026-09-21 |
 | `TICKET_brc121_client_has_no_body_transport_for_large_beef.md` | 📌 PROPOSED (G2) | **B5-T4 402 payments** — (decision at the microscope pass; waits on BRCs #261) | 2026-09-23 |
 | `TICKET_mkcert_dev_private_key_is_tracked_and_public.md` | 📌 PROPOSED (G2) | **Background — hygiene** — (🟡 low; regenerate, do NOT rewrite history) | 2026-09-23 |
-| `TICKET_chromium_default_debug_log_lands_in_install_root.md` | ✅ **FIXED `9559191`** (beta.4 release) | **✅ close — fixed `9559191`** | 2026-09-23 |
+| `TICKET_chromium_default_debug_log_lands_in_install_root.md` | ✅ **CLOSED 2026-09-25** | — (fixed `9559191`, shipped in beta.4) | 2026-09-23 |
 | `TICKET_g1_gate_cannot_see_chromiums_own_log_target.md` | 📌 PROPOSED (G2) | **Background — instruments** — (⭐ the gate PASSED through the defect it was written for) | 2026-09-23 |
 | `TICKET_update_is_visible_when_it_should_not_be.md` | 📌 PROPOSED (G2) | **B5-T6 Browser shell** — (👤 owner-raised; ⭐ tiers 1+2 give Chrome's UX without Chrome's architecture) | 2026-09-24 |
 | `TICKET_wallet_backend_is_shared_across_os_accounts.md` | 📌 PROPOSED (G2) | **B5-T5 Identity & privacy** — (🔐 measured once on macOS; mechanism is code reading) | 2026-09-24 |
-| `TICKET_active_user_count_without_identifying_users.md` | 📌 PROPOSED (G2) | **❄️ Defer — research, not this release** | 2026-09-17 |
+| `TICKET_active_user_count_without_identifying_users.md` | 📌 PROPOSED (G2) | **B5-T5 Identity & privacy** — 👤 owner wants it **this release** (marketing, fundraising); a phase: *count users without identifying them* | 2026-09-17 |
 | `TICKET_brc103_server_identity_unverified.md` | 📌 PROPOSED (G2) | **B5-T5 Identity & privacy** — (🔴 AuthFetch trusts the server's claimed key) | 2026-09-16 |
 | `TICKET_brc140_key_shares_vs_bip39.md` | 📌 PROPOSED (G2) | **B5-T3 Backup & sync (research phase)** — (🔬 research-and-decide) | 2026-09-16 |
 | `TICKET_menu_exit_closes_primary_not_the_clicked_window.md` | 📌 PROPOSED (G2) | **B5-T6 Browser shell** | beta.3 Phase 3.5 |
@@ -82,7 +82,7 @@ existing links use it. Describe the **symptom or the defect**, not the fix:
 | `TICKET_brc121_remint_on_retry.md` | OPEN *(⚠️ likely stale)* — deferred 2026-08-10 | **B5-T4 402 payments** — ✅ verified 2026-09-25: **still open, narrowed** (possibly-paid case; see file) — (real money; beta.3's `TICKET_brc121_paid_retry_aborts_and_mints_a_payment_each_time.md` was **closed** by Phase 11 item 11 — in-flight payment reuse — which likely closes this too. **Verify, then close with evidence**) | 2026-08 |
 | `TICKET_debug_log_unfiltered_in_production.md` | OPEN *(⚠️ likely stale)* | **Background — hygiene** — ✅ verified 2026-09-25: **still open, narrowed** (a few INFO URL lines; macOS log pruning) — (beta.3 `CRITICAL_UPDATES.md` reads it as fixed by `fa0c143`, and beta.3's twin `TICKET_production_debug_logging_unbounded.md` is **closed** by `fa0c143` + `c3604f9` — **verify, then close with evidence**) | 2026-08 |
 | `TICKET_knowledge_and_memory_architecture.md` | 🔵 RESEARCH, not scheduled | **❄️ Defer — research, not scheduled** | 2026-09-08 |
-| `TICKET_logged_in_screenshots_in_public_history.md` | OPEN — 👤 owner decision needed (rewrite vs accept) | **👤 owner decision (rewrite history vs accept)** — (exposure grows with time) | 2026-08-13 |
+| `TICKET_logged_in_screenshots_in_public_history.md` | ⏸️ **owner decision re-opened 2026-09-25** | — (the rewrite's blast radius grew: all four public tags incl. `v0.4.0-beta.4` now descend from the bad commit; see the note at the top of the file) | 2026-08-13 |
 | `TICKET_profile_lock_misreports_missing_dir.md` | OPEN | **B5-T6 Browser shell** — (small) | 2026-08 |
 | `TICKET_reservation_ownership_converge_on_spent_by.md` | OPEN | **B5-T1 Money path** — 📌 placed as **Track 0.5** in `../README.md` (owner, 2026-09-15; to confirm at kickoff) | 2026-08-22 |
 | `TICKET_engine_behind_its_own_cef_branch_and_upstream_stable.md` | 📌 PROPOSED (G2) | **B5-T0 Engine** — (⭐ proposed as a track, likely Track 0; **target is an owner decision**) | 2026-09-24 |
@@ -94,7 +94,7 @@ existing links use it. Describe the **symptom or the defect**, not the fix:
 | `TICKET_db_lock_held_across_await_is_unenforced.md` | 📌 PROPOSED (G2) | **Background — instruments** — (hygiene; carries H-1/H-2/H-4 notes) | 2026-09-25 |
 | `TICKET_dead_cert_tx_builder_marks_coins_spent_on_404.md` | 📌 PROPOSED (G2) | **B5-T1 Money path** — (hygiene; dead code, grep-verified only) | 2026-09-25 |
 | `TICKET_final_mvp_efficiency_leftovers_never_scheduled.md` | 📌 PROPOSED (G2) | **Background — split at triage (fuzzing → instruments)** — (five items; ⭐ fuzz testing's "post-launch" trigger has fired) | 2026-09-25 |
-| `TICKET_appcast_missing_minimum_system_version.md` | 🟡 leftover — 👤 **owner decision** | **👤 owner decision — then close** — (moved from beta.3; defect fixed `20aa750`) | 2026-08-17 |
+| `TICKET_appcast_missing_minimum_system_version.md` | ✅ **CLOSED 2026-09-25** | — (owner: no pinned Big Sur feed item; live feed already declares macOS 12.0) | 2026-08-17 |
 | `TICKET_brand_remaining_permission_prompts.md` | OPEN | **B5-T6 Browser shell** — (moved from beta.3; 21 prompts still stock Chrome UI) | beta.3 |
 | `TICKET_brc121_beef_header_exceeds_100kb_and_payment_is_lost.md` | 🟡 leftover | **B5-T4 402 payments** — (moved from beta.3; HTTP 431 still retried; money) | beta.3 |
 | `TICKET_bulk_utxo_sync_truncates_at_20_per_address.md` | OPEN | **B5-T1 Money path** — (moved from beta.3; ⚠️ **money, high**: wallet sees only 20 coins per address) | beta.3 |

@@ -1,5 +1,10 @@
 # TICKET — the macOS appcast advertises no `minimumSystemVersion`, and the floor just moved 11.0 → 12.0
 
+> ✅ **CLOSED 2026-09-25 (owner decision).** **No pinned 0.3.x feed item for Big Sur.** We do not maintain 0.3.x,
+> so there is nothing to send. Verified the same day: the **live** feed serves `0.4.0-beta.4` with
+> `<sparkle:minimumSystemVersion>12.0`, so Big Sur Macs are not offered 0.4.0 and stay safely on 0.3.x.
+> Follow-up for the website, not this ticket: the download page should say *requires macOS 12 or newer*.
+
 > 📦 **Moved from `0.4.0-beta.3/` on 2026-09-25** (open-ticket review before that folder is archived).
 > Defect fixed in `20aa750`. **Remaining:** one 👤 owner product decision — offer Big Sur users on 0.3.x a pinned second feed item, or not.
 

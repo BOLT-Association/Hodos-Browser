@@ -1,7 +1,7 @@
 # Phase <N> — <title> · PHASE CONTRACT
 
 **Workstream:** <WSx> · **Ticket:** `<TICKET_*.md>` · **Status:** ⬜ NOT STARTED / 🚧 IN PROGRESS / ✅ SIGNED OFF
-**Opened:** <date> · **Owner:** <who> · **Platforms:** Windows / macOS / both
+**Opened:** <date> · **Owner:** <who> · **Platforms:** Windows / macOS / both · **GitHub issue:** #<N> (opened at G6)
 **Standard:** `../HARNESS.md`. Read it before filling this in.
 
 ---
@@ -59,7 +59,9 @@ reviewer can check you looked.>
 - [ ] `../REGRESSION_SET.md` run in full at this boundary — result recorded
 - [ ] Adversarial review complete, four questions answered in writing
 - [ ] Any baseline lowered in `../HARNESS.md` §4, residuals listed with reasons
-- [ ] Commit messages cite the row IDs they satisfy
+- [ ] Commit messages cite the row IDs they satisfy, and reference the phase issue (`Refs #N`)
+- [ ] **Pushed, and the phase's GitHub issue CLOSED** by the closing commit (`Closes #N`) — `RELEASE_CYCLE.md` §4.1a
+- [ ] Context: memory saved · boundary decided (continue / fresh session) — `RELEASE_CYCLE.md` §4.6
 
 | Item | Result | Date | By |
 |---|---|---|---|

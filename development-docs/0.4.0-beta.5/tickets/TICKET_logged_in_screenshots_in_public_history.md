@@ -1,5 +1,12 @@
 # TICKET — logged-in session screenshots are in the PUBLIC repo's git history
 
+> ⏸️ **2026-09-25 — owner approved Option A, then execution was PAUSED for a re-decision.** Measured that day:
+> `99e72aa` is an ancestor of `release/0.4.0`, `release/main`, `release/staging` **and all four public tags**
+> `v0.4.0-beta.1` … `v0.4.0-beta.4` — the last is the public Latest — with **537** commits on top of it. A rewrite now
+> changes every one of those commit ids. On `release` alone it breaks the tag↔commit link of every shipped build; on
+> `origin` too, it invalidates every commit id cited as evidence across `development-docs/` (hundreds) and forces the
+> macOS agent and the second worktree to re-clone. The August estimate (~1 h, one tag) no longer holds.
+
 **Filed:** 2026-08-13 · **Severity:** moderate, time-sensitive (exposure grows with time, not severity)
 **Status:** OPEN · **Owner decision needed:** rewrite now vs. accept
 
