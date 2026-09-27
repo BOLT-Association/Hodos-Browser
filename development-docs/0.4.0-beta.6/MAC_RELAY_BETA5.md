@@ -9,6 +9,28 @@
 
 ---
 
+# 📋 ROUND W-27b (**Windows**) — 🗂️ **the release folders were renamed. Update every path you hold.** No rebuild: docs + Rust comments only.
+
+## §1 — The moves (commit `457d8f7`, 2026-09-27)
+
+| Was | Now | Why |
+|---|---|---|
+| `development-docs/0.4.0-beta.5/` (the release being planned — **this relay's folder**) | **`development-docs/0.4.0-beta.6/`** | Decision 1: the engine security release takes `v0.4.0-beta.5`, so this plan ships as `v0.4.0-beta.6` |
+| `development-docs/0.4.0-beta.6/` (next-release intake) | **`development-docs/0.4.0-beta.7/`** | follows from the above |
+
+- ⭐ **This relay file keeps its name** (`MAC_RELAY_BETA5.md`) and phase ids keep **`B5-`** — both are
+  lookup keys already cited elsewhere.
+- 📏 Sweep: 41 files, 112 path references, verified path-only. `0.4.0-beta.3/` untouched by rule — its 43
+  historical references still name the old path.
+- 🔨 **No rebuild.** `rust-wallet/src/handlers.rs` and `utxo_fetcher.rs` changed **comments only** (doc
+  paths). No `cef-native/` or `frontend/` change.
+
+## §2 — What to do
+
+Rebase; update any path you hold (session prompts, private memory pointers). Nothing else.
+
+---
+
 # 📋 ROUND W-27a (**Windows**) — ✅ **all 14 G2 owner decisions made (2026-09-27).** 🍎 macOS still stands down — planning is not complete (G3–G6 remain). **No rebuild: docs only.**
 
 ## §1 — What was decided, as it touches you
@@ -18,7 +40,7 @@ Full record: `README.md` → *"✅ Decisions as made (G2 sitting, 2026-09-27)"*.
 | # | Decision | 🍎 What it means for macOS (later, not now) |
 |---|---|---|
 | **1** | ⭐ **Engine security release ships ALONE, refresh only** → `chromium-150.0.7871.255` (closes the exploited V8 bug; `085f765`). The `"Hodos"` `Sec-CH-UA` brand and the ad-block pull move to a **second** engine build | You will get a build round: the T0 scope says the Mac host's `chromium/src/.git` was **deleted**, so moving `.187 → .255` needs a **fresh no-history `src` fetch** (tens of GB, half a day of machine time) — the cheap reuse path does not apply. Then stage, `vtool` minos re-measure, codecs, farbling rotation token. ⚠️ **Not yet** — it arrives as its own round |
-| **1** | 🔢 **Version names change.** The security release is **`v0.4.0-beta.5`**. The release planned in this folder becomes **`v0.4.0-beta.6`**; this folder renames to `0.4.0-beta.7/`, and the intake folder `0.4.0-beta.7/` to `0.4.0-beta.7/` — **one rename commit, not yet done**. Why not `beta.4.1`: `release.yml`'s build-number parser reads only a trailing `-beta.<digits>`, so `beta.4.1` scores **99 = final** → `40099`, which outranks every later beta in **Sparkle** and in `UpdateStager::IsNewerBuild` — a silent auto-update dead end on both platforms | Update any path you hold when the rename round lands |
+| **1** | 🔢 **Version names change.** The security release is **`v0.4.0-beta.5`**. The release planned in this folder becomes **`v0.4.0-beta.6`**; this folder renames to `0.4.0-beta.6/`, and the intake folder `0.4.0-beta.6/` to `0.4.0-beta.7/` — **one rename commit** *(✅ done later the same day — round W-27b)*. Why not `beta.4.1`: `release.yml`'s build-number parser reads only a trailing `-beta.<digits>`, so `beta.4.1` scores **99 = final** → `40099`, which outranks every later beta in **Sparkle** and in `UpdateStager::IsNewerBuild` — a silent auto-update dead end on both platforms | Update any path you hold when the rename round lands |
 | 2 / 2a | Money = **positively marked** (`change=1`, wallet-toolbox rule) **plus** a Go-style separate money-index table (schema change approved, heavy negative controls) | Rust only — shared. Nothing platform-specific |
 | 7 | Unidentified coins: tiered rule — real script first; multi-sat plain P2PKH ⇒ money; 1-sat unreadable ⇒ held and **shown** | Wallet panel UI (frontend) — relay-confirm at the time |
 | 11 / 12 | Derived keys: per-site grant at levels 1–2 + a cross-site detector (schema); missing `counterparty` ⇒ SDK defaults (`anyone` for signing) | Rust only — shared |

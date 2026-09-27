@@ -4,7 +4,7 @@ This folder contains feature research, design exploration, and implementation gu
 
 ⛔ **The root holds only living, cross-release documents** — `README.md`, `RELEASE_CYCLE.md`,
 `SCOPING_PROCESS.md`, `PRIOR_ART.md`, `MACOS_CATCHUP_PLAYBOOK.md`, `KNOWLEDGE_AND_MEMORY.md`. Release-specific work lives in a
-release folder (`0.4.0-beta.6/` is current); finished work lives in `archived-docs/`.
+release folder (`0.4.0-beta.6/` is current — planned as beta.5 until the 2026-09-27 rename; intake for the next one is `0.4.0-beta.7/`); finished work lives in `archived-docs/`.
 
 ## Where things moved (2026-09-25)
 

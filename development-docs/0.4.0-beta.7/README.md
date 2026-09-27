@@ -1,15 +1,15 @@
-# beta.6 release — intake only
+# beta.7 release — intake only *(this folder was `0.4.0-beta.6/` until 2026-09-27)*
 
 **Opened:** 2026-09-25, during beta.5 planning. **Status:** 📥 **INTAKE ONLY** — no planning has run.
 This folder exists so work that belongs to the *next* release has a home the day it is found, instead
-of being lost or squeezed into beta.5.
+of being lost or squeezed into the release being planned (`../0.4.0-beta.6/`).
 
-⛔ Nothing here is scheduled. beta.6 planning starts at its own gate `G0` (`../RELEASE_CYCLE.md`),
-after beta.5 ships and its AAR is written.
+⛔ Nothing here is scheduled. beta.7 planning starts at its own gate `G0` (`../RELEASE_CYCLE.md`),
+after beta.6 ships and its AAR is written.
 
 | File | What |
 |---|---|
-| `tickets/` | Tickets filed for beta.6. Same conventions as `../0.4.0-beta.6/tickets/README.md` |
+| `tickets/` | Tickets filed for beta.7. Same conventions as `../0.4.0-beta.6/tickets/README.md` |
 
 ## Deferred here by the planned release's G2 decisions (2026-09-27)
 
@@ -24,5 +24,4 @@ Pointers, so nothing deferred is lost. Each item's evidence stays where it was r
 | **Site-scoped identity keys** (derived-keys part 3) | the ecosystem adopts it — carried in the BRC draft `originator-scoped-authentication-keys` | decision 11 |
 | **BRC-140 key shares** — build no earlier than here | root-key convention settled (decision 6) | T3 SCOPE Q5 |
 
-⚠️ **Naming:** once the planned release's folder is renamed to `0.4.0-beta.7/` (decision 1), this intake folder becomes `0.4.0-beta.7/`.
-
+✅ **Naming:** renamed 2026-09-27 (`457d8f7`) — the planned release's folder is `../0.4.0-beta.6/`; this intake folder is `0.4.0-beta.7/`.
