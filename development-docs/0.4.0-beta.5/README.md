@@ -1,8 +1,12 @@
 # beta.5 release — scope and running order
 
 **Opened:** 2026-08-29, from the beta.4 kickoff prompt (the telescope pass; archived to `../../archived-docs/0.4.0-beta.4-planning/`).
-**Status:** ⏸️ **PAUSED 2026-09-25 at the end of G2 research** — owner switched to an urgent `v0.4.0-beta.4`
-fix. ⭐ **Resume at the section directly below.**
+**Status:** 🟡 **G2 — all 14 owner decisions made 2026-09-27; G2 close items remain** (see "▶️ RESUME HERE").
+⭐ **Resume at the section directly below.**
+
+> 🔢 **Renaming owed (decision 1, 2026-09-27):** the engine security release takes **`v0.4.0-beta.5`**, so the
+> release planned here becomes **`v0.4.0-beta.6`** — this folder → `0.4.0-beta.6/`, intake folder → `0.4.0-beta.7/`,
+> in one rename commit. Until then, read "beta.5" below as *the release planned in this folder*.
 
 > **Naming.** This folder produces **`v0.4.0-beta.5`**. It sits beside `0.4.0-beta.3/`, whose cycle
 > is closed (AAR written) but whose relay stays the live macOS channel until this release opens its
@@ -27,7 +31,7 @@ fix. ⭐ **Resume at the section directly below.**
 |---|---|
 | **G0 Oriented** | ✅ done 2026-09-24 (consolidation, cleanup, ticket inventory) |
 | **G1 Mission** | ✅ **signed off by the owner 2026-09-27** — see "🎯 G1 — Mission" below; also to be reused as the release notes |
-| **G2 Tracks** | 🟡 **research done** — seven `SCOPE.md` files, one per track folder (`track-0-engine/` … `track-6-browser-shell/`); **14 owner decisions owed** (table below). Owner has **not yet read** the scope docs |
+| **G2 Tracks** | 🟡 **research done; all 14 owner decisions made 2026-09-27** ("✅ Decisions as made" below; decision 10's chain check ran — zero hits). ⬜ **G2 close items remain** — see "G2 — what is still owed" below |
 | G3–G6 | ⬜ not started. Next after the decisions: G3 phases per track, then G4 logistics, G5 comms + serialization, G5.5 feasibility, G6 go/no-go |
 | macOS | 🍎 **not started, by owner decision** — macOS joins after planning is complete. Keep updating `MAC_RELAY_BETA5.md` as planning moves |
 
@@ -91,6 +95,25 @@ Research was run on Fable for T2 and T4, the current model for the rest — comp
 | 12 | 👤 **Approved (invariant 3): a missing `counterparty` is accepted with the `@bsv/sdk` 2.8.7 per-call defaults.** `createSignature` ⇒ **`anyone`**; `createHmac` and `verifySignature` ⇒ **`self`** (encrypt/decrypt already default `self`, correct). ⛔ Do **not** reuse `handlers.rs :: resolve_counterparty_pubkey`'s `None → self` for signing. The signing math is unchanged — only the default filling a blank field. Also: validate the request **before** the permission prompt (today a user can approve a call that was always going to fail) | T5-P3 item. Negative control pins the **default**, not "no error": a signature made without a counterparty verifies under `anyone` and **fails** under `self`. Decision 11's part-2 detector must watch `anyone` as well as `self` (both give every site the same key for a given protocol + keyID) |
 | 13 | **User count: cut-down Brave usage ping, OPT-OUT, with three conditions** (T5 SCOPE §5 P5, §9 Q8/Q9). Once a day, one cookieless HTTPS GET: `daily`/`weekly`/`monthly`/`first` flags + OS, channel, version. **No** install date/week (`dtoi`/`woi` — near-identifying at our size), no referral, no ID/account/key/balance/URL. Conditions: ① first-run notice; ② the public **"every byte we send"** page is live **before** the ping ships; ③ a **wire-level** negative control proves the off switch sends **zero** requests (Brave shipped exactly that bug, `brave-browser#45271`). Stated plainly to users: the server **sees the IP** at request time — protection is **policy** (country at the edge, small countries suppressed, IP dropped before write, no access logs), never called "anonymous" | T5-P5. Endpoint location/readers (K11) and page wording (K12) settled at G3. ⛔ **Switch-on is outward-facing and irreversible once data exists — it returns to the owner** (unconditional stop 4) |
 | 14 | **Browser-shell cut line: split view (#5) and Chrome password import (#7 slice C) → the release after this one** (beta.7 after the rename). Split view gets its own scoping run **after** session restore (T6-P2) lands. Password import comes back as **CSV only** — never touching Chrome's keys (App-Bound Encryption; Brave and Firefox both retreated to CSV). **Stays:** Chrome bookmarks + history import (slices A + B, T6-P6) | T6 Groups 1–2 stand as the keep set; Group 3 is first to cut at G5.5. If the save-password bubble is ever wanted branded, that is a `NEXT_CHROMIUM_BUILD.md` PART 2 row |
+
+### ⬜ G2 — what is still owed before G3 (written 2026-09-27, after decision 14)
+
+G2's contract (`../RELEASE_CYCLE.md` §2): *tracks defined; telescope + kaleidoscope(open) done; every track
+has a scope doc and an integration check.* The scope docs and their integration checks exist (T0 §6, T1 §8,
+T2–T6 §6). What remains:
+
+| # | Item | Who |
+|---|---|---|
+| 1 | **Ticket assignment.** ~45 tickets in `tickets/README.md` sit at 📌 **PROPOSED (G2)**; the register's own rule is that only the owner's assignment makes a ticket work. Includes the moves the scopes recommend: loopback leftovers W4/W6/W7/W8 → T5 (T1 Q3); `two_next_address_index_sources…` → T1 (T1 Q7 = T5 Q10); merge `derivation_params_unbound_to_origin` into the derived-keys ticket (T5 Q3); the three 2026-09-25 tickets (prompt behind the other window, site delete not reaching the browser, find bar) → T6 | 👤 owner (one pass through the register, with proposals pre-filled) |
+| 2 | **Track-level questions the 14 did not cover that are genuinely owner calls** (agent's classification): **T6 Q1** menu → Exit quits the app (reverses the owner's 2026-08-31 statement) · **T6 Q6** store a declined permission as a soft-revoked row (wallet data) · **T5 Q2** `/.well-known/auth` — delete, or send the master key (invariant 3) · **T1 Q2** a `signAction` whose broadcast is fatally refused returns an **error** to the dApp, not 200 (API behaviour change) · **T1 Q5** rescan stops writing BIP-32 addresses into `addresses` | 👤 owner — one short sitting |
+| 3 | **The remaining track questions** — T0 Q2–Q5, T1 Q4/Q6/Q8/Q9, T2 Q3/Q5/Q7, T3 Q5/Q6, T4 Q5–Q8, T5 Q1/Q11/Q12, T6 Q2–Q4/Q8 — taken **per each scope's recommendation** at G3 unless the owner objects (RELEASE_CYCLE §2: the agent certifies verification gates). ⚠️ T0 Q3 (merge upstream into `hodos/7871`) involves a **fork push** — outward-facing, owner approves at the time | agent, at G3 |
+| 4 | **Rewrite the scope docs and track table to the decisions.** T3 → **T3a + T3b** (decision 3); T0 → two builds (decision 1); T1-P3 gains the money index (2a); T5-P3 gains part 2 (11); the older track table / "why this order" text further down this file (planning notes say they win until rewritten) | agent |
+| 5 | **Cross-track integration re-check for the two schema changes.** Decision 2a's money index (derived ⇒ rebuilt on restore) and decision 11's `requesting_domain` on `derived_key_cache` (is it carried in the backup and the BRC-38 export, or rebuilt?) — both are new T1/T5 → T3 edges | agent |
+| 6 | **Security release (decision 1) needs its own short plan** — it ships outside this cycle, like the beta.4 hotfix: T0-P1 → P2 → P5 contract, both platforms, then an owner promote call. It should not wait for G6 of the planned release | agent drafts, 👤 owner promotes |
+| 7 | **The folder rename** (`0.4.0-beta.5/` → `0.4.0-beta.6/`, `0.4.0-beta.6/` → `0.4.0-beta.7/`) + repo-wide pointer sweep + a relay round, as one commit. Decide there whether phase ids keep `B5-` | agent |
+| 8 | **Log the scopes' prior-art rows** into `../PRIOR_ART.md` (every SCOPE has a ready-to-paste §; working rule 5) and apply the doc corrections the research flagged but did not edit: root `CLAUDE.md` rule 5 "no Rust implementation" (two ports now exist — T1 Q8); `CEF_VERSION_UPDATE_TRACKER.md` "fix not on our branch"; `CEF_BUILD_RUNBOOK.md` branch `7103` row; D2's "spring 2027" → M160 LTC 2027-01-13 (T0 Q5); `X402_INTEGRATION.md` §4a (T4 Q7); `R-TOKENPERM`'s 147 → 165 attribution (decision 8) | agent — each its own docs commit |
+
+⇒ When 1–5 are done, G2 can be certified; items 6–8 can run alongside.
 
 ### Research follow-ups raised during the G2 sitting (2026-09-27)
 

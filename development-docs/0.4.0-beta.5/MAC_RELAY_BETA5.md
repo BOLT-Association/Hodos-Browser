@@ -9,6 +9,37 @@
 
 ---
 
+# 📋 ROUND W-27a (**Windows**) — ✅ **all 14 G2 owner decisions made (2026-09-27).** 🍎 macOS still stands down — planning is not complete (G3–G6 remain). **No rebuild: docs only.**
+
+## §1 — What was decided, as it touches you
+
+Full record: `README.md` → *"✅ Decisions as made (G2 sitting, 2026-09-27)"*. The ones with a macOS consequence:
+
+| # | Decision | 🍎 What it means for macOS (later, not now) |
+|---|---|---|
+| **1** | ⭐ **Engine security release ships ALONE, refresh only** → `chromium-150.0.7871.255` (closes the exploited V8 bug; `085f765`). The `"Hodos"` `Sec-CH-UA` brand and the ad-block pull move to a **second** engine build | You will get a build round: the T0 scope says the Mac host's `chromium/src/.git` was **deleted**, so moving `.187 → .255` needs a **fresh no-history `src` fetch** (tens of GB, half a day of machine time) — the cheap reuse path does not apply. Then stage, `vtool` minos re-measure, codecs, farbling rotation token. ⚠️ **Not yet** — it arrives as its own round |
+| **1** | 🔢 **Version names change.** The security release is **`v0.4.0-beta.5`**. The release planned in this folder becomes **`v0.4.0-beta.6`**; this folder renames to `0.4.0-beta.6/`, and the intake folder `0.4.0-beta.6/` to `0.4.0-beta.7/` — **one rename commit, not yet done**. Why not `beta.4.1`: `release.yml`'s build-number parser reads only a trailing `-beta.<digits>`, so `beta.4.1` scores **99 = final** → `40099`, which outranks every later beta in **Sparkle** and in `UpdateStager::IsNewerBuild` — a silent auto-update dead end on both platforms | Update any path you hold when the rename round lands |
+| 2 / 2a | Money = **positively marked** (`change=1`, wallet-toolbox rule) **plus** a Go-style separate money-index table (schema change approved, heavy negative controls) | Rust only — shared. Nothing platform-specific |
+| 7 | Unidentified coins: tiered rule — real script first; multi-sat plain P2PKH ⇒ money; 1-sat unreadable ⇒ held and **shown** | Wallet panel UI (frontend) — relay-confirm at the time |
+| 11 / 12 | Derived keys: per-site grant at levels 1–2 + a cross-site detector (schema); missing `counterparty` ⇒ SDK defaults (`anyone` for signing) | Rust only — shared |
+| 13 | Usage ping, **opt-out**, Brave-style, no install date; off switch proven by a wire-level zero-requests control | **Both platforms** send it — the off-switch control must be run on macOS too |
+| 14 | Split view and Chrome password import → the release after this one | T6 keeps Exit/session restore (Cmd-Q with two windows — the `windowShouldClose` `window_id == 0` question) and Chrome bookmarks/history import (the importer's mac arm must be exercised) |
+
+Also: decision 4 (one active device at a time) is recorded as a **provisional R&D direction**, not a design.
+
+## §2 — One measurement you may want to know about
+
+📏 **Decision 10's read-only chain check ran on the Windows machine's wallets: zero "freed but actually
+spent" BRC-121 payments** (production 1 failed row, dev 49 — all 404 on WhatsOnChain; controls 200/404
+first). Windows-only data — **do NOT inherit this** for a Mac wallet. If your Mac wallet has made BRC-121
+payments, the same check applies to it (method in the README decision-10 row).
+
+## §3 — No asks this round
+
+W-25a's asks (adopt/review `KNOWLEDGE_AND_MEMORY.md`) still stand and can still wait.
+
+---
+
 # 📋 ROUND W-25b (**Windows**) — ⏸️ **beta.5 planning PAUSED at the end of G2 research; 👤 owner switched to an urgent `v0.4.0-beta.4` fix.** 🍎 macOS still stands down.
 
 ## §1 — Where planning stopped
