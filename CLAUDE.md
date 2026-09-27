@@ -35,7 +35,7 @@ Six standing rules. They are short on purpose. Adopted 2026-08-30; provenance an
    | Source | Good for |
    |---|---|
    | **BRC documentation** — always first | What the spec *requires* vs what it leaves to the implementer |
-   | **BSV Association SDKs + `wallet-toolbox`** | ⭐ **The authoritative answer.** How a conforming wallet actually behaves. **TypeScript and Go** are richest. ⚠️ No Rust implementation — port patterns, never code |
+   | **BSV Association SDKs + `wallet-toolbox`** | ⭐ **The authoritative answer.** How a conforming wallet actually behaves. **TypeScript and Go** are richest. ⚠️ Community Rust ports now exist (`b1narydt/rust-wallet-toolbox`, crate `bsv-wallet-toolbox-rs`; found 2026-09-25) — **unaudited, licence unconfirmed, not a reference**. Rule unchanged: port patterns, never code |
    | **Bitcoin BIPs** | Protocol lineage only — BRC-42/43 descend from BIP32, and BIP text is often better argued than the BRC that followed |
    | **BDK / `rust-bitcoin`** | ⛔ **BTC, not BSV. Narrow use only — see the warning below.** |
 
