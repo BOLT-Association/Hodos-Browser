@@ -355,6 +355,14 @@ label; the `bip39`/`bip32` crates; SQLite transaction semantics. Nothing in CEF,
 
 ---
 
+## 6a. Cross-track integration re-check — the two G2 schema changes *(2026-09-27, code reading)*
+
+| Change | Carried by backup / export today? | Consequence for T3 |
+|---|---|---|
+| **Decision 2a — money-index table** (T1-P3), built from `outputs.change` | The index is **derived**, so neither the on-chain payload nor a BRC-38 file carries it (the TS toolbox has no such table). `BackupOutput` **does** carry `change` (`backup.rs :: BackupOutput`) | Restore **rebuilds** the index from `change`. ⚠️ **Old backups predate the stamp's meaning:** today received payments are written `change=0` (`upsert_received_utxo*`, T1 SCOPE §3.4), so restoring an existing backup and rebuilding from `change` alone would leave real money **unselectable — the balance would appear to drop**. ⇒ T3a's restore path must run every restored output through T1's classifier (decision 7) **before** the rebuild, and the upgrade test set must include **restore of a pre-beta.6 backup**. Negative control: rebuild without the classifier pass ⇒ a restored plain payment is not selectable |
+| **Decision 11 — `requesting_domain` on `derived_key_cache`** (T5-P3 part 2) | **Not carried at all** — `derived_key_cache` is absent from `BackupPayload` (`backup.rs`) | A restored wallet starts the cross-site detector with **no history** — acceptable for a warn-and-log detector (it re-learns); stated in the restore report wording, not hidden. If the detector ever **refuses**, this must be revisited |
+| ⚠️ **Found in the check:** `derived_key_cache.derived_pubkey` is `UNIQUE` and written with `INSERT OR REPLACE` (`migrations.rs`, `handlers.rs` ~`:459`) | — | Two sites given the same `(invoice, counterparty)` produce the **same** `derived_pubkey`, so the second write **replaces** the first — adding a `requesting_domain` column to that row would **overwrite the very evidence part 2 needs**. ⇒ T5-P3's contract: record requesters in a **child table** (FK + CASCADE, the `cert_field_permissions` pattern root `CLAUDE.md` names) or change the uniqueness — and keep the PushDrop-signing lookup (`AppState.derived_key_cache`, pubkey → params) working. Owner approved *a* schema change; the exact shape is decided in the contract |
+
 ## 7. Feasibility inputs
 
 ### 7.1 Owner-hours (N) — human-bound rows only
