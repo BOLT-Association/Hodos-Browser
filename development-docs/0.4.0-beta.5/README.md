@@ -94,6 +94,15 @@ Research was run on Fable for T2 and T4, the current model for the rest — comp
 - 👤 **"Unknown" must not be a permanent resting state** (owner, on decision 2): *"We need to classify it
   as something one way or another."* What an Unknown coin resolves to — and how it is shown — is taken
   up in decision 7 (RQ-2).
+- 👤 **Backup track direction (owner, 2026-09-27, while amending decision 2):**
+  1. **T3 starts by proving the database is correct** — after T1's money-path and schema changes — before
+     any backup-format work; restore must rebuild the new money index correctly.
+  2. **Import/export (T3b-P5) is close to a track of its own** and may deserve to go **earlier**: "can we
+     export our wallet?" is worth testing first.
+  3. **T3's own planning (G3) opens with a fresh read** of the current BRCs on wallet data export/import
+     (BRC-38/39/40 and anything newer), the current database schemas in wallet-toolbox (TS **and** Go)
+     and the SDK, and **any published test vectors** — then checks whether our export/import can match
+     the standards being built now, and how that relates to the on-chain backup (decision 5).
 
 ### Confirmed by the orchestrating session (not only by the research agents)
 
