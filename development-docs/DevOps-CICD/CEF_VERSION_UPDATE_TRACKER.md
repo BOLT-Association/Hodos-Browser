@@ -55,7 +55,7 @@ roughly 20 High and one Critical fix between them that we do not have *(read, Ch
 > published 2026-09-23 — a fourth refresh), whose V8 `4ceb8016` contains it (measured, V8 gitiles). ⇒ Route
 > **A alone** closes the CVE; route B is unnecessary. 👤 **Owner decision 2026-09-27:** ship the `.255` refresh
 > **alone** as the security release `v0.4.0-beta.5` —
-> `../0.4.0-beta.5/track-0-engine/SECURITY_RELEASE_PLAN.md`. Evidence: `../0.4.0-beta.5/track-0-engine/SCOPE.md` §2.3.
+> `../0.4.0-beta.6/track-0-engine/SECURITY_RELEASE_PLAN.md`. Evidence: `../0.4.0-beta.6/track-0-engine/SCOPE.md` §2.3.
 
 ### ⛔ CVE-2026-85046 is NOT on our branch at all *(superseded — see the correction above)*
 

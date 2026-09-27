@@ -18,7 +18,7 @@ Full record: `README.md` → *"✅ Decisions as made (G2 sitting, 2026-09-27)"*.
 | # | Decision | 🍎 What it means for macOS (later, not now) |
 |---|---|---|
 | **1** | ⭐ **Engine security release ships ALONE, refresh only** → `chromium-150.0.7871.255` (closes the exploited V8 bug; `085f765`). The `"Hodos"` `Sec-CH-UA` brand and the ad-block pull move to a **second** engine build | You will get a build round: the T0 scope says the Mac host's `chromium/src/.git` was **deleted**, so moving `.187 → .255` needs a **fresh no-history `src` fetch** (tens of GB, half a day of machine time) — the cheap reuse path does not apply. Then stage, `vtool` minos re-measure, codecs, farbling rotation token. ⚠️ **Not yet** — it arrives as its own round |
-| **1** | 🔢 **Version names change.** The security release is **`v0.4.0-beta.5`**. The release planned in this folder becomes **`v0.4.0-beta.6`**; this folder renames to `0.4.0-beta.6/`, and the intake folder `0.4.0-beta.6/` to `0.4.0-beta.7/` — **one rename commit, not yet done**. Why not `beta.4.1`: `release.yml`'s build-number parser reads only a trailing `-beta.<digits>`, so `beta.4.1` scores **99 = final** → `40099`, which outranks every later beta in **Sparkle** and in `UpdateStager::IsNewerBuild` — a silent auto-update dead end on both platforms | Update any path you hold when the rename round lands |
+| **1** | 🔢 **Version names change.** The security release is **`v0.4.0-beta.5`**. The release planned in this folder becomes **`v0.4.0-beta.6`**; this folder renames to `0.4.0-beta.7/`, and the intake folder `0.4.0-beta.7/` to `0.4.0-beta.7/` — **one rename commit, not yet done**. Why not `beta.4.1`: `release.yml`'s build-number parser reads only a trailing `-beta.<digits>`, so `beta.4.1` scores **99 = final** → `40099`, which outranks every later beta in **Sparkle** and in `UpdateStager::IsNewerBuild` — a silent auto-update dead end on both platforms | Update any path you hold when the rename round lands |
 | 2 / 2a | Money = **positively marked** (`change=1`, wallet-toolbox rule) **plus** a Go-style separate money-index table (schema change approved, heavy negative controls) | Rust only — shared. Nothing platform-specific |
 | 7 | Unidentified coins: tiered rule — real script first; multi-sat plain P2PKH ⇒ money; 1-sat unreadable ⇒ held and **shown** | Wallet panel UI (frontend) — relay-confirm at the time |
 | 11 / 12 | Derived keys: per-site grant at levels 1–2 + a cross-site detector (schema); missing `counterparty` ⇒ SDK defaults (`anyone` for signing) | Rust only — shared |
@@ -55,7 +55,7 @@ W-25a's asks (adopt/review `KNOWLEDGE_AND_MEMORY.md`) still stand and can still 
 
 ## §1 — Where planning stopped
 
-- **G2 research done:** one `SCOPE.md` per track folder under `0.4.0-beta.5/` (`track-0-engine/` …
+- **G2 research done:** one `SCOPE.md` per track folder under `0.4.0-beta.6/` (`track-0-engine/` …
   `track-6-browser-shell/`). **14 owner decisions are owed**, listed in the README's
   **"▶️ RESUME HERE"** section. Nothing below G3 has started.
 - 👤 **Owner: macOS does not start until planning is complete.** This relay will keep carrying planning
@@ -100,12 +100,12 @@ and the one carrying this round.
 
 | Was | Now |
 |---|---|
-| `development-docs/0.4.0-beta.4/` (the next-release plan) | **`development-docs/0.4.0-beta.5/`** — the beta.4 version number was spent by the hotfix that shipped |
-| beta.4's tracks `track-0-reqwest…`, `track-1-utxo…` | `0.4.0-beta.5/track-1-money-path/{reqwest-tls-bump,utxo-safety-guard}/` |
-| `track-4-onchain-backup-sync/` | `0.4.0-beta.5/track-3-backup-sync/` — ⭐ start at `BACKUP_HISTORY_OVERVIEW.md` |
+| `development-docs/0.4.0-beta.4/` (the next-release plan) | **`development-docs/0.4.0-beta.6/`** — the beta.4 version number was spent by the hotfix that shipped |
+| beta.4's tracks `track-0-reqwest…`, `track-1-utxo…` | `0.4.0-beta.6/track-1-money-path/{reqwest-tls-bump,utxo-safety-guard}/` |
+| `track-4-onchain-backup-sync/` | `0.4.0-beta.6/track-3-backup-sync/` — ⭐ start at `BACKUP_HISTORY_OVERVIEW.md` |
 | `track-3-opns-naming/` | `development-docs/Future-Features/Decentralized-Naming/` — **OpNS is out of beta.5** |
-| `X402_INTEGRATION.md`, `ONCHAIN_BACKUP_SYSTEM.md`, `WATCH_fungibles.md`, `TOOLS_TAB_claim_a_payment.md` | into their track folders under `0.4.0-beta.5/` (T4, T3, T2, T6) |
-| **16 still-open tickets** in `0.4.0-beta.3/` | `0.4.0-beta.5/tickets/`. 17 more that read "open" but were fixed are stamped **closed** in place. Your `TICKET_wallet_backend_is_shared_across_os_accounts.md` came across with the beta.4 folder and is in track **T5** |
+| `X402_INTEGRATION.md`, `ONCHAIN_BACKUP_SYSTEM.md`, `WATCH_fungibles.md`, `TOOLS_TAB_claim_a_payment.md` | into their track folders under `0.4.0-beta.6/` (T4, T3, T2, T6) |
+| **16 still-open tickets** in `0.4.0-beta.3/` | `0.4.0-beta.6/tickets/`. 17 more that read "open" but were fixed are stamped **closed** in place. Your `TICKET_wallet_backend_is_shared_across_os_accounts.md` came across with the beta.4 folder and is in track **T5** |
 | `development-docs/Wallet-Hardening/`, `Final-MVP-Sprint/` | `archived-docs/` (three backup docs → `track-3-backup-sync/research/`) |
 | `Dolphin Milk + Edwin Integration/` | `development-docs/Future-Features/` |
 | `MACOS_CATCHUP_PLAYBOOK.md` | **unchanged** — stays your boot brief; its stale 2026-06-26 banner was removed |
@@ -133,7 +133,7 @@ attention. That protocol is its §4.
 - The **phase contract template** (`0.4.0-beta.3/PHASE_CONTRACT_TEMPLATE.md`) gained the issue field and two sign-off lines.
 - **Engine decision:** stay on **CEF 150**, CEF's long-term branch (supported to about Apr 2027). Refresh it in-branch this release; the next major target is **160**.
   - ⚠️ macOS has to re-measure the framework's `minos` on the refreshed build (`CEF_VERSION_UPDATE_TRACKER.md`).
-- **Proposed beta.5 tracks** (`0.4.0-beta.5/README.md`): T0 engine · T1 money path · T2 1Sat Ordinals (BSV-21 first) · T3 backup & sync · T4 402 payments · T5 identity & privacy · T6 browser shell.
+- **Proposed beta.5 tracks** (`0.4.0-beta.6/README.md`): T0 engine · T1 money path · T2 1Sat Ordinals (BSV-21 first) · T3 backup & sync · T4 402 payments · T5 identity & privacy · T6 browser shell.
 
 ## §5 — 🚦 Nothing is queued for you
 

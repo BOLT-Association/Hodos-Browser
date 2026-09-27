@@ -6,7 +6,7 @@
 > version update**, and the **fix-vs-redesign (v2)** decision inputs.
 >
 > Companion to [`README.md`](./README.md) (the wallet-hardening register). Sibling
-> of the design docs: `development-docs/0.4.0-beta.5/track-3-backup-sync/ONCHAIN_BACKUP_SYSTEM.md`,
+> of the design docs: `development-docs/0.4.0-beta.6/track-3-backup-sync/ONCHAIN_BACKUP_SYSTEM.md`,
 > `archived-docs/Final-MVP-Sprint/wallet-backup-efficiency-plan.md`,
 > `archived-docs/Final-MVP-Sprint/backup-double-spend-incident-2026-04-11.md`.
 
@@ -351,7 +351,7 @@ delay the field fixes.
 
 ## 9. Related
 - `README.md` — wallet-hardening register (add BS-C1/H3 → root-cause link here)
-- `development-docs/0.4.0-beta.5/track-3-backup-sync/ONCHAIN_BACKUP_SYSTEM.md` — original design
+- `development-docs/0.4.0-beta.6/track-3-backup-sync/ONCHAIN_BACKUP_SYSTEM.md` — original design
 - `archived-docs/Final-MVP-Sprint/backup-double-spend-incident-2026-04-11.md` — prior incident
   (write-side half-fixed; recovery side + this shutdown root cause still open)
 - `archived-docs/Final-MVP-Sprint/wallet-backup-efficiency-plan.md` — the cost-vs-size work

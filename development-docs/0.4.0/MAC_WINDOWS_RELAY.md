@@ -6224,7 +6224,7 @@ If the rebase stops on a conflict, the likely files and how to resolve them:
 | `development-docs/0.4.0/MACOS_PORT_0_4_0.md` | **Yours wins.** Windows does not edit it. |
 | `cef-native/src/handlers/simple_handler.cpp`, `simple_render_process_handler.cpp` | Windows touched **only** the farbling seed block in the render handler (fail-closed, landed 2026-08-08 — you should already have it). If you see a conflict here, take **both** changes; they are in different functions. |
 | `frontend/src/components/PrivacyShieldPanel.tsx`, `components/settings/PrivacySettings.tsx` | Windows softened the fingerprint copy. **Take Windows' version** unless you changed the same strings. |
-| `development-docs/0.4.0-beta.5/track-4-402-payments/X402_INTEGRATION.md` | **Do not touch.** Concurrent work on another machine. |
+| `development-docs/0.4.0-beta.6/track-4-402-payments/X402_INTEGRATION.md` | **Do not touch.** Concurrent work on another machine. |
 
 ### Step 2 — read what changed
 

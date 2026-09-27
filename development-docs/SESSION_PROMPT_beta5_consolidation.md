@@ -23,16 +23,16 @@ The beta.3 cycle is **closed**: its AAR is written, and the process it produced 
 ⚠️ **The problem you are here to fix.** `development-docs/0.4.0-beta.4/` is the *next* release's
 folder — `TELESCOPED`, five tracks, no phase design — but **the beta.4 version number is now spent**,
 consumed by the hotfix that shipped. Its target has to become **beta.5**, and a second folder
-`0.4.0-beta.5/` already exists with two loose tickets in it. Plus `development-docs/` root has
+`0.4.0-beta.6/` already exists with two loose tickets in it. Plus `development-docs/` root has
 accumulated finished and misfiled documents.
 
 ---
 
 ## 1. Your job, in three parts
 
-### Part A — consolidate `0.4.0-beta.4/` + `0.4.0-beta.5/` → **`0.4.0-beta.5/`**
+### Part A — consolidate `0.4.0-beta.4/` + `0.4.0-beta.6/` → **`0.4.0-beta.6/`**
 
-- `git mv` the beta.4 folder's contents into `0.4.0-beta.5/`, merging with the two tickets there
+- `git mv` the beta.4 folder's contents into `0.4.0-beta.6/`, merging with the two tickets there
   (`TICKET_chrome_import_bookmarks_history_passwords.md`, `TOOLS_TAB_claim_a_payment.md` — fold the
   latter into `tickets/` if it is one, and say so if it is not).
 - Inventory today: **21 tickets**, 5 track folders (`track-0-reqwest-tls-bump` …
@@ -57,9 +57,9 @@ accumulated finished and misfiled documents.
 |---|---|
 | `README.md`, `RELEASE_CYCLE.md`, `SCOPING_PROCESS.md`, `PRIOR_ART.md` | **keep** — living, cross-release |
 | `MACOS_CATCHUP_PLAYBOOK.md` | ⭐ **keep** — it is the **macOS agent's boot brief** ("you are a fresh, memoryless agent… this is your complete brief"), actively maintained. ⚠️ **Strip its stale 2026-06-26 priority banner** about update-stability, which is long done |
-| `X402_INTEGRATION.md` (64 KB) | → **`0.4.0-beta.5/`**. 👤 Owner: this becomes a **track** this cycle |
-| `ONCHAIN_BACKUP_SYSTEM.md` | → **`0.4.0-beta.5/`** as input to the backup track. ⚠️ Dated **2026-04-21** — treat as a starting sketch, **not** a spec |
-| `TICKET_brc121_remint_on_retry.md`, `TICKET_debug_log_unfiltered_in_production.md`, `TICKET_knowledge_and_memory_architecture.md`, `TICKET_logged_in_screenshots_in_public_history.md`, `TICKET_profile_lock_misreports_missing_dir.md`, `TICKET_reservation_ownership_converge_on_spent_by.md` | → **`0.4.0-beta.5/tickets/`** |
+| `X402_INTEGRATION.md` (64 KB) | → **`0.4.0-beta.6/`**. 👤 Owner: this becomes a **track** this cycle |
+| `ONCHAIN_BACKUP_SYSTEM.md` | → **`0.4.0-beta.6/`** as input to the backup track. ⚠️ Dated **2026-04-21** — treat as a starting sketch, **not** a spec |
+| `TICKET_brc121_remint_on_retry.md`, `TICKET_debug_log_unfiltered_in_production.md`, `TICKET_knowledge_and_memory_architecture.md`, `TICKET_logged_in_screenshots_in_public_history.md`, `TICKET_profile_lock_misreports_missing_dir.md`, `TICKET_reservation_ownership_converge_on_spent_by.md` | → **`0.4.0-beta.6/tickets/`** |
 | `TICKET_farbling_constant_seed_shipped.md` | ⭐ **verify, then archive** — see §2 |
 | `QR_SCAN_OVERVIEW.md`, `QR_SCAN_WINDOWS.md`, `QR_SCAN_MACOS.md` | → **archive.** 📏 Verified shipped: `quirc` is vendored and built (`cef-native/CMakeLists.txt`), and two docs say **COMPLETE** in their own titles |
 | `MACOS_SPRINT_HANDOVER_20260501.md` | → **archive** — superseded by the playbook |
@@ -77,7 +77,7 @@ reference is worse than no move.
 build at the start of beta.5… that needs to be a whole track… that will be what we need to do first
 because we'll build everything on top of that."*
 
-⛔ **Create this as a ticket in `0.4.0-beta.5/tickets/` and carry it into your `G2` track proposal as a
+⛔ **Create this as a ticket in `0.4.0-beta.6/tickets/` and carry it into your `G2` track proposal as a
 likely Track 0.** It is not optional scope and it is not small.
 
 **Why it sequences first — and note WHICH argument this is.** ⭐ It is a **serialization** constraint,

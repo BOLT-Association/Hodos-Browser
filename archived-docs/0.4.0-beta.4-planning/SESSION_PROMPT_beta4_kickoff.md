@@ -189,8 +189,8 @@ classification on ingest, not exclusion logic.** That shapes the guard.
 
 ## 7. Deliverables for this session
 
-1. `0.4.0-beta.5/README.md` — release scope, the four tracks, the settled order and the reasoning.
-2. `0.4.0-beta.5/RELEASE_PLAN.md` — track-level breakdown, no phase detail.
+1. `0.4.0-beta.6/README.md` — release scope, the four tracks, the settled order and the reasoning.
+2. `0.4.0-beta.6/RELEASE_PLAN.md` — track-level breakdown, no phase detail.
 3. Folder moves per §2, cross-references fixed, originals deleted.
 4. `WATCH_fungibles.md` — the 163/175 state and an explicit re-check gate.
 5. `tickets/` folder with a ticket template.

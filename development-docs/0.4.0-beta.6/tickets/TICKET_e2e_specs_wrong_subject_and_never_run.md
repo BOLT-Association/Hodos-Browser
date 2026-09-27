@@ -89,5 +89,5 @@ rows become automatable, which is a change to the set's **bucketing** rather tha
 - `../research/RESEARCH_c_testing_practice.md` — the source, with its own detail
 - `../../0.4.0-beta.3/HARNESS.md` §2 (SUBJECT), §3 (tiers) — ⛔ read-only
 - `../../0.4.0-beta.3/REGRESSION_SET.md` — the three rows this could unblock — ⛔ read-only
-- `development-docs/0.4.0-beta.5/tickets/TICKET_cdp_port_open_in_release.md` — the other half of the port question — ⛔ read-only
+- `development-docs/0.4.0-beta.6/tickets/TICKET_cdp_port_open_in_release.md` — the other half of the port question — ⛔ read-only
 - `../../SCOPING_PROCESS.md` §7b-ii — the adoption list this came from

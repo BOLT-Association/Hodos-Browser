@@ -334,7 +334,7 @@ coexistence, not version matching; never link the shell against Chromium's copie
 - **Two owner decisions surfaced:** the `reqwest 0.11 → 0.12+` bump (closes the three `rustls-webpki`
   advisories on the wallet's TLS path — the one item here that is a server-authentication weakness rather
   than a DoS), and the cheap `cargo update -p time -p bytes`. Neither done in the review itself.
-  👤 **Decided 2026-09-15:** `reqwest` becomes **beta.4 sprint 0** (`0.4.0-beta.5/track-1-money-path/reqwest-tls-bump/`);
+  👤 **Decided 2026-09-15:** `reqwest` becomes **beta.4 sprint 0** (`0.4.0-beta.6/track-1-money-path/reqwest-tls-bump/`);
   `time`/`bytes`, OpenSSL 3.6.4 and the npm set were **bumped the next day as their own commits** — see the ✅ cells.
 - OpenSSL 3.6.4 is a recommended, non-urgent bump (no affected API in our use) — ✅ done 2026-09-15, proof owed to the next validation build.
 - The CI audit lane is still triple-neutered and dark; this review on the build host is the only advisory

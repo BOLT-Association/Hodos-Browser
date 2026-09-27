@@ -11,7 +11,7 @@ use serde::{Deserialize, Serialize};
 /// satoshi; the asset IS the output. Spending one into a larger output permanently
 /// destroys it — BRC-147: *"a general 'pay' or auto-pay grant MUST NOT authorize
 /// spending them."* See
-/// `development-docs/0.4.0-beta.5/track-2-1sat-ordinals/README.md` §"Two rules from
+/// `development-docs/0.4.0-beta.6/track-2-1sat-ordinals/README.md` §"Two rules from
 /// BRC-147 that are load-bearing for us", rule 2.
 ///
 /// ⛔ This is a **defensive floor, not a classification system.** It cannot tell a

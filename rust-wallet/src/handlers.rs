@@ -8111,7 +8111,7 @@ pub struct SignActionResponse {
     // lists it. `SignActionOptions.send_with` is parsed and then never read by
     // sign_action — the feature does not work — so emitting a result array for it
     // would be inventing a value. Reported, not fixed:
-    // development-docs/0.4.0-beta.5/tickets/TICKET_signaction_response_not_brc100_shape.md §11.
+    // development-docs/0.4.0-beta.6/tickets/TICKET_signaction_response_not_brc100_shape.md §11.
 }
 
 impl SignActionResponse {
@@ -10221,7 +10221,7 @@ mod sign_action_response_shape_tests {
     // wallet returned no BEEF to submit", because @bsv/sdk's HTTPWalletJSON hands
     // the parsed JSON straight to the caller and `result.tx` was undefined.
     // The money was already spent. Ticket:
-    // development-docs/0.4.0-beta.5/tickets/TICKET_signaction_response_not_brc100_shape.md
+    // development-docs/0.4.0-beta.6/tickets/TICKET_signaction_response_not_brc100_shape.md
     //
     // 🔴 NEGATIVE CONTROL: delete the `tx` field from SignActionResponse (or its
     // `hex::decode` at the construction site) and `tx_is_present_as_a_byte_array`

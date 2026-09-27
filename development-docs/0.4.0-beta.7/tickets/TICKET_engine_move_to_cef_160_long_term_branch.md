@@ -1,6 +1,6 @@
 # 🧭 Move the engine to CEF 160, the next long-term branch, before branch 7871 loses support
 
-**Found:** 2026-09-25, beta.5 T0 research (`../../0.4.0-beta.5/track-0-engine/SCOPE.md` §2.1, §2.2, Q5).
+**Found:** 2026-09-25, beta.5 T0 research (`../../0.4.0-beta.6/track-0-engine/SCOPE.md` §2.1, §2.2, Q5).
 **Status:** ⬜ UNASSIGNED · **Track:** intake — planned engine move, not a defect · **Filed by:** Claude, from G2 decision (T0 Q5 approved 2026-09-27)
 
 > ⚠️ **Method note.** Dates are from CEF's `branches_and_building` page and chromiumdash's milestone

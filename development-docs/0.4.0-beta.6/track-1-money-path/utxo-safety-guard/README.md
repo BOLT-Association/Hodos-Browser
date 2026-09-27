@@ -150,7 +150,7 @@ stray 1-satoshi payment and protects nothing at 2 satoshis or above.
 ## 🚨 Read this before designing the classifier — `locking_script` is a FABRICATION
 
 **Measured against mainnet 2026-09-08.** Full detail and reproducible outpoints:
-`development-docs/0.4.0-beta.5/tickets/TICKET_synced_outputs_store_a_fabricated_locking_script.md`.
+`development-docs/0.4.0-beta.6/tickets/TICKET_synced_outputs_store_a_fabricated_locking_script.md`.
 
 The wallet **never records the locking script it saw on chain.** `utxo_fetcher.rs` generates one from
 the address (`generate_p2pkh_script_from_address`) at all three fetch sites, because neither indexer

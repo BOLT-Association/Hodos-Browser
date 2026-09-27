@@ -6,8 +6,8 @@
 > Generalizes the backup-only [`FIX_A_RECONCILE_PLAN.md`](FIX_A_RECONCILE_PLAN.md)
 > into ONE reconcile primitive that fixes BOTH the regular-send `"Missing inputs"`
 > loop AND the backup-token divergence. Companion:
-> [`ONCHAIN_BACKUP_REVIEW.md`](../../development-docs/0.4.0-beta.5/track-3-backup-sync/research/ONCHAIN_BACKUP_REVIEW.md),
-> [`FIX_B_CRASH_SAFETY_SHUTDOWN_PLAN.md`](../../development-docs/0.4.0-beta.5/track-3-backup-sync/research/FIX_B_CRASH_SAFETY_SHUTDOWN_PLAN.md).
+> [`ONCHAIN_BACKUP_REVIEW.md`](../../development-docs/0.4.0-beta.6/track-3-backup-sync/research/ONCHAIN_BACKUP_REVIEW.md),
+> [`FIX_B_CRASH_SAFETY_SHUTDOWN_PLAN.md`](../../development-docs/0.4.0-beta.6/track-3-backup-sync/research/FIX_B_CRASH_SAFETY_SHUTDOWN_PLAN.md).
 
 **Status:** Phase 1 research DONE + owner decisions locked (2026-07-10). Phase 2
 design drafted → [`RECONCILE_PHASE2_DESIGN.md`](./RECONCILE_PHASE2_DESIGN.md)

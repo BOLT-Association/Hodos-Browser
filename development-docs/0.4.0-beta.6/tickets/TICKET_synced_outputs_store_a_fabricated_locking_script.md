@@ -154,6 +154,6 @@ format, is the defect.
 - `phase-8a-dust-guard/PHASE_CONTRACT.md` §0.5 (`D-5`) — where this was found, and §7 `D-9`
 - `TICKET_token_outputs_destroyed_by_dust_paths.md` — the sibling ticket; its floor is what makes
   this non-urgent today
-- `../0.4.0-beta.5/README.md` decision 3 — the classifier this would blind
-- `../0.4.0-beta.5/track-2-1sat-ordinals/README.md` §"Two rules from BRC-147" — why 1-sat outputs
+- `../0.4.0-beta.6/README.md` decision 3 — the classifier this would blind
+- `../0.4.0-beta.6/track-2-1sat-ordinals/README.md` §"Two rules from BRC-147" — why 1-sat outputs
   are assets rather than change

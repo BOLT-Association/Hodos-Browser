@@ -38,7 +38,7 @@ Commit shas quoted below were each checked with `git show -s` on 2026-09-25.
 | `Final-MVP-Sprint/wallet-efficiency-and-bsv-alignment.md` | The eight "do not break" backup invariants; the done/not-done checklist | Checklist accurate. Its answer "multi-device sync is not a current concern" is **superseded** by track 4 |
 | `Final-MVP-Sprint/bsv-ecosystem-alignment-plan.md` (backup parts only) | Correction that BEEF compaction does not shrink the backup | Accurate. Rest of the doc not assessed here |
 | `Wallet-Hardening/ONCHAIN_BACKUP_REVIEW.md` | The July 2026 field bug (stuck retry loop), the `BS-*` findings register, "full sync breaks things" | Findings mostly still open in code (§2.6). Its §2 ("no graceful shutdown exists") is **wrong and self-corrected** in its own header |
-| `0.4.0-beta.5/track-3-backup-sync/ONCHAIN_BACKUP_SYSTEM.md` (2026-04-21) | The first description of the design | **A sketch with ≥ 6 verified errors** (listed in §7). Do not cite it for facts |
+| `0.4.0-beta.6/track-3-backup-sync/ONCHAIN_BACKUP_SYSTEM.md` (2026-04-21) | The first description of the design | **A sketch with ≥ 6 verified errors** (listed in §7). Do not cite it for facts |
 | `track-4…/README.md` | Work items 0–7, the wallet export/import survey, tests T1–T11, "already decided" block | Annotated in place; plan supersedes where marked |
 | `track-4…/IMPLEMENTATION_PLAN.md` | The authority: goals G1–G12, decisions D1–D15, phases 1–8, harness H1–H19 | Current plan. **Nothing in it has been implemented yet** [code: no harness, no header, no intent record] |
 | `track-4…/ADVERSARIAL_REVIEW.md` + `research/ADV_R1…R5` | 36 confirmed findings (7 critical) against the plan, each answered by a plan edit; 3 refuted | Accurate against the plan as revised 2026-08-24 |
@@ -50,8 +50,8 @@ Commit shas quoted below were each checked with `git show -s` on 2026-09-25.
 | `research/C1`, `C2`, `C3` | wallet-toolbox (TS, Go) sync machinery; deggen's `go-private-backup-cache` | Accurate as of their pinned commits; upstream may have moved |
 | `research/D2_plan_critique.md` | The pre-review completeness critique (11 gaps, all fixed in the plan) | Historical |
 | `BSV-Tokens/BSV_TOKEN_PROTOCOLS_COMPARISON.md` §"Case study" | PushDrop is the right container; wrapper is ~0.05% of cost; 546-sat marker is a BTC idiom | Accurate |
-| `0.4.0-beta.5/tickets/TICKET_brc140_key_shares_vs_bip39.md` | Split-the-seed recovery option (BRC-140), recommended "research in beta.5, build no earlier than beta.6" | Open, unassigned |
-| `0.4.0-beta.5/RELEASE_PLAN.md`, `TELESCOPE.md`, `HARNESS_DELTA.md` (found while searching) | The "ancestry depth, not media" hypothesis; the rule that track 4 must not redesign the plan | Current; see §4.4 and §7 row 16 |
+| `0.4.0-beta.6/tickets/TICKET_brc140_key_shares_vs_bip39.md` | Split-the-seed recovery option (BRC-140), recommended "research in beta.5, build no earlier than beta.6" | Open, unassigned |
+| `0.4.0-beta.6/RELEASE_PLAN.md`, `TELESCOPE.md`, `HARNESS_DELTA.md` (found while searching) | The "ancestry depth, not media" hypothesis; the rule that track 4 must not redesign the plan | Current; see §4.4 and §7 row 16 |
 | Commit `ed51099` (2026-09-15) message | A new, measured way the backup's size hurts *other* payments | Accurate [measured] |
 | Current code | Everything in §2 | — |
 
@@ -497,7 +497,7 @@ archiving moves it, it does not delete it.
 | `Final-MVP-Sprint/wallet-backup-efficiency-plan.md` | §4 carries the measurement table, what shipped and what did not |
 | `Final-MVP-Sprint/wallet-efficiency-and-bsv-alignment.md` | Backup half captured. ⚠️ Non-backup half (ecosystem items 1a–3c) **not assessed here** — archive only if that work is also done/owned elsewhere |
 | `Final-MVP-Sprint/bsv-ecosystem-alignment-plan.md` | Backup-relevant part (one correction) captured. Same caveat as above |
-| `0.4.0-beta.5/track-3-backup-sync/ONCHAIN_BACKUP_SYSTEM.md` | Superseded; its errors are listed in §7. The plan says to rewrite it after Phase 2 — archive the old one then, or now with a pointer here |
+| `0.4.0-beta.6/track-3-backup-sync/ONCHAIN_BACKUP_SYSTEM.md` | Superseded; its errors are listed in §7. The plan says to rewrite it after Phase 2 — archive the old one then, or now with a pointer here |
 | `track-4…/TRACK_KICKOFF_PROMPT.md` | Executed; history only |
 | `track-4…/research/D2_plan_critique.md` | All 11 gaps fixed in the plan |
 
@@ -516,5 +516,5 @@ was **not** in scope; do not archive that folder wholesale on the strength of th
 | `Wallet-Hardening/ONCHAIN_BACKUP_REVIEW.md` | Its `BS-*` finding ids are cited throughout the plan and are still open in code (§2.8). Archive after plan Phase 2 closes them |
 | `Wallet-Hardening/FIX_B_…`, `FOLLOWUP_RECORD_BEFORE_BROADCAST_TOKENS.md` | The live disagreement D7 resolves; keep until the intent record ships |
 | `BSV-Tokens/` | Owned by other tracks; only its backup case study is captured here |
-| `0.4.0-beta.5/tickets/TICKET_brc140_key_shares_vs_bip39.md` | Open decision |
+| `0.4.0-beta.6/tickets/TICKET_brc140_key_shares_vs_bip39.md` | Open decision |
 | This file | Until the research replaces it |

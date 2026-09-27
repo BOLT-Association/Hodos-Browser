@@ -105,7 +105,7 @@ show-most-recent) — frontend, privacy-only; tracked in the WS3 ticket, do inde
 ## Doc index
 - [`RECONCILE_SPENT_INPUTS_PLAN.md`](../../archived-docs/Wallet-Hardening/RECONCILE_SPENT_INPUTS_PLAN.md) — WS1 parent plan
 - [`RECONCILE_PHASE2_DESIGN.md`](./RECONCILE_PHASE2_DESIGN.md) — WS1 buildable design + review log
-- [`FIX_A_RECONCILE_PLAN.md`](../../archived-docs/Wallet-Hardening/FIX_A_RECONCILE_PLAN.md) / [`FIX_B_CRASH_SAFETY_SHUTDOWN_PLAN.md`](../../development-docs/0.4.0-beta.5/track-3-backup-sync/research/FIX_B_CRASH_SAFETY_SHUTDOWN_PLAN.md) — WS1 precursors (backup-specific)
-- [`ONCHAIN_BACKUP_REVIEW.md`](../../development-docs/0.4.0-beta.5/track-3-backup-sync/research/ONCHAIN_BACKUP_REVIEW.md) — backup subsystem review + field bug
+- [`FIX_A_RECONCILE_PLAN.md`](../../archived-docs/Wallet-Hardening/FIX_A_RECONCILE_PLAN.md) / [`FIX_B_CRASH_SAFETY_SHUTDOWN_PLAN.md`](../../development-docs/0.4.0-beta.6/track-3-backup-sync/research/FIX_B_CRASH_SAFETY_SHUTDOWN_PLAN.md) — WS1 precursors (backup-specific)
+- [`ONCHAIN_BACKUP_REVIEW.md`](../../development-docs/0.4.0-beta.6/track-3-backup-sync/research/ONCHAIN_BACKUP_REVIEW.md) — backup subsystem review + field bug
 - [`FOLLOWUP_REORG_HANDLING.md`](./FOLLOWUP_REORG_HANDLING.md) — WS2 ticket + sketch
 - [`FOLLOWUP_NEXT_INDEX_UNIFICATION.md`](./FOLLOWUP_NEXT_INDEX_UNIFICATION.md) — WS3 ticket

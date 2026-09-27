@@ -78,7 +78,7 @@ missing, showed the boundary at 20.
 
 - `PAYMENT_TEST_BATCH.md` M5 — the row that surfaced it; its carrier had to be marked confirmed by
   hand to finish, and that seeding is disclosed there.
-- `development-docs/0.4.0-beta.5/` — the asset layer. ⚠️ This should be read before the ordinals
+- `development-docs/0.4.0-beta.6/` — the asset layer. ⚠️ This should be read before the ordinals
   sprint starts.
 - `rust-wallet/src/utxo_fetcher.rs` — `WOC_BULK_CONFIRMED`, the per-chunk loop, and the
   single-address fallback that already exists.

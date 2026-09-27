@@ -66,7 +66,7 @@ honestly signed off — it can only be run against a route list someone believes
 > above ("prove the default is refusal") has nothing to observe and the GREEN means nothing.
 > ⇒ **Before running this row, state which field the classifier reads and whether that field is an
 > observation or a fabrication.** Detail:
-> `development-docs/0.4.0-beta.5/tickets/TICKET_synced_outputs_store_a_fabricated_locking_script.md`.
+> `development-docs/0.4.0-beta.6/tickets/TICKET_synced_outputs_store_a_fabricated_locking_script.md`.
 
 ⭐ **Two routes to put on the list now**, both measured during beta.3 Phase 8 and both easy to miss:
 `create_action`'s **`send_max`** branch (bypasses coin selection entirely —

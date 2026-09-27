@@ -7,7 +7,7 @@
 >
 > Parent: [`RECONCILE_SPENT_INPUTS_PLAN.md`](../../archived-docs/Wallet-Hardening/RECONCILE_SPENT_INPUTS_PLAN.md).
 > Supersedes the backup-only [`FIX_A_RECONCILE_PLAN.md`](../../archived-docs/Wallet-Hardening/FIX_A_RECONCILE_PLAN.md);
-> composes with [`FIX_B_CRASH_SAFETY_SHUTDOWN_PLAN.md`](../../development-docs/0.4.0-beta.5/track-3-backup-sync/research/FIX_B_CRASH_SAFETY_SHUTDOWN_PLAN.md).
+> composes with [`FIX_B_CRASH_SAFETY_SHUTDOWN_PLAN.md`](../../development-docs/0.4.0-beta.6/track-3-backup-sync/research/FIX_B_CRASH_SAFETY_SHUTDOWN_PLAN.md).
 
 **Status:** design **v2** — revised after a 4-agent adversarial review (2026-07-10)
 that found 4 CRITICAL-class defects in v1 (§8 review log). **§9 decisions SETTLED**
