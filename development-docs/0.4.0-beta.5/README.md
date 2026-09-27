@@ -26,7 +26,7 @@ fix. ⭐ **Resume at the section directly below.**
 | Gate (`../RELEASE_CYCLE.md` §2) | State |
 |---|---|
 | **G0 Oriented** | ✅ done 2026-09-24 (consolidation, cleanup, ticket inventory) |
-| **G1 Mission** | 🟡 **proposed, owner has not signed** — see "🎯 G1 — Mission" below. Owner liked it and wants it reused as release notes |
+| **G1 Mission** | ✅ **signed off by the owner 2026-09-27** — see "🎯 G1 — Mission" below; also to be reused as the release notes |
 | **G2 Tracks** | 🟡 **research done** — seven `SCOPE.md` files, one per track folder (`track-0-engine/` … `track-6-browser-shell/`); **14 owner decisions owed** (table below). Owner has **not yet read** the scope docs |
 | G3–G6 | ⬜ not started. Next after the decisions: G3 phases per track, then G4 logistics, G5 comms + serialization, G5.5 feasibility, G6 go/no-go |
 | macOS | 🍎 **not started, by owner decision** — macOS joins after planning is complete. Keep updating `MAC_RELAY_BETA5.md` as planning moves |
@@ -148,7 +148,7 @@ and delta sizes have never been measured.
 
 **Next:** triage every ticket in `tickets/` into tracks (`../RELEASE_CYCLE.md` §1 step 9, gate G2), after the mission is signed off at G1.
 
-## 🎯 G1 — Mission *(PROPOSED 2026-09-25 — 👤 owner sign-off owed)*
+## 🎯 G1 — Mission *(✅ SIGNED OFF by the owner 2026-09-27)*
 
 > **beta.5 makes Hodos a wallet people can trust with more than coins — and can take with them.**
 > Nothing the wallet cannot positively identify as money can be spent, by any path. Ordinals can be
