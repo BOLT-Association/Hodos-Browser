@@ -1,7 +1,7 @@
 # beta.6 release — scope and running order *(planned as "beta.5" until 2026-09-27)*
 
 **Opened:** 2026-08-29, from the beta.4 kickoff prompt (the telescope pass; archived to `../../archived-docs/0.4.0-beta.4-planning/`).
-**Status:** 🟡 **G2 — all 14 owner decisions made 2026-09-27; G2 close items remain** (see "▶️ RESUME HERE").
+**Status:** 🟡 **G2 ✅ signed off 2026-09-27 — G3 (phase contracts) next** (see "▶️ RESUME HERE").
 ⭐ **Resume at the section directly below.**
 
 > 🔢 **Renamed 2026-09-27 (decision 1, commit `457d8f7`).** The engine security release takes **`v0.4.0-beta.5`**,
@@ -34,8 +34,9 @@
 |---|---|
 | **G0 Oriented** | ✅ done 2026-09-24 (consolidation, cleanup, ticket inventory) |
 | **G1 Mission** | ✅ **signed off by the owner 2026-09-27** — see "🎯 G1 — Mission" below; also to be reused as the release notes |
-| **G2 Tracks** | 🟡 **research done; all 14 owner decisions made 2026-09-27** ("✅ Decisions as made" below; decision 10's chain check ran — zero hits). ⬜ **G2 close items remain** — see "G2 — what is still owed" below |
-| G3–G6 | ⬜ not started. Next after the decisions: G3 phases per track, then G4 logistics, G5 comms + serialization, G5.5 feasibility, G6 go/no-go |
+| **G2 Tracks** | ✅ **signed off by the owner 2026-09-27** — all 14 decisions + the extra owner calls recorded ("✅ Decisions as made"); G2-close items 1–8 done ("G2 — what is still owed") |
+| **G3 Phases** | 🟡 **next** — one phase contract per phase, per track (the SCOPE docs' "Candidate phases" + each "0. G2 decisions applied" block) |
+| G4–G6 | ⬜ not started — G4 logistics, G5 comms + serialization, G5.5 feasibility, G6 go/no-go |
 | macOS | 🍎 **not started, by owner decision** — macOS joins after planning is complete. Keep updating `MAC_RELAY_BETA5.md` as planning moves |
 
 ### 🟡 2026-09-25 interruption — resolved as NOT an emergency
