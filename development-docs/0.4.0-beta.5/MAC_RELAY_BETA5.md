@@ -34,9 +34,20 @@ spent" BRC-121 payments** (production 1 failed row, dev 49 — all 404 on WhatsO
 first). Windows-only data — **do NOT inherit this** for a Mac wallet. If your Mac wallet has made BRC-121
 payments, the same check applies to it (method in the README decision-10 row).
 
-## §3 — No asks this round
+## §3 — Shared rule doc changed (`KNOWLEDGE_AND_MEMORY.md` §4 protocol)
 
-W-25a's asks (adopt/review `KNOWLEDGE_AND_MEMORY.md`) still stand and can still wait.
+- **Root `CLAUDE.md` working rule 5**, `rust-wallet/` table: *"No Rust implementation"* → community Rust
+  wallet-toolbox ports now exist (`b1narydt/rust-wallet-toolbox`, `bsv-wallet-toolbox-rs`) — **unaudited,
+  licence unconfirmed, not a reference**. **Policy unchanged:** port patterns, never code. Nothing to do
+  but know it (commit `cf51b1a`).
+- Also docs-only this round: `PRIOR_ART.md` (+38 rows), `CEF_VERSION_UPDATE_TRACKER.md` (the V8 fix **is** on
+  7871 `.255`), the engine security release plan `track-0-engine/SECURITY_RELEASE_PLAN.md` (read it before
+  the build round — it names your fresh `src` fetch as step 2).
+
+## §4 — No asks this round
+
+W-25a's asks (adopt/review `KNOWLEDGE_AND_MEMORY.md`) still stand and can still wait. The folder rename
+(beta.5 → beta.6, intake → beta.7) is **held** and will arrive as its own round.
 
 ---
 
