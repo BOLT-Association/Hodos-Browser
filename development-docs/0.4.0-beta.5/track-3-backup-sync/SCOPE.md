@@ -14,6 +14,25 @@ until the owner re-opens a decision), `../README.md` (planning notes, G1 mission
 
 ---
 
+## ✅ 0. G2 decisions applied (owner, 2026-09-27)
+
+> The research below is the **evidence**; this block is the **decision**. Where they differ, this block wins.
+> Full record: `../README.md` → "✅ Decisions as made".
+
+| Question | Decided |
+|---|---|
+| §9 **Q4** one track or two | ✅ **Two, both fixed scope (decision 3).** **T3a — Backup you can trust:** P0 → P4. **T3b — Sync & portability:** P5 → P8 |
+| 👤 T3a's first step | **Prove the database is correct** (after T1's money-path + schema changes) before any format work; restore must **rebuild** the new money index (derived from `outputs.change`, so omitted from backups) |
+| **Q2** format | ✅ **Same wallet, two formats (decision 5):** strict BRC-38/39 export from the full DB; compact on-chain format that never claims to be BRC-38; freeze before the first mainnet broadcast of a new version. ⭐ New required test: **export file ⇄ on-chain restore round-trip → identical wallet** |
+| **Q1** root key | ✅ **Provisional (decision 6):** keep BIP-32 `m`; keep the BIP-32 recovery code; import asks where the phrase came from in tiers (Hodos with backup token → other BRC-100 → plain BIP-32 → don't know) and **falls back through the rest** if nothing is found. BRC-157 for new wallets **not** decided |
+| **Q3** two devices | ⚠️ **PROVISIONAL R&D direction (decision 4): one active device at a time.** Owner constraints: deltas only, never a full re-broadcast; chain efficiency **tested**, with a cloud/relay fallback on evidence; leave room for a future agents track. P7 opens with R4-1 (how "active" is recorded/switched), R4-2 (chain as sync channel: poll vs push, lag, per-delta cost), R4-3 (agents as writers, BRC-181) |
+| **RQ-2** | ✅ **Tiered rule (decision 7)** — see T1's block; restore **never fails outright** on unidentified coins, it reports them |
+| 👤 Import/export | "Close to a track of its own" — may move **earlier**; T3's G3 opens with a fresh read of BRC-38/39/40 + newer, TS **and** Go toolbox schemas, SDK, and any **test vectors** |
+| New columns to carry | Decision 11 adds `requesting_domain` to `derived_key_cache` — see §6a (cross-track integration re-check) |
+| Q5 key shares · Q6 format-first | Per this doc's recommendations (approved) |
+
+---
+
 ## 1. Goal
 
 Every Hodos wallet keeps an on-chain backup that a fresh install can restore from the recovery phrase

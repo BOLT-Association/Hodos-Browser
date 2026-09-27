@@ -12,6 +12,19 @@ DevOps-CICD engine docs named in §3.
 
 ---
 
+## ✅ 0. G2 decisions applied (owner, 2026-09-27)
+
+> The research below is the **evidence**; this block is the **decision**. Where they differ, this block wins.
+> Full record: `../README.md` → "✅ Decisions as made".
+
+| Question | Decided |
+|---|---|
+| §9 **Q1** — does the security refresh wait? | ✅ **(b)+(c), refresh only (decision 1).** **Build 1 = P1 → P2 → P5**, refresh to `.255` only, ships **alone** as **`v0.4.0-beta.5`** — out of cycle, plan in `SECURITY_RELEASE_PLAN.md`. **P4 (brand) moves to Build 2** with P3 — it is irreversible once seen and its header-vs-JS agreement is unmeasured. Promotion is an owner call after P5 |
+| Version name | `v0.4.0-beta.4.1` rejected: `release.yml`'s build-number parser scores it **99 = final** (`40099`), outranking every later beta in Sparkle and `UpdateStager::IsNewerBuild`. The planned release becomes `v0.4.0-beta.6` |
+| Q2 b3 · Q3 merge · Q4 CRLF fix in P1 · Q5 record M160 window | Taken **per this doc's recommendations** at G3 (owner approved the agent-level set). ⚠️ Q3's fork push is outward-facing — owner approves at the time |
+
+---
+
 ## 1. Goal
 
 Move the shipped engine from `chromium-150.0.7871.187` to the newest build on the **same** long-term

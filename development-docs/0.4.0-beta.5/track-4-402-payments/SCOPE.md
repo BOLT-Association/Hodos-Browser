@@ -7,6 +7,21 @@
 
 ---
 
+## ✅ 0. G2 decisions applied (owner, 2026-09-27)
+
+> The research below is the **evidence**; this block is the **decision**. Where they differ, this block wins.
+> Full record: `../README.md` → "✅ Decisions as made".
+
+| Question | Decided |
+|---|---|
+| §9 **Q3** x402 adapter (P3) | ✅ **Deferred** to the next release; re-check if #2890 merges, a live BRC-29 `exact` server appears, or the owner wants bsv.cx (decision 9) |
+| **Q1** P1 changes release/re-mint | ✅ **Yes — P1 first.** Ask the chain before freeing or re-paying; can't tell ⇒ wait and tell the user |
+| **Step 0** | ✅ **RUN 2026-09-27 — zero hits** (decision 10). Controls 200/404 first; production 1 failed row ⇒ 404; dev 49 failed ⇒ all 404. **P1 is hardening, not an incident** |
+| **Q2** | ✅ Record, never broadcast ourselves · **Q4** ✅ pay exactly `amount` |
+| Q5 TTL 20 s · Q6 body transport deferred · Q7 fix `X402_INTEGRATION.md` §4a · Q8 read #2890's comment | Per this doc's recommendations (approved) |
+
+---
+
 ## 1. Goal
 
 Make a BRC-121 payment **never lose track of whether it was paid** — the wallet asks the chain before it restores coins or mints a second payment, and tells the user plainly when delivery is unknown — then, only if there is something live to test against, add the x402 envelope over the same client.

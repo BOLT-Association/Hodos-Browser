@@ -15,6 +15,22 @@ is code reading. Each candidate phase therefore opens with a RED measurement.
 
 ---
 
+## ✅ 0. G2 decisions applied (owner, 2026-09-27)
+
+> The research below is the **evidence**; this block is the **decision**. Where they differ, this block wins.
+> Full record: `../README.md` → "✅ Decisions as made".
+
+| Question | Decided |
+|---|---|
+| Derived keys (P3; §9 Q4/Q5/Q6) | ✅ **Parts 1 + 2 (decision 11).** Part 1: levels 1–2 derived `getPublicKey` needs the `createSignature` grant. **Part 2 is IN** (overrides **Q5**'s defer): `requesting_domain` on `derived_key_cache`, **warn + log** when two sites get the same `(invoice, counterparty)` — schema change approved. Part 3 → BRC draft only. Level 0 stays open, documented |
+| **Q7** missing counterparty | ✅ **Approved (decision 12):** SDK per-call defaults — `createSignature` ⇒ `anyone`, `createHmac`/`verifySignature` ⇒ `self`; not via `resolve_counterparty_pubkey`. Validate before prompting |
+| **Q8 / Q9** user count | ✅ **Opt-out Brave-style ping with three conditions** (decision 13): first-run notice; the "every byte we send" page ships first; wire-level zero-requests control. No install date. Switch-on returns to the owner |
+| **Q2** `/.well-known/auth` | ✅ **Keep, fix to the protocol, low priority.** It is the wallet's BRC-103 **server-role** path (never used — the browser wallet is always the client, and that path is correct). Fix = send the identity key and sign with the same key (SDK behaviour); SDK `Peer` RED → GREEN + corrupted-byte control. 👤 *"we just want all functionality"* |
+| **Q3** merge tickets · **Q10** two-index → T1 · loopback W4/W6/W7/W8 → **here** | ✅ Done in the register 2026-09-27 |
+| Q1 BRC-103 no-auth responses · Q11 · Q12 | Per this doc's recommendations (approved) |
+
+---
+
 ## 1. Goal
 
 A site learns only the keys, identity and wallet surface the user chose to give it. Servers we talk

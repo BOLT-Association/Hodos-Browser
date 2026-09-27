@@ -225,23 +225,24 @@ and delta sizes have never been measured.
 **Fixed scope (owner):** the money path and on-chain backup cannot be cut. **Out:** OpNS (D4).
 **If the release runs long, cut from the back:** browser-shell items first, then the x402 adapter.
 
-## 🧭 G2 — Tracks and ticket triage *(PROPOSED 2026-09-25)*
+## 🧭 G2 — Tracks and ticket triage *(proposed 2026-09-25 · ✅ decided 2026-09-27)*
 
-Every ticket in `tickets/` now names a track in the register's **Track** column (`tickets/README.md`).
+Every ticket in `tickets/` now names a track in the register's **Track** column (`tickets/README.md`) — 👤 **all placements approved 2026-09-27**. Each row below is updated to the G2 decisions ("✅ Decisions as made", above).
 
 | Track | Goal, one line | Tickets | Existing material |
 |---|---|---|---|
-| **B5-T0 Engine** | Refresh CEF 150 (long-term branch) in-branch and ship the two queued engine fixes | 1 | `tickets/TICKET_engine_behind…`, `../DevOps-CICD/NEXT_CHROMIUM_BUILD.md` |
-| **B5-T1 Money path** | No path can spend what the wallet has not classified as money, and the coin/transaction record stays true to the chain | 11 | `track-1-money-path/utxo-safety-guard/`, `track-1-money-path/reqwest-tls-bump/` *(becomes a phase here)*, the reservation-ownership ticket |
+| **B5-T0 Engine** | Refresh CEF 150 (long-term branch) in-branch and ship the two queued engine fixes. ⭐ **Two builds (decision 1):** Build 1 = refresh only → ships **alone** as the security release `v0.4.0-beta.5` (plan: `track-0-engine/SECURITY_RELEASE_PLAN.md`); Build 2 = ad-block pull + `"Hodos"` brand, inside this release | 1 | `tickets/TICKET_engine_behind…`, `../DevOps-CICD/NEXT_CHROMIUM_BUILD.md` |
+| **B5-T1 Money path** | No path can spend what the wallet has not classified as money, and the coin/transaction record stays true to the chain. Money = positively marked (`change=1`) **plus** a Go-style money-index table in P3 (decisions 2, 2a); unidentified coins follow the tiered rule (7) | 11 | `track-1-money-path/utxo-safety-guard/`, `track-1-money-path/reqwest-tls-bump/` *(becomes a phase here)*, the reservation-ownership ticket |
 | **B5-T2 1Sat Ordinals** | Hold, show, receive and deliberately transfer ordinals (BRC-147/150/165) | 2 | `track-2-1sat-ordinals/` |
-| **B5-T3 Backup & sync** | On-chain backup and multi-device restore in a standard, interoperable format — stable, conflict-free, efficient | 1 | `track-3-backup-sync/` ⭐ start at `BACKUP_HISTORY_OVERVIEW.md` |
-| **B5-T4 402 payments** | The x402 adapter over our BRC-121 client, plus the open 402 defects | 4 | `track-4-402-payments/X402_INTEGRATION.md` |
+| **B5-T3a Backup you can trust** | Single device: prove the DB is correct, measure, round-trip harness, fix today's backup, re-fetchable bytes off chain, freeze the on-chain format (decision 3) | 1 |
+| **B5-T3b Sync & portability** | Standard BRC-38/39 export/import (same wallet, two formats — decision 5), tiered phrase import (6), deltas, one active device at a time — ⚠️ **provisional R&D direction** (4), publish the BRC | — | `track-3-backup-sync/` ⭐ start at `BACKUP_HISTORY_OVERVIEW.md` |
+| **B5-T4 402 payments** | A BRC-121 payment never loses track of whether it was paid (ask the chain before freeing or re-paying), plus the open 402 defects. **x402 adapter deferred** to the next release (decision 9) | 4 | `track-4-402-payments/X402_INTEGRATION.md` |
 | **B5-T5 Identity & privacy** | A site gets only the keys, identity and wallet surface the user chose to give it; servers prove who they are (BRC-103/104); count users without identifying them | 11 | — |
-| **B5-T6 Browser shell** | Multi-window, tabs, import, update visibility and consent-UI defects | 16 | `track-6-browser-shell/TOOLS_TAB_claim_a_payment.md` (outline) |
+| **B5-T6 Browser shell** | Multi-window, tabs, import, update visibility and consent-UI defects. Exit quits the app; split view and password import deferred (decision 14); declined permissions are not stored | 16 | `track-6-browser-shell/TOOLS_TAB_claim_a_payment.md` (outline) |
 | *Background* | Agent-run instruments and hygiene — **not a track** | 7 | — |
 | *Closed / owner decision / defer* | Chromium `debug.log` ✅ closed · Big Sur feed ✅ closed · screenshots in public history ✅ closed (accepted risk) · knowledge & memory architecture ✅ adopted as `../KNOWLEDGE_AND_MEMORY.md` | 4 |
 
-⚠️ **7 tracks is above the 4–5 guideline.** That is a **feasibility (G5.5)** question, answered in
+⚠️ **8 tracks (T3 split) is above the 4–5 guideline.** That is a **feasibility (G5.5)** question, answered in
 owner-hours, not now. Recommendation already on record: cut from the back — `T6`, then `T4`.
 
 ✅ **Folders match the tracks** (reorganised 2026-09-25): `track-0-engine/` … `track-6-browser-shell/`, each
@@ -298,6 +299,10 @@ written. This convention starts here.
 
 ## What beta.5 is
 
+> 🗄️ **Superseded 2026-09-27 — kept as history.** This section predates the G2 decisions (OpNS is out, the
+> track set is T0–T6 with T3 split, RQ-1/RQ-2 are decided). The live plan is "▶️ RESUME HERE" and
+> "🧭 G2 — Tracks" above.
+
 beta.3 is browser-shell work — overlays, DPI, window identity, logging, the trust boundary.
 **beta.5 is the wallet's asset layer.** Four tracks, in a fixed order, that take the wallet from
 "cannot tell a token from a coin" to "holds, spends and recovers tokens deliberately".
@@ -313,6 +318,10 @@ beta.3 is browser-shell work — overlays, DPI, window identity, logging, the tr
 | — | Tickets | `tickets/` | Reviewed and assigned into tracks by the owner, not worked ad hoc |
 
 ## Why this order — settled, do not relitigate
+
+> 🗄️ **Superseded 2026-09-27 — kept as history.** This section predates the G2 decisions (OpNS is out, the
+> track set is T0–T6 with T3 split, RQ-1/RQ-2 are decided). The live plan is "▶️ RESUME HERE" and
+> "🧭 G2 — Tracks" above.
 
 **Guard → 1Sat → OpNS → Backup.** Each one is a prerequisite for the next, not a preference:
 
@@ -455,6 +464,10 @@ To be filled in at the end of the microscope pass, not now. Two structural rules
 
 ## Decisions owed before track 1 implementation starts
 
+> 🗄️ **Superseded 2026-09-27 — kept as history.** This section predates the G2 decisions (OpNS is out, the
+> track set is T0–T6 with T3 split, RQ-1/RQ-2 are decided). The live plan is "▶️ RESUME HERE" and
+> "🧭 G2 — Tracks" above.
+
 1. **Exposure question** (above) — answer by experiment, not by reading. Sizes the guard's urgency
    and tells us whether existing users are already affected.
 2. **Where the classification seam sits** — ingest-only, or ingest plus a verification pass on
@@ -468,6 +481,10 @@ To be filled in at the end of the microscope pass, not now. Two structural rules
 5. ⭐ **RQ-1 and RQ-2** — the two research questions below. Both are **research tasks, not decisions**.
 
 ## Research questions owed before track work *(carried from `RESUME_beta4.md` §3, archived 2026-09-25)*
+
+> 🗄️ **Superseded 2026-09-27 — kept as history.** This section predates the G2 decisions (OpNS is out, the
+> track set is T0–T6 with T3 split, RQ-1/RQ-2 are decided). The live plan is "▶️ RESUME HERE" and
+> "🧭 G2 — Tracks" above.
 
 ⭐ Two questions sit **between** tracks. If each track's session answered them on its own, you would
 get incompatible answers — so they are researched once, up front, and then the owner decides.

@@ -13,6 +13,20 @@
 
 ---
 
+## ✅ 0. G2 decisions applied (owner, 2026-09-27)
+
+> The research below is the **evidence**; this block is the **decision**. Where they differ, this block wins.
+> Full record: `../README.md` → "✅ Decisions as made".
+
+| Question | Decided |
+|---|---|
+| §9 **Q1** menu → Exit | ✅ **Quits the whole app** — the industry standard (Chrome, Firefox, Vivaldi, our macOS build). 👤 *"do what people are accustomed to."* The window's X closes one window |
+| **Q5** password import · **Q7** split view | ✅ **Deferred** to the next release (decision 14). Passwords return **CSV-only**; split view gets its own scoping after P2 |
+| **Q6** store a declined permission | ✅ **No.** The user is simply re-prompted (👤 *"the user's not going to know to go undo it"*). **P8 dropped** |
+| Q2 session restore (a) + crash-save item · Q3 Tier 1 G1 / Tier 2 G2 · Q4 claim endpoint (T6 builds, T1 harness rows) · Q8 cut order | Per this doc's recommendations (approved) |
+
+---
+
 ## 1. Goal
 
 **The browser around the wallet behaves the way a user of Chrome expects: updates happen out of sight, quitting

@@ -11,6 +11,22 @@ phases only; no contracts, no code. **Standard:** `../../RELEASE_CYCLE.md` §2 (
 
 ---
 
+## ✅ 0. G2 decisions applied (owner, 2026-09-27)
+
+> The research below is the **evidence**; this block is the **decision**. Where they differ, this block wins.
+> Full record: `../README.md` → "✅ Decisions as made".
+
+| Question | Decided |
+|---|---|
+| §9 **Q1** BSV-21 | ✅ **Recognise, hold, show in this release** (P1, P4) — `bsv21` basket, never `1sat` (decision 8) |
+| **Q2** BSV-21 transfer (P5) | ✅ **Deferred** to the release after this one |
+| **Q4** token-spend consent | ✅ **Per action, no standing grant** (BRC-165 MUST — the MUST is in **165**, not 147 as `README.md`/`R-TOKENPERM` say; fix the attribution) |
+| **Q6** order | ✅ **P2 (permission class) first** |
+| Q3 verify-only · Q5 indexer posture · Q7 patterns-only | Per this doc's recommendations (approved) |
+| ⚠️ New since this research | BRC PR **#273** (2026-09-27) revives BRC-162 binary BSV-21 — contradicts §2.1 item 3. Watch item: an unreadable binary BSV-21 output is a held 1-sat coin under decisions 2 + 7; the classifier may need a second encoding. **BRC-181 merged 2026-09-25** (listed open below) |
+
+---
+
 ## 1. Goal
 
 **Hold, show, receive and deliberately transfer 1Sat ordinals to the current BRC-147/150/159/160/165 text

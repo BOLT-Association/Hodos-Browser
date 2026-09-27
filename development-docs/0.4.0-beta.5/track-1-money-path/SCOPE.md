@@ -52,6 +52,24 @@ Two defects that are **already ticketed and still live** meet a rule-7 trip-wire
 
 ---
 
+## ✅ 0. G2 decisions applied (owner, 2026-09-27)
+
+> The research below is the **evidence**; this block is the **decision**. Where they differ, this block wins.
+> Full record: `../README.md` → "✅ Decisions as made".
+
+| Question | Decided |
+|---|---|
+| §11 **Q1 / RQ-1** | ✅ **Option B + C (decisions 2, 2a).** Money = positively marked `change=1`; **plus** Go's separate money-index table (built from the stamp; coin selection reads only it; carries the reservation) — **in P3**. 👤 Schema change approved on condition of exhaustive negative controls (every selector route, beta.4-DB upgrade, restore rebuild) |
+| Unknown coins (RQ-2, owned by T3) | ✅ **Tiered rule (decision 7):** real script first (P4) → multi-sat plain P2PKH, no inscription ⇒ money on evidence → 1-sat unreadable ⇒ held → unresolved ⇒ **shown** under the balance, auto-retry, manual "treat as money". P5 owns the classifier and the display |
+| **Q2** refused `signAction` | ✅ Never report success. Temporary failure ⇒ **a couple of retries of the same signed tx, then an error**; permanent rejection ⇒ error with the reason |
+| **Q3** loopback W4/W6/W7/W8 | ✅ Moved to **T5** |
+| **Q5** rescan BIP-32 addresses | ✅ **Stop writing them into `addresses`.** 👤 A BIP-32 hit is **swept into a BRC-42 address** — design here: automatic or confirmed; a sweep is a normal spend (network fee + 1,000-sat service fee) |
+| **Q7** two-index-sources ticket | ✅ Moved **into T1** (P6) |
+| Q4 reorg (narrow) · Q6 T1 writes, T3 reviews · Q8 rule-5 sentence · Q9 reqwest 0.12 | Per this doc's recommendations (agent-level, approved) |
+| Order | T1 (incl. the schema change) lands **before** T3's format work |
+
+---
+
 ## 1. Goal
 
 **No path — automatic, user-triggered or recovery — can spend an output the wallet has not positively
