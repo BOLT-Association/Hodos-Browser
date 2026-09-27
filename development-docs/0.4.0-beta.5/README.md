@@ -171,8 +171,8 @@ Every ticket in `tickets/` now names a track in the register's **Track** column 
 | **B5-T2 1Sat Ordinals** | Hold, show, receive and deliberately transfer ordinals (BRC-147/150/165) | 2 | `track-2-1sat-ordinals/` |
 | **B5-T3 Backup & sync** | On-chain backup and multi-device restore in a standard, interoperable format — stable, conflict-free, efficient | 1 | `track-3-backup-sync/` ⭐ start at `BACKUP_HISTORY_OVERVIEW.md` |
 | **B5-T4 402 payments** | The x402 adapter over our BRC-121 client, plus the open 402 defects | 4 | `track-4-402-payments/X402_INTEGRATION.md` |
-| **B5-T5 Identity & privacy** | A site gets only the keys, identity and wallet surface the user chose to give it; servers prove who they are (BRC-103/104); count users without identifying them | 10 | — |
-| **B5-T6 Browser shell** | Multi-window, tabs, import, update visibility and consent-UI defects | 14 | `track-6-browser-shell/TOOLS_TAB_claim_a_payment.md` (outline) |
+| **B5-T5 Identity & privacy** | A site gets only the keys, identity and wallet surface the user chose to give it; servers prove who they are (BRC-103/104); count users without identifying them | 11 | — |
+| **B5-T6 Browser shell** | Multi-window, tabs, import, update visibility and consent-UI defects | 16 | `track-6-browser-shell/TOOLS_TAB_claim_a_payment.md` (outline) |
 | *Background* | Agent-run instruments and hygiene — **not a track** | 7 | — |
 | *Closed / owner decision / defer* | Chromium `debug.log` ✅ closed · Big Sur feed ✅ closed · screenshots in public history ✅ closed (accepted risk) · knowledge & memory architecture ✅ adopted as `../KNOWLEDGE_AND_MEMORY.md` | 4 |
 

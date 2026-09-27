@@ -18,6 +18,7 @@ Tickets stay in `../tickets/` (planning note D11); this list mirrors the registe
 - [`TICKET_two_next_address_index_sources_can_reuse_addresses.md`](../tickets/TICKET_two_next_address_index_sources_can_reuse_addresses.md) — 🏷️ Two sources for the next address index can drift apart and reuse an address
 - [`TICKET_createSignature_requires_counterparty.md`](../tickets/TICKET_createSignature_requires_counterparty.md) — TICKET — `createSignature` rejects a request with no `counterparty` (suspected BRC-100 conformance gap)
 - [`TICKET_wallet_bridge_plumbing_is_advertised_to_every_site.md`](../tickets/TICKET_wallet_bridge_plumbing_is_advertised_to_every_site.md) — TICKET — the wallet bridge's **plumbing** is advertised to every https site, by name
+- [`TICKET_deleting_a_site_in_the_advanced_wallet_does_not_reach_the_browser.md`](../tickets/TICKET_deleting_a_site_in_the_advanced_wallet_does_not_reach_the_browser.md) — 🔁 Deleting a site in the advanced wallet does not reach the browser — it keeps treating the site as approved
 
 ## Existing material
 

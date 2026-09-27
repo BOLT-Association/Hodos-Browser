@@ -112,8 +112,11 @@ existing links use it. Describe the **symptom or the defect**, not the fix:
 | `TICKET_wallet_quiet_detector_blind_to_long_polls.md` | OPEN | **B5-T6 Browser shell** — (moved from beta.3) | beta.3 |
 | `TICKET_brc121_release_restores_inputs_the_server_may_have_spent.md` | 📌 PROPOSED (G2) | **B5-T4 402 payments** — ❔ **unverified hypothesis**, money; ground-truth check against the chain is step 1 | 2026-09-25 |
 | `TICKET_rescan_cannot_find_payments_to_generated_addresses.md` | 📌 PROPOSED (G2) | **B5-T1 Money path** — the scan; its button is Tools-tab card 2 (T6). ⚠️ today's rescan scans BIP32 while generated addresses are BRC-42 | 2026-09-25 |
+| `TICKET_prompt_opens_behind_another_window_with_two_windows_open.md` | 📌 PROPOSED (G2) | **B5-T6 Browser shell** — from the 2026-09-25 beta.4 scare (Lead C); buggy, not broken | 2026-09-25 |
+| `TICKET_deleting_a_site_in_the_advanced_wallet_does_not_reach_the_browser.md` | 📌 PROPOSED (G2) | **B5-T5 Identity & privacy** — consent surface (Lead B); IPC role gate blocks our own wallet tab | 2026-09-25 |
+| `TICKET_find_bar_does_not_follow_tab_switches.md` | 📌 PROPOSED (G2) | **B5-T6 Browser shell** — adopt Chromium's per-tab find state | 2026-09-27 |
 
-📏 **Reconciled 2026-09-25: 54 tickets, 54 rows** (the last two filed during triage). 28 from the 2026-09-24 consolidation (19 with the
+📏 **Reconciled 2026-09-27: 57 tickets, 57 rows** (the last five filed during triage and the 2026-09-25 beta.4 scare). 28 from the 2026-09-24 consolidation (19 with the
 old beta.4 folder, 1 loose, 1 from the old beta.5 folder, 6 from `development-docs/` root, 1 engine
 bump) · **16** still-open tickets moved from `../../0.4.0-beta.3/` after a file-by-file review · **7**
 from the Wallet-Hardening review · **1** from the Final-MVP-Sprint review.

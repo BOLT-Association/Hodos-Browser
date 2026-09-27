@@ -22,6 +22,8 @@ Tickets stay in `../tickets/` (planning note D11); this list mirrors the registe
 - [`TICKET_edit_limits_modal_usability.md`](../tickets/TICKET_edit_limits_modal_usability.md) — Edit Limits modal (Approved Sites) — long, losable, and it discards work silently
 - [`TICKET_modal_info_tooltip_overflows_modal.md`](../tickets/TICKET_modal_info_tooltip_overflows_modal.md) — TICKET — the info-icon tooltip in the permission modal overflows the modal and adds a dead scrollbar
 - [`TICKET_wallet_quiet_detector_blind_to_long_polls.md`](../tickets/TICKET_wallet_quiet_detector_blind_to_long_polls.md) — The "is the wallet busy?" detector counts a long poll as silence
+- [`TICKET_prompt_opens_behind_another_window_with_two_windows_open.md`](../tickets/TICKET_prompt_opens_behind_another_window_with_two_windows_open.md) — 🪟 With two browser windows open, a permission prompt opens BEHIND the other window — the site looks frozen
+- [`TICKET_find_bar_does_not_follow_tab_switches.md`](../tickets/TICKET_find_bar_does_not_follow_tab_switches.md) — 🔍 The find bar does not follow a tab switch — the new tab shows no results until you retype
 
 ## Existing material
 
