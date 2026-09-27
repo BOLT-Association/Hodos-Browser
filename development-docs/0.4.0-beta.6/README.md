@@ -35,7 +35,7 @@
 | **G0 Oriented** | ✅ done 2026-09-24 (consolidation, cleanup, ticket inventory) |
 | **G1 Mission** | ✅ **signed off by the owner 2026-09-27** — see "🎯 G1 — Mission" below; also to be reused as the release notes |
 | **G2 Tracks** | ✅ **signed off by the owner 2026-09-27** — all 14 decisions + the extra owner calls recorded ("✅ Decisions as made"); G2-close items 1–8 done ("G2 — what is still owed") |
-| **G3 Phases** | 🟡 **next** — one phase contract per phase, per track (the SCOPE docs' "Candidate phases" + each "0. G2 decisions applied" block) |
+| **G3 Phases** | 🟡 **next** — one phase contract per phase, per track (the SCOPE docs' "Candidate phases" + each "0. G2 decisions applied" block). ⭐ **Start a fresh session with `SESSION_PROMPT_G3_phase_contracts.md`** |
 | G4–G6 | ⬜ not started — G4 logistics, G5 comms + serialization, G5.5 feasibility, G6 go/no-go |
 | macOS | 🍎 **not started, by owner decision** — macOS joins after planning is complete. Keep updating `MAC_RELAY_BETA5.md` as planning moves |
 
