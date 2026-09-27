@@ -57,7 +57,7 @@ Research was run on Fable for T2 and T4, the current model for the rest — comp
 
 | # | Decision | Recommendation | Detail |
 |---|---|---|---|
-| 1 | 🚨 Ship the engine refresh **now, alone, as a security release?** | **Yes.** Pick its version name deliberately so "beta.5" is not spent twice | `track-0-engine/SCOPE.md` |
+| ✅ 1 | 🚨 Ship the engine refresh **now, alone, as a security release?** | **Yes.** Pick its version name deliberately so "beta.5" is not spent twice | `track-0-engine/SCOPE.md` |
 | 2 | **What counts as money (RQ-1).** Both reference wallets treat a coin as money only when **positively marked**; ours is money by default | Adopt their rule using existing columns, **no schema change** | `track-1-money-path/SCOPE.md` §3 |
 | 3 | **Split backup into two tracks**: *backup you can trust* and *sync & portability* | Yes; both stay in beta.5 | `track-3-backup-sync/SCOPE.md` |
 | 4 | **Multi-device:** nobody runs two devices spending the same coins without conflict | **One active device at a time** for beta.5 — "detect and heal" fails the *no conflicts* bar | same |
@@ -71,6 +71,12 @@ Research was run on Fable for T2 and T4, the current model for the rest — comp
 | 12 | **`createSignature` with no counterparty:** SDK default is `anyone`, our code would fill `self` | Match the SDK — **signing code, invariant 3: owner approval** | same |
 | 13 | **User count:** adopt Brave's usage ping | Yes; state plainly that the server sees IP addresses | same |
 | 14 | **Browser-shell cut line:** split view and Chrome password import → beta.6 | Yes | `track-6-browser-shell/SCOPE.md` |
+
+### ✅ Decisions as made (G2 sitting, 2026-09-27)
+
+| # | Owner decision | Consequence recorded |
+|---|---|---|
+| 1 | **Ship the engine refresh now, alone, as a security release — refresh only.** Engine → `chromium-150.0.7871.255` (closes the exploited V8 bug). The fork's CRLF line-ending cleanup (T0 Q4) may ride along: source-only, no binary change. **Not** in it: the `"Hodos"` `Sec-CH-UA` brand (irreversible once seen, and its header-vs-JS agreement is unmeasured — T0 SCOPE §5 P4, §6c) — it moves to the **second** engine build with the ad-blocker pull. Promotion stays an owner call after P5 verification. ⭐ **Version: `v0.4.0-beta.5`.** `v0.4.0-beta.4.1` was rejected on evidence: `release.yml`'s build-number parser (both the mac build step and the appcast step) only reads a trailing `-beta.<digits>`, so `beta.4.1` scores **99 = "final 0.4.0"** → build number `40099`, which outranks every later beta (`beta.5` = `40005`) in Sparkle and in `UpdateStager::IsNewerBuild` — a silent auto-update dead end. `0.4.1-beta.1` would outrank the unshipped 0.4.0 final. ⇒ **the release planned in this folder becomes `v0.4.0-beta.6`**; this folder renames to `0.4.0-beta.6/` and the intake folder to `0.4.0-beta.7/` (owner, 2026-09-27), done as one rename commit after the 14 decisions | T0 becomes two builds: **Build 1** = P1 → P2 → P5 (security release); **Build 2** = P3 ad-block pull + P4 brand → P5-lite, inside the planned release. T0 Q2/Q3/Q5 still owed at G3 |
 
 ### Confirmed by the orchestrating session (not only by the research agents)
 
