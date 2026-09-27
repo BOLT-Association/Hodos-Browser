@@ -46,7 +46,7 @@ Two standards were published (Brandon Cryderman / HandCash — see `Marketing/Pr
 ### Two rules from BRC-147 that are load-bearing for us
 
 1. **Tags are claims, not proof.** "A malicious or buggy sender can attach another inscription's origin to an unrelated 1-sat UTXO." Without a *verifying* BRC-150 package, the receiver **MUST NOT** present sender-supplied `name`/`app`/`origin:` as authoritative. Our UI must distinguish *verified* from *claimed* provenance.
-2. **Spending a `1sat` output is NOT a BRC-29 payment.** BRC-147: "a general 'pay' or auto-pay grant **MUST NOT** authorize spending them." → This must be enforced in the **Rust permission engine** (`hodos_permission_engine`), not just the UI. A 1-sat ordinal caught by ordinary coin selection is a **permanently destroyed asset** — spending it into a >1-sat output annihilates the origin. Treat this with the same seriousness as the privacy-perimeter gates.
+2. **Spending a `1sat` output is NOT a BRC-29 payment.** ⚠️ *Corrected 2026-09-27:* BRC-147 says only **SHOULD** ("Not treat a general 'pay' or auto-pay grant as authorization to spend `1sat` tips"); the **MUST NOT** — plus **per-action** send approval — is **BRC-165** (T2 SCOPE §2.1 item 4). → This must be enforced in the **Rust permission engine** (`hodos_permission_engine`), not just the UI. A 1-sat ordinal caught by ordinary coin selection is a **permanently destroyed asset** — spending it into a >1-sat output annihilates the origin. Treat this with the same seriousness as the privacy-perimeter gates.
 
 ### ⚠️ Indexer dependency — decide this deliberately (research 2026-08-05)
 

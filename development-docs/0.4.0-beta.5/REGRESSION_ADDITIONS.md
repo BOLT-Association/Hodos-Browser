@@ -92,8 +92,10 @@ shape its rule must survive.
 
 ## R-TOKENPERM — pay grants do not authorize token spends
 
-⛔ **BRC-147: pay and auto-pay grants MUST NOT authorize ordinal spends.** This is a spec
+⛔ **BRC-165: pay and auto-pay grants MUST NOT authorize token spends, and send approval is per action.** This is a spec
 requirement, and it sits on the same surface as the four privacy-perimeter gates.
+*(Attribution corrected 2026-09-27: BRC-147 has this only as a **SHOULD**; the MUST — and the per-action rule, which also
+rules out a standing token-spend grant — is in **BRC-165**. T2 SCOPE §2.1 item 4; G2 decision 8. The test itself is unchanged.)*
 
 | | |
 |---|---|
