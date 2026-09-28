@@ -62,3 +62,12 @@ Owner decision 2026-09-28: remaining tracks run on **Opus** (Fable stopped for u
 - Consequences carried: wallet_activity uses o.change=0 for received ⇒ P5-A11; "six selectors + send_max" = 2 selectors × 6 routes (S1–S6)
 - Edge to T5-P2: first-party-only list lacks /wallet/cleanup, /wallet/rescan, /wallet/release-nosend. Schema at V25; T1-P3 then T5-P3 renumber
 - Doc fixes: reqwest sites 23 not 35; SCOPE §7 P3 selector wording
+
+## T2 (P1–P3 Opus before the stop, P4 Opus) — committed
+- P1 classify & file · P2 token-spend permission (per action) · P3 receive & transfer · P4 hold & show (extends /wallet/tokens; amt from chain script; exact u128 sums; no inline media — View opens a normal tab; no BSV-21 send)
+- Awaiting independent RED: P1 A1–A7,A11,A12 · P2 A1–A8 · P3 A3–A12 · P4 A2,A3,A6,A12
+- Owner-h ≈4.0. K=4 phases
+- Owner Qs: P1 Q1 BRC-162 binary hold only (rec) · Q2 money = exact 25-byte P2PKH template (into T1-P5) · P2 Q1 asset baskets 1sat/bsv21/bsv20/opns + unfiled 1-sat · Q2 build createSignature binding in P2 (rec yes) · Q3 relinquishOutput on asset: prompt each time (rec) · P3 Q1 new signing call site from customInstructions triple (inv 3; rec approve w/ pubkey-matches-script) · Q2 addresses only · Q3 write-ahead in existing rows vs new table (inv 2, at kickoff) · Q4 transfer pays 1,000-sat fee · P4 Q1 no inline media · Q2 held tokens shown in T1's line only · Q3 BSV-21 "not verified" only · Q4 metadata in parent_transactions
+- Reported: BRC-162 (PR #273) merged 2026-09-28, no 1-sat requirement ⇒ "held 1-sat coin" wording should read "held at any satoshi value"; money rule must be exact 25-byte match. createSignature + relinquishOutput are spend paths the scope missed.
+- ⚠️ GET /wallet/tokens (and likely /wallet/balance, /wallet/activity) readable by approved websites (domain_trust_gate; first-party-only covers POST/DELETE) — bypasses BRC-165 view prompt; P4-A0 measures; T5-P2 allow-list decides. list_token_outputs DB error → 200 [] (trip-wire 2 shape, display path) — P4-A8
+- Doc fixes: README "Basket and permission mechanics" still says BRC-147 MUST (should be 165); WATCH_fungibles.md stale (DO NOT BUILD, log stops 2026-08-29); decision-8 watch wording; T1-P5 cite P4-A6 + extend A10 to held token rows
