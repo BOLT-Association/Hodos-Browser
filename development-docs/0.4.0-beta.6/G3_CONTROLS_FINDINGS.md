@@ -12,3 +12,12 @@ Detail per row lives in each contract's `§4a. Independent control notes`. This 
 - 👤 P5-A10 GREEN must extend to held token-shaped rows (T2-P4 edge)
 - Residue: real spends on scratch profiles (P6-A13, A15, A16, P7-A6, A7); impossible-state fixtures in-memory/scratch (P5-A5a, P6-A2, P7-A8)
 - No poisoning evidence.
+
+## controls-A — T1 P1, P2, P3, P4 (33/33 cells)
+- 👤 **P3 design question before kickoff:** the two money selectors do not share a predicate (`get_spendable_confirmed_by_user` confirmed-only vs `get_spendable_by_user`); one index with one membership rule cannot give S3/S5/S6 their confirmed-only set — say how those routes join back to `outputs.confirmed`.
+- **GREENs that can pass with the feature absent:** P1-A9 (second visit served from `PaidContentCache` — require a cache MISS + the pay402 log line) · P1-A2 (truncated bulk body falls back to single-address fetch and rebuilds the same set) · P4-A6 (`TaskPurge` only deletes parents in `proven_txs` — seed it) · P4-A10 (need ≥20 consecutive Errs + a coin beyond)
+- Wrong/under-specified SUBJECT: P2-A10 (helper maps Unknown→Ok(false) internally — GREEN must name the three-way reader) · P2-A11 (depends on ARC GP answering 404) · P1-A3 (no recorded "before") · P1-A4 (`peerpay_received` dedups on message_id — count per txid) · P2-A2 (name the transport: IPC vs HTTP) · P4-A11/A12
+- Proposed rows: P2-X1 sendWith on phase-1 signAction · P3-X1 kill between claim and sign (backstop becomes TaskFailAbandoned) · P3-X2 old sweeper ignores P3 rows (rollback) · P4-X1 offloaded empty `locking_script` reaching a sighash path · P4-X2 `upsert_received_utxo_with_confirmed` hard-codes `type='P2PKH'`
+- Residue: small real spends on scratch wallets; trip-wire-1-shaped scratch rows declared in-cell; ⚠️ P2-A7 macOS Keychain item outlives the profile (manual delete); P1-A9/P1-A4 leave rows on the **dev** wallet. ⚠️ Hosts-file fault injection warned against — it would blind the installed production wallet; use a fake `IndexerProvider` (needs a test constructor on `WalletServices`).
+- Many controls need a **scratch build** (one switch compiled flipped) — budget build time.
+- No poisoning evidence.
