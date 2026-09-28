@@ -30,3 +30,14 @@ Detail per row lives in each contract's `§4a. Independent control notes`. This 
 - P2.2-A3/A6: `task_backup.rs :: run` classifies Skipped by `err.contains("skipped")` — make structural · P2.3-A5 vacuous at 1 sat (beta.3 floor) — add 2/546-sat · P2.3-A3 Monitor rebuild masks the subject · P2.3-A7 sequence after P2.2-A3 · P0-A7 `check_outpoint_spent` returns Unknown for plain P2PKH — UNVERIFIED as a third state · P0-A10 two tables confused · P2.1-A3 `import_entities` re-ids `domain_permissions` ⇒ orphaned child grants unless remapped · P2.1-A4 `outputs.confirmed` not on `models.rs :: Output` · smaller items in §4a
 - Residue: scratch DB copies; mock-chain superseding token (P2.3-A2); one real claimed coin in a mainnet scratch wallet (T6-P5-A1)
 - No poisoning evidence.
+
+## controls-E (Opus, after Fable hit the usage limit) — T3a P3, P4 + T3b P5–P8 (35/35 cells)
+- 👤 **P5-A14 "a sweep never burns an item" passes with the feature absent — and the gap is in shipped code:** `recovery.rs :: split_token_reserved` holds only outputs with `satoshis <= TOKEN_RESERVED_SATS` (= 1). A 2-sat or 546-sat inscription at a Centbee/external address is swept as funding **today** (code reading). Same 1-sat trap in P5-A5, P3-A5.
+- P5-A6 "phrase must control the file" cannot fail as written (BRC-38 file has no mnemonic; macOS Keychain outside the profile) · P5-A4 round-trip shares the collector's blind spot — the "equals source" leg must read the source DB; `canonical()` must compare grants by domain+protocol (re-id) · P5-A1 export can drop rows and pass — compare against the source DB
+- P3 §0: `collect_payload` already drops `locking_script` for every `spendable=0` output ⇒ P3 §12 Q1 partly decided by code · P3-A1 storage-shape mismatch vs T1-P4's pointer form · P3-A2 unverified bytes also land in `transactions.raw_tx`/`proven_txs.raw_tx`; does a txid mismatch fall through providers? · P3-A4 vacuous unless indexer down + mock ARC verifies scripts
+- P4-A4 one-sided (needs REJECTED ⇒ release); `rollback_backup` discards step results (`let _ =`) · P4-A5 free on an idle wallet · P4-A2 parser can fail before the tag — require an auth-tag failure + header transplant · P4-A1/A8 legacy fallback on auth failure only; synthetic nonce fixture
+- P6-A4 timer-task list misses six monitor tasks · smaller items in §4a
+- 👤 **New failure mode P3-X1:** `fetch_tsc_proof_from_api` returns a proof that failed verification as `Ok(Some)`; `refetch_stripped_data` stores it in `proven_txs.merkle_path` — a verdict where an error is owed, as durable state (trip-wire 2+3 shape; latent, code reading). Proposed P4-X1/P6-X1: no row checks "backups carry no service fee".
+- Orchestrator fix applied: P6-A2 RED (1) now reads "with T3a-P2.2-A3's fix reverted".
+- Residue: mock-chain txs, scratch profiles; P5-A12/A13 move real coins into scratch wallets; P5-A14 mainnet run is green-only.
+- No poisoning evidence.
