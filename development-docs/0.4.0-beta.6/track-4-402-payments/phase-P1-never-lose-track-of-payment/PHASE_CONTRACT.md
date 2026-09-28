@@ -108,7 +108,7 @@ All verified 2026-09-28 by Read/Grep at `65869b1`.
 | `rust-wallet/src/handlers.rs :: pay_402`, `Pay402ReuseEntry`, `pay402_reuse_key`, `PAY402_REUSE_TTL_MS` (25 000), `PAY402_REUSE_STATUS_SQL` | ✅ | `dispatch_payment` runs **before** the reuse check; past-TTL branch removes the entry and falls through to mint; output `satoshis: Some(req.satoshis)`, `randomize_outputs: false`, labels `brc121`/`pay402`, description `"Paid content — <host>"`, `no_send: true` |
 | `rust-wallet/src/main.rs :: AppState.pay402_reuse` | ✅ | In-memory `HashMap` — lost on wallet restart (§12 Q-P1-3) |
 | `rust-wallet/src/database/transaction_repo.rs :: set_transaction_status` | ✅ | Stamps `failed_at` on `Failed` — `TaskUnFail` depends on it |
-| `rust-wallet/src/monitor/task_check_for_proofs.rs :: NOSEND_TIMEOUT_SECS` (10 min), `mark_failed` | ✅ | The crash backstop; unchanged by P1 |
+| `rust-wallet/src/monitor/task_check_for_proofs.rs :: NOSEND_TIMEOUT_SECS` (10 min), `mark_failed` | ✅ | The crash backstop; unchanged by P1. ⚠️ **G3 integration:** T3a-P2.2 proposes changing `mark_failed` so an inconclusive oracle no longer restores inputs (BRC-177); ownership is owner question T3a-P2.2 Q1 — if it lands, re-run this phase's release rows against it |
 | `rust-wallet/src/monitor/task_unfail.rs :: recover_transaction` | ✅ | Recovers `failed` rows within 6 h only when mined with a proof; unchanged |
 | `rust-wallet/src/reconcile.rs :: check_outpoint_spent`, `SpentStatus` | ✅ | Not P1's primitive (it answers the input side); the audit tool if a promoted row's inputs are ever questioned |
 | `rust-wallet/src/permission_service/request_gate.rs :: dispatch_payment` path (`decide_and_record_payment`) | ✅ | Spend recorded at decision time (A8) |

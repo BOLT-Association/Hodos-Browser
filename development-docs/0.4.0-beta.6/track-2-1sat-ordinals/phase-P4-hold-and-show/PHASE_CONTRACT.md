@@ -148,7 +148,7 @@ Revert the `list_token_outputs` extension commit and the `TokensTab` commit (Rus
 | T1-P5 ↔ T2-P4 | held/Unknown line | ⭐ **One place per outpoint** (`P4-A6`): held token-shaped rows live in T1's line with reason *"token this wallet cannot show yet"*; T1-P5-A10's "Treat as money" refusal must cover them (`P4-A12`). T1-P5's contract should cite this row |
 | T1-P5-A11 → T2-P4 | `wallet_activity` | **No dependency:** P4 does not read the feed |
 | T2-P4 → T5-P2 | dApp-reachable surface | `GET /wallet/tokens` (and likely `/wallet/balance`, `/wallet/activity`) readable by approved dApps — code reading, `P4-A0` measures. T5-P2's allow-list should decide the GET side; P4 lands the tokens refusal if T5-P2 has not |
-| T2-P4 → T3a-P2 | restore | After restore every filed token re-lists (`R-RESTORE`); `P4-A6` re-run on a restored wallet |
+| T2-P4 → T3a-P2.3 | restore | After restore every filed token re-lists (`R-RESTORE`); `P4-A6` re-run on a restored wallet |
 | T2-P4 → T3a-P0 | measurement | `P4-M1` numbers for BSV-21 (joins `P3-M1`) |
 | T0 Build 1 → T2-P4 | engine | Browser-level rows (`P4-A10`, `P4-A13`) run on the new engine |
 | T2-P4 → REGRESSION_ADDITIONS | indexer posture rule | Proposed at track close, own commit (rule 6) |

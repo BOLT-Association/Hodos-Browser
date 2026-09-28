@@ -98,7 +98,7 @@ Every coin that enters the wallet — by sync, rescan, restore, PeerPay, a dApp 
 
 - Token recognisers and filing (`1sat`, `bsv21`, tags, customInstructions) — T2-P1.
 - The token-spend permission class for dApp-named inputs — T2-P2 (this phase only routes D1 there).
-- The full restore report and its wording — T3a-P2 (the wording is settled at the P2 restore sitting with real coins, decision 7).
+- The full restore report and its wording — T3a-P2.3 (the wording is settled at the P2 restore sitting with real coins, decision 7).
 - Backup format changes — none; `change` is already in the payload.
 - Late payments / scans — P6.
 
@@ -142,7 +142,7 @@ Code: revert the seam + selection switch in one commit; the index membership ret
 | needs ← | B5-T1-P3, P4 | The index (membership switched here) and observed scripts |
 | ↔ | **B5-T2-P1** (classify & file) | ⭐ Seam split per T2-P1 §11: **T1 owns the seam, the stamp, Unknown and its display; T2 owns recognisers + filing.** Order: T2 recognisers → rule ② (exact 25-byte template) → ③ held. BRC-162 guard: rule ② must be exact-template |
 | gives → | B5-T2-P2 (token-spend permission) | D1: dApp-named Token/Unknown inputs are routed to that class |
-| gives → | **B5-T3a-P2** (trustworthy backup / restore) | Restore **classifies before rebuilding** the money index (old backups carry `change=0` on received payments — T3 SCOPE §6a); `P5-A9` is T1's half of `R-RESTORE` |
+| gives → | **B5-T3a-P2.3** (trustworthy backup / restore) | Restore **classifies before rebuilding** the money index (old backups carry `change=0` on received payments — T3 SCOPE §6a); `P5-A9` is T1's half of `R-RESTORE` |
 | gives → | B5-T6-P5 (Tools tab claim) | A claimed payment enters through the internalize route (I4/I5) and is classified like any other — T1's money-path rows apply to the claim endpoint |
 | gives → | B5-T1-P6, P7 | Scans and shedding write through the seam; shedding spends only index coins |
 

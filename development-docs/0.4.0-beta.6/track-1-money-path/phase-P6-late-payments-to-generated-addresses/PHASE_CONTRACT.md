@@ -122,7 +122,7 @@ Every scan-written row carries a scan-specific `purpose` ⇒ `SELECT … WHERE p
 | Direction | Other phase | What is given / needed |
 |---|---|---|
 | needs ← | B5-T1-P4, P5 | Error-honest fetch, >20 coins, observed scripts; the classifier (nothing writes scan results before P5 — SCOPE §7) |
-| ↔ | **B5-T3a-P2** (trustworthy backup / restore) | ⭐ **T1 writes, T3 reviews** (Q6): `reconcile_backup_tx`, the counter write-back, the scan-after-restore hook, the address strip it depends on. T3's restore must **classify before rebuilding** the money index (old backups carry `change=0`). If T3a-P2 moves backup change off the receive address (G8), NC-1/NC-11's fixture changes |
+| ↔ | **B5-T3a-P2.3** (trustworthy backup / restore) | ⭐ **T1 writes, T3 reviews** (Q6): `reconcile_backup_tx`, the counter write-back, the scan-after-restore hook, the address strip it depends on. T3's restore must **classify before rebuilding** the money index (old backups carry `change=0`). If T3a-P2 moves backup change off the receive address (G8), NC-1/NC-11's fixture changes |
 | gives → | **B5-T6-P5** (Tools tab card 2) | The scan endpoint + its response (found / incomplete ranges / the self-only note). Card copy must carry NC-9's sentence |
 | gives → | **B5-T5-P2** (dApp-reachable surface) | `POST /wallet/rescan` is reachable by an approved site; recommend first-party-only |
 | gives → | B5-T5 (privacy) | G8: backup change goes to the user's newest receive address — linkable. Flag only |

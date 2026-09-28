@@ -2,16 +2,11 @@
 
 Owner decision 2026-09-28: remaining tracks run on **Opus** (Fable stopped for usage). Relaunch per-track agents with the brief in `SESSION_PROMPT_G3_phase_contracts.md`, telling each to KEEP the contracts already in its `phase-P*` folders and write only the missing phases. Then: independent negative-control agents (Opus) for every RED cell marked `⏳ independent control`, the integration pass, README G3 certify, MAC relay round.
 
-## Contract status
-- ✅ T0 Build 2 — P3, P4, P5-lite (`b735c69`)
-- ✅ T4 — P1, P2 (`0280986`)
-- 🟡 T1 — P1 only · owed P2–P7
-- 🟡 T2 — P1, P2, P3 · owed P4
-- 🟡 T3a — P0, P1 · owed P2 (agent planned P2 parent + P2.1 sub-phase), P3, P4
-- ⬜ T3b — none · owed P5–P8
-- 🟡 T5 — P1 · owed P2–P5
-- 🟡 T6 — P1, P2 · owed P3–P7, P9, P10
-- Partial files (`9f0c7dc`) are unreviewed; their agents never filed a report.
+## Contract status (updated 2026-09-28, after the integration pass)
+- ✅ **All 41 contracts written** — T0 Build 2 (3) · T1 (7) · T2 (4) · T3a (7, P2 split into P2.1–P2.3) · T3b (4) · T4 (2) · T5 (5) · T6 (9, no P8)
+- ✅ Integration pass: `G3_INTEGRATION.md`
+- ⏳ **Next:** independent negative controls — 208 RED cells in 29 contracts marked `⏳ independent control`. Planned as an end-of-day **Fable** run (owner's usage window); Fable reviewing Opus-written contracts also gives the model comparison for `AAR_NOTES.md`. Then: certify G3 in README, relay round in `MAC_RELAY_BETA5.md`, push, tell the owner what G4 needs.
+- Owner questions: per track below and in each contract's §12.
 
 ## Finished agents' reports (orchestrator notes)
 ## T0 Build 2 (Opus) — committed b735c69

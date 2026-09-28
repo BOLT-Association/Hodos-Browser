@@ -1,7 +1,7 @@
 # beta.6 release — scope and running order *(planned as "beta.5" until 2026-09-27)*
 
 **Opened:** 2026-08-29, from the beta.4 kickoff prompt (the telescope pass; archived to `../../archived-docs/0.4.0-beta.4-planning/`).
-**Status:** 🟡 **G2 ✅ signed off 2026-09-27 — G3 (phase contracts) next** (see "▶️ RESUME HERE").
+**Status:** 🟡 **G3 in progress — 41 contracts written + integrated 2026-09-28; independent negative controls owed** (see "▶️ RESUME HERE").
 ⭐ **Resume at the section directly below.**
 
 > 🔢 **Renamed 2026-09-27 (decision 1, commit `457d8f7`).** The engine security release takes **`v0.4.0-beta.5`**,
@@ -35,7 +35,7 @@
 | **G0 Oriented** | ✅ done 2026-09-24 (consolidation, cleanup, ticket inventory) |
 | **G1 Mission** | ✅ **signed off by the owner 2026-09-27** — see "🎯 G1 — Mission" below; also to be reused as the release notes |
 | **G2 Tracks** | ✅ **signed off by the owner 2026-09-27** — all 14 decisions + the extra owner calls recorded ("✅ Decisions as made"); G2-close items 1–8 done ("G2 — what is still owed") |
-| **G3 Phases** | 🟡 **next** — one phase contract per phase, per track (the SCOPE docs' "Candidate phases" + each "0. G2 decisions applied" block). ⭐ **Start a fresh session with `SESSION_PROMPT_G3_phase_contracts.md`** |
+| **G3 Phases** | 🟡 **contracts written + integration pass done (2026-09-28) — NOT yet certified.** 41 contracts across 8 tracks (T0 Build 2: 3 · T1: 7 · T2: 4 · T3a: 7 incl. P2.1–P2.3 · T3b: 4 · T4: 2 · T5: 5 · T6: 9). Edges closed in `G3_INTEGRATION.md`. ⛔ **Owed before G3 is certified:** the independent negative controls — **208 RED cells in 29 contracts** marked `⏳ independent control` (RELEASE_CYCLE §4.2; planned as an end-of-day Fable run). Owner questions indexed per track in `G3_RESUME_NOTES.md`. ⭐ **Resume from `G3_RESUME_NOTES.md`** |
 | G4–G6 | ⬜ not started — G4 logistics, G5 comms + serialization, G5.5 feasibility, G6 go/no-go |
 | macOS | 🍎 **not started, by owner decision** — macOS joins after planning is complete. Keep updating `MAC_RELAY_BETA5.md` as planning moves |
 
@@ -451,7 +451,7 @@ one. This changes **urgency, not the fix** — which is why the beta.3 floor shi
 - Our `domain_basket_permissions` (V18, `domain_permission_repo.rs:407`) grants **one domain, one
   basket, binary**. BRC-99/165 scopes let a grant name an axis (`all` / `collection` / `app` /
   `creator` / `id`) with the value carried in tags. Ours is narrower than the spec.
-- ⛔ **Spend is a `createAction` label** (`p 1sat input id <key>`), not a basket. **BRC-147 says pay
+- ⛔ **Spend is a `createAction` label** (`p 1sat input id <key>`), not a basket. **BRC-165 says pay
   and auto-pay grants MUST NOT authorize ordinal spends.** So the auto-approve engine needs a
   separate token-spend permission class, and the approval modals must show which baskets and
   sub-categories a grant covers. This lands in track 2, and it touches the privacy-perimeter

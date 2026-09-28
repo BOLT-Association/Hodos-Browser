@@ -130,7 +130,7 @@ Revert the recogniser + filing commit and the `p 1sat` routing commit (two commi
 | T1-P4 → T2-P1 | real scripts | **Blocking for the sync / restore rows** (`P1-A6`, `P1-A7`); ≥ ~256 B prefix or the full script |
 | T1-P5 ↔ T2-P1 | classifier seam | ⭐ **T1 owns the seam, the stamp, `Unknown` and its display; T2 owns token recognisers + filing.** Order inside the seam: T2 recognisers → decision 7 ② (exact P2PKH template) → ③ held. T1-P5's contract should cite this row |
 | T2-P1 → T1-P5 | BRC-162 | Rule ② must be an exact-template match (evidence: BRC-162 §"Satoshi value (convention)") |
-| T2-P1 → T3a-P2 | restore | Restore re-ingests through the seam; tokens restored with the indexer down ⇒ held, filed once the real script is read. Wrapped + unwrapped CI both appear in old backups |
+| T2-P1 → T3a-P2.3 | restore | Restore re-ingests through the seam; tokens restored with the indexer down ⇒ held, filed once the real script is read. Wrapped + unwrapped CI both appear in old backups |
 | T2-P1 → T2-P2 | view gate | `is_protected_basket` extension is shared; P2 lands first |
 
 ## 12. Open questions for the owner

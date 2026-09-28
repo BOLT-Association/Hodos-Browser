@@ -143,7 +143,7 @@ Export and import are new endpoints + one overlay screen: revert the phase's com
 | **Step 0** (vectors, derivation cross-checks, owner answers, BRC-140 decision) | **Now** — no code dependency | nothing |
 | **Export + import build** (A1–A3, A5–A10, A16) | after **T1-P3** (money index) + **T1-P5** (classifier + `change=1` migration) + **T3a-P1** (harness, comparator) | ⚠️ Not before T1-P5: an export taken before the `change=1` migration tells a conforming wallet that received payments are **not money** (they are written `change=0` today — SCOPE §6a), and import has no classifier to call |
 | **Tier ③ sweep** (A13) | after **T1-P6** | the BIP-32 → BRC-42 sweep builder |
-| **Decision 5 round-trip** (A4) | runs when the build lands; **closes** only after **T3a-P2** | its on-chain half needs restore-classifies-before-rebuild (§6a). Before P2 its on-chain half is expected red — recorded as such, not rounded up. Re-run at **T3a-P4**'s freeze |
+| **Decision 5 round-trip** (A4) | runs when the build lands; **closes** only after **T3a-P2.3** | its on-chain half needs restore-classifies-before-rebuild (§6a). Before P2 its on-chain half is expected red — recorded as such, not rounded up. Re-run at **T3a-P4**'s freeze |
 
 ⇒ G5 can schedule P5 **in parallel with T3a-P2..P4**, not behind them.
 
@@ -151,7 +151,7 @@ Export and import are new endpoints + one overlay screen: revert the phase's com
 |---|---|---|
 | needs | **T3a-P0** A12 | HandCash `.brc39` field list + root-key consequence; the "no vectors exist — generate them" finding |
 | needs | **T3a-P1** | `canonical()`, mock chain, H2 manifest, fixtures A/B/C |
-| needs | **T3a-P2** | restore classifies before the money-index rebuild (A4's on-chain half); BS-C2 (tier ① must not read an indexer error as "no backup") |
+| needs | **T3a-P2.3** | restore classifies before the money-index rebuild (A4's on-chain half); BS-C2 (tier ① must not read an indexer error as "no backup") |
 | needs | **T3a-P4** | the frozen on-chain format — A4 is re-run against it |
 | needs | **T1-P3 / T1-P5** | money index; classifier + migration (A5, and every export) |
 | needs | **T1-P4** | real scripts on synced rows — an export of fabricated 25-byte scripts would publish fabrications as fact |

@@ -16,7 +16,7 @@
 | BRC-40 (via T3a-P0 §0, read today) | Unchanged since 2026-04-24: sync of 12 entities by watermark, **no deletes, no versioning** | Plan D2 stands: BRC-38 row forms **plus** our own per-table `deletes` and a per-row version counter. Named as a deviation from BRC-40 in P8 |
 | `go-private-backup-cache` | Still `ca2136e` (2026-08-21), **still no licence** (`gh api …/license` = null) | D3 stands: borrow two ideas (append-only log, `prev_payload_sha256` link), **no code** |
 | wallet-toolbox `WalletStorageManager.ts` | Last change `b3155fa` 2026-09-22 — unchanged since SCOPE §2.5 | — |
-| Our code, re-read for this contract | ⚠️ `handlers.rs :: do_onchain_backup` decides "nothing changed" with `settings_repo.get_backup_hash().unwrap_or(None)`, and `settings_repo.rs :: get_backup_hash` itself **logs and returns `None` on a DB error**. An error therefore reads as *"no baseline"* ⇒ a **full** backup is built and broadcast | Trip-wire 2 shape (a verdict where an error is owed), and it is exactly the event decision 4(a) forbids. Owned here (P6-A2's RED), because a missing baseline must mean *snapshot* only when it truly is missing |
+| Our code, re-read for this contract | ⚠️ `handlers.rs :: do_onchain_backup` decides "nothing changed" with `settings_repo.get_backup_hash().unwrap_or(None)`, and `settings_repo.rs :: get_backup_hash` itself **logs and returns `None` on a DB error**. An error therefore reads as *"no baseline"* ⇒ a **full** backup is built and broadcast | Trip-wire 2 shape (a verdict where an error is owed), and it is exactly the event decision 4(a) forbids. ~~Owned here~~ **G3 integration (2026-09-28): the fix lands earlier, in T3a-P2.2 (row `P2.2-A3`)** — confirmed in code, 0 log hits. P6-A2's RED 1 becomes *"revert P2.2-A3's fix"*, because a missing baseline must mean *snapshot* only when it truly is missing |
 
 ## 1. Goal
 
@@ -38,7 +38,7 @@ After a wallet's first on-chain backup, each later backup puts on chain only the
 | Working rule 7, trip-wire 2 | an error is never a verdict | The baseline-hash read above; a delta producer that reads "no rows changed" from a failed query would silently stop backing up |
 | Trip-wire 3 / decision 5 freeze | a mainnet token is permanent and must decrypt forever (plan G11) | A delta token broadcast before the freeze is a format we must support forever — P6-A9 + the sign-off gate |
 | D14 | nothing deletes or restores on a timer | A delete record emitted by a timer-only monitor transition would erase a row on every future restore |
-| `R-RESTORE` | fail-closed survives recovery | Replay must hand every restored output to the classifier path T3a-P2 built, same as a snapshot restore |
+| `R-RESTORE` | fail-closed survives recovery | Replay must hand every restored output to the classifier path T3a-P2.3 built, same as a snapshot restore |
 | `R-NOSPEND` | no incidental spend | Delta broadcasts are funded like today's backups: smallest-sufficient, never a 1-sat input (`R-PEERPAY-DELIVERY` half 1's existing `a3_backup_funding_is_smallest_sufficient` test is the control) |
 | Service fee | backups carry none today | A refactor that routes delta broadcasts through `create_action_internal` would add 1,000 sats per delta — must not happen (SCOPE §6) |
 | Invariant 2 | no schema change without asking | ⚠️ The per-row version counter (D2's arbiter) and a delta-baseline record are **new columns/table** ⇒ §12 Q1 |
@@ -115,12 +115,12 @@ Before the first mainnet delta broadcast: revert the phase's commits; the snapsh
 |---|---|---|
 | needs | **T3a-P0** E1, E3 | real fee rate and delta bytes (the constants and the owner's acceptance numbers) |
 | needs | **T3a-P1** | harness, mock, `canonical()`, H2 manifest |
-| needs | **T3a-P2** | restore classifies before rebuild; BS-C1 lock; baseline pinning (D13 — "a live silent-loss bug") |
+| needs | **T3a-P2.2 + P2.3** | restore classifies before rebuild; BS-C1 lock; baseline pinning (D13 — "a live silent-loss bug") |
 | needs | **T3a-P4** | the frozen envelope/header, intent record (D7) and history discovery (D6) that the delta type rides on |
 | needs | **T1-P3** | the money index (excluded from deltas, rebuilt on replay) |
 | gives | **P7** | the delta log and its measured sizes — R4-2's per-delta cost input |
 | gives | **P8** | the delta format the BRC §7 describes |
-| watch | **T4-P1** | stuck `noSend` rows follow BRC-177 (T3a-P2); a delta must never carry a status change T4 did not make |
+| watch | **T4-P1** | stuck `noSend` rows follow BRC-177 (T3a-P2.2); a delta must never carry a status change T4 did not make |
 
 ## 12. Open questions for the owner
 

@@ -122,7 +122,7 @@ Revert the transfer-builder entry + UI commit and the receive-walk commit. The c
 | T1-P4/P5 → T2-P3 | real scripts, classifier | Plain-address receive path needs them |
 | T1 (`created`-status reconcile ticket) | crash contract | Cited; not blocking |
 | T2-P3 → T3a-P0/P2 | **measurement rows** `P3-M1` | ⚠️ Tell T3: BRC-150 `beefB64` rows will be ~zero (nobody emits them); the real workload is the internalize BEEF / cached parent txs |
-| T2-P3 → T3a-P2 / T3b | restore of CI-only ordinals | Keys known only from CI must survive backup + restore (CI is in the backup payload; the write-ahead record must be too) — `R-RESTORE` |
+| T2-P3 → T3a-P2.3 / T3b | restore of CI-only ordinals | Keys known only from CI must survive backup + restore (CI is in the backup payload; the write-ahead record must be too) — `R-RESTORE` |
 | T2-P3 ↔ T5-P3 | counterparty defaults | CI-triple signing must use the triple's counterparty verbatim; never decision 12's default |
 
 ## 12. Open questions for the owner
