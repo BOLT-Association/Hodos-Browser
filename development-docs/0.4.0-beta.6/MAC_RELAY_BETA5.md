@@ -9,6 +9,34 @@
 
 ---
 
+# 📋 ROUND W-28a (**Windows**) — 📑 **G3: every phase now has a contract (41). These are what macOS will execute.** 🍎 macOS still stands down until G6 (planning closed). **No rebuild: docs only.**
+
+## §1 — Where they are
+
+Each contract: `track-<n>-<slug>/phase-P<k>-<slug>/PHASE_CONTRACT.md`. Each has a **§9 Platforms** table naming its macOS rows,
+or saying "Windows-only, because …". Cross-track order: `G3_INTEGRATION.md` §3. Template: `PHASE_CONTRACT_TEMPLATE.md`.
+
+## §2 — The contracts with macOS work (from each contract's §9 — read it there, this is the index)
+
+| Contract | 🍎 What touches macOS |
+|---|---|
+| **B5-T0-P3 — ad-block scripts reach the right page** · **P4 — "Hodos" in Client Hints** · **P5-lite — build 2 verify** | engine build 2 for macOS; re-measure the framework `minos` (`CEF_VERSION_UPDATE_TRACKER.md`) |
+| **B5-T1-P2 — a failure says it failed** | row A7: another wallet's phrase keeps the wallet locked — **both OSes**; ⚠️ its control leaves a Keychain item (`HodosBrowserDev`/`wallet-mnemonic`) you must delete by hand |
+| **B5-T2-P2 — token-spend permission** | the gold pill must not fire on a token spend — needs a **C++ change** at the pill sites (controls-D finding) |
+| **B5-T4-P1 — a 402 payment never loses track** · **P2 — the 431 path** | `HttpRequestInterceptor.cpp`, `simple_handler.cpp` |
+| **B5-T5-P2 — what a site can reach** · **P4 — one OS account, one wallet** | shared C++; P4 includes the macOS-only `StopServers`; P4 needs two OS accounts on one Mac |
+| **B5-T6-P1 silent updates · P2 Exit + session restore · P3 small defects · P6 Chrome import · P7 brand prompts · P10 pin/mute** | P3: profile lock (`ProfileLock.cpp`) and the two-window prompt Z-order — ⚠️ the macOS twin of `CreateNotificationOverlay` also uses the primary window (`g_main_window`), so macOS is **probably affected too**, despite the ticket; P10: the mac `SaveSession` copy |
+| Rust-only phases (T1 P3–P7, T2 P1/P3/P4, T3a, T3b, T5-P3) | no macOS-specific code; run their tests on macOS at the platform rows |
+
+**Windows-only, so macOS does not wait for them:** B5-T6-P4 apply-on-quit (Sparkle already does this on macOS) · B5-T6-P9 item D (per-window DPI).
+
+## §3 — What to do
+
+Nothing yet. Read the contracts that name macOS when convenient; answer in a round if a §9 row is wrong for macOS
+(you improved last cycle's specs by refusing to merely satisfy them). Work is queued only after the owner closes planning at **G6**.
+
+---
+
 # 📋 ROUND W-27b (**Windows**) — 🗂️ **the release folders were renamed. Update every path you hold.** No rebuild: docs + Rust comments only.
 
 ## §1 — The moves (commit `457d8f7`, 2026-09-27)

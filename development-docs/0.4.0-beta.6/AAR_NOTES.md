@@ -44,3 +44,16 @@ COST:       ~6 agents' in-flight work lost (their finished files were kept, 9f0c
 INSTRUMENT: none — agent count and model were chosen with no usage budget in view. Candidate: a
             multi-agent plan states its expected token spend, and Fable-heavy batches run at end of day.
 ```
+
+## 2026-09-28 — G3 model comparison, as far as it got
+
+```
+WHAT:       Contracts: T0/T2/T4/T6 + most of T1/T3a/T5 by Opus; T1-P1, T3a-P0/P1, T5-P1 by Fable (before the
+            stop). Independent controls: controls-A/B/C by Fable (103 cells), D/E/F by Opus (105) after Fable
+            hit the usage limit a second time. Every control group, on both models, found GREENs that could
+            pass with the feature absent — ~20 across the round.
+COST:       two usage-limit stops in one day; the owner's review of the contracts is the real score, not yet run.
+INSTRUMENT: the comparison needs the owner's review per contract (Fable- vs Opus-authored, Fable- vs
+            Opus-controlled). Record it here at that review. Early signal only: the independent-control round
+            earned its keep — every group found an assertion that could not fail.
+```

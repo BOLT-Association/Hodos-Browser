@@ -1,7 +1,7 @@
 # beta.6 release — scope and running order *(planned as "beta.5" until 2026-09-27)*
 
 **Opened:** 2026-08-29, from the beta.4 kickoff prompt (the telescope pass; archived to `../../archived-docs/0.4.0-beta.4-planning/`).
-**Status:** 🟡 **G3 in progress — 41 contracts written + integrated 2026-09-28; independent negative controls owed** (see "▶️ RESUME HERE").
+**Status:** 🟡 **G3 ✅ certified 2026-09-28 — G4 (logistics) next** (see "▶️ RESUME HERE").
 ⭐ **Resume at the section directly below.**
 
 > 🔢 **Renamed 2026-09-27 (decision 1, commit `457d8f7`).** The engine security release takes **`v0.4.0-beta.5`**,
@@ -35,8 +35,9 @@
 | **G0 Oriented** | ✅ done 2026-09-24 (consolidation, cleanup, ticket inventory) |
 | **G1 Mission** | ✅ **signed off by the owner 2026-09-27** — see "🎯 G1 — Mission" below; also to be reused as the release notes |
 | **G2 Tracks** | ✅ **signed off by the owner 2026-09-27** — all 14 decisions + the extra owner calls recorded ("✅ Decisions as made"); G2-close items 1–8 done ("G2 — what is still owed") |
-| **G3 Phases** | 🟡 **contracts written + integration pass done (2026-09-28) — NOT yet certified.** 41 contracts across 8 tracks (T0 Build 2: 3 · T1: 7 · T2: 4 · T3a: 7 incl. P2.1–P2.3 · T3b: 4 · T4: 2 · T5: 5 · T6: 9). Edges closed in `G3_INTEGRATION.md`. ⛔ **Owed before G3 is certified:** the independent negative controls — **208 RED cells in 29 contracts** marked `⏳ independent control` (RELEASE_CYCLE §4.2; planned as an end-of-day Fable run). Owner questions indexed per track in `G3_RESUME_NOTES.md`. ⭐ **Resume from `G3_RESUME_NOTES.md`** |
-| G4–G6 | ⬜ not started — G4 logistics, G5 comms + serialization, G5.5 feasibility, G6 go/no-go |
+| **G3 Phases** | ✅ **certified by the agent 2026-09-28** (agent-certified gate, RELEASE_CYCLE §2). 41 contracts; edges closed (`G3_INTEGRATION.md`); all 208 money/schema/crypto negative controls designed by non-author agents (`G3_CONTROLS_FINDINGS.md`). Per track: **T0** Build 2 — 3 (P3 ad-block pull, P4 brand, P5-lite) · **T1** — 7 (P1–P7) · **T2** — 4 (P2 permission first) · **T3a** — 7 (P0, P1, P2.1–P2.3, P3, P4) · **T3b** — 4 (P5–P8; P7 provisional R&D) · **T4** — 2 · **T5** — 5 · **T6** — 9 (no P8). ⚠️ Each contract's §4a lists GREENs the control designers found could pass with the feature absent — authors fix them at phase kickoff. Owner questions: each contract's §12, indexed in `G3_RESUME_NOTES.md` |
+| **G4 Logistics** | 🟡 **next** — RELEASE_CYCLE §3.4: nothing we depend on expires inside the cycle |
+| G5–G6 | ⬜ not started — G5 comms + serialization (map: `G3_INTEGRATION.md` §3), G5.5 feasibility, G6 go/no-go |
 | macOS | 🍎 **not started, by owner decision** — macOS joins after planning is complete. Keep updating `MAC_RELAY_BETA5.md` as planning moves |
 
 ### 🟡 2026-09-25 interruption — resolved as NOT an emergency

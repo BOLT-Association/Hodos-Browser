@@ -5,7 +5,8 @@ Owner decision 2026-09-28: remaining tracks run on **Opus** (Fable stopped for u
 ## Contract status (updated 2026-09-28, after the integration pass)
 - ✅ **All 41 contracts written** — T0 Build 2 (3) · T1 (7) · T2 (4) · T3a (7, P2 split into P2.1–P2.3) · T3b (4) · T4 (2) · T5 (5) · T6 (9, no P8)
 - ✅ Integration pass: `G3_INTEGRATION.md`
-- ⏳ **Next:** independent negative controls — 208 RED cells in 29 contracts marked `⏳ independent control`. Planned as an end-of-day **Fable** run (owner's usage window); Fable reviewing Opus-written contracts also gives the model comparison for `AAR_NOTES.md`. Then: certify G3 in README, relay round in `MAC_RELAY_BETA5.md`, push, tell the owner what G4 needs.
+- ✅ Independent negative controls: all 208 designed (`G3_CONTROLS_FINDINGS.md`) — Fable A/B/C, Opus D/E/F
+- ✅ **G3 certified 2026-09-28.** Relay round W-28a written. **Next: G4 logistics** (RELEASE_CYCLE §3.4).
 - Owner questions: per track below and in each contract's §12.
 
 ## Finished agents' reports (orchestrator notes)
