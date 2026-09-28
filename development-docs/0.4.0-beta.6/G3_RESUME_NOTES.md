@@ -34,3 +34,12 @@ Owner decision 2026-09-28: remaining tracks run on **Opus** (Fable stopped for u
 - Owner Qs: Q-P1-1 strict reading (deviates from "reuse" wording), Q-P1-2 5xx re-check, Q-P1-3 survive restart (existing columns), Q-P1-4 unknown time bound ~10 min
 - Q8: the unread #2890 comment is our own; deferral stands. Q7 verified.
 - Doc fixes: X402_INTEGRATION §4 intro/§10 row 7 stale; body-transport ticket UNASSIGNED + recheck condition; track README goal line mentions x402 adapter; relay: HttpRequestInterceptor.cpp + simple_handler.cpp
+
+## T3b (Opus, restarted) — P5–P8 committed
+- P5 export/import + phrase tiers (OWNS decision 5 round-trip, P5-A4) · P6 deltas · P7 two devices R&D (answers in R4_ANSWERS.md; build = P7b) · P8 publish BRC
+- P5 can start early: Step 0 now; build needs T1-P3, T1-P5, T3a-P1; A4 closes after T3a-P2; re-run at T3a-P4 freeze
+- Awaiting independent RED: P5 A1,A4,A5,A6,A9,A11,A12,A13,A14 · P6 A1,A4,A5,A6,A7,A8,A9 · P7 R1a,R1b · P8 A1,A2
+- Owner-h ≈5.5 (P5 2.25, P6 0.5, P7 1.5, P8 1.25). K=2 design-invalidating: root convention (P5); conflict mechanism / chain-as-sync (P7)
+- Owner Qs: P5 Q1 foreign file = adopt root (inv 2+3) vs sweep (rec sweep) · P5 Q2 always scan all tiers (HandCash evidence; refines decision 6) · P5 Q3 Centbee confirm + Centi path? · P6 Q1 side table for deltas (schema) · P6 Q2 padding default no · P7 R0 numeric bar · P7 Q2 P7b build in beta.6? (rec answers-only) · P8 submit after ship
+- Found: P5-A8 hypothesis — `2-receive address-{i}` invoice ⇒ BRC-29 wallet can't spend our receive outputs from an export. ⚠️ `do_onchain_backup` → `get_backup_hash().unwrap_or(None)` + DB error ⇒ None ⇒ full backup rebroadcast (trip-wire 2 shape, code reading; suggest fix in T3a-P2)
+- Doc fixes: T3a P0/P1 relative paths one `../` too many; SCOPE §2.3 HandCash summary incomplete (+PRIOR_ART row); SCOPE §7.1 2h sitting → P7b; IMPLEMENTATION_PLAN App. A item 3 superseded by decision 5
