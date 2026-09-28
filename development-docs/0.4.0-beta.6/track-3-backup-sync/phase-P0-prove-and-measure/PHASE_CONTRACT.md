@@ -1,8 +1,8 @@
 # B5-T3a-P0 — Prove the database is correct, and replace every estimate with a number · PHASE CONTRACT
 
-**Track:** B5-T3a Backup you can trust (single device) · **Tickets:** none closed here; feeds `../../../tickets/TICKET_brc140_key_shares_vs_bip39.md` (decided in T3b-P5) and `../../../tickets/TICKET_final_mvp_efficiency_leftovers_never_scheduled.md` (the "measure month-1 vs month-6" item) · **Status:** ⬜ NOT STARTED
+**Track:** B5-T3a Backup you can trust (single device) · **Tickets:** none closed here; feeds `../../tickets/TICKET_brc140_key_shares_vs_bip39.md` (decided in T3b-P5) and `../../tickets/TICKET_final_mvp_efficiency_leftovers_never_scheduled.md` (the "measure month-1 vs month-6" item) · **Status:** ⬜ NOT STARTED
 **Opened:** 2026-09-28 · **Author:** Claude (Fable 5.1), G3 agent for T3a · **Platforms:** both (Rust-only; read-only DB copies + chain reads) · **GitHub issue:** *(opened at G6)*
-**Standard:** `../../../../0.4.0-beta.3/HARNESS.md` (inherited, read-only) + `../../HARNESS_DELTA.md` + `../../REGRESSION_ADDITIONS.md`.
+**Standard:** `../../../0.4.0-beta.3/HARNESS.md` (inherited, read-only) + `../../HARNESS_DELTA.md` + `../../REGRESSION_ADDITIONS.md`.
 **G2 decisions carried:** 2, 2a (the money index is derived from `outputs.change`; T1 lands first), 3 (T3a = P0→P4), 5 (two formats; freeze before first mainnet broadcast), 7 (tiered rule; restore reports unidentified coins), 10 (the method for a read-only chain check on the owner's wallets: `mode=ro`, positive control first), `SCOPE.md` §0 and §6a. Decisions 4 and 6 are **provisional** and are consumed here only as "what to measure for".
 
 > 👤 Owner direction this phase carries (`../../README.md` "Research follow-ups", 2026-09-27): *T3 starts by proving the database is correct — after T1's money-path and schema changes — before any backup-format work; restore must rebuild the new money index correctly.* And: *T3's planning opens with a fresh read of the current BRCs, the toolbox schemas (TS and Go) and any test vectors.* The fresh read is §0 below; it is the reason this contract, not a research doc, carries it.
@@ -56,7 +56,7 @@ Before any backup-format code changes, the owner can see — as numbers, not est
 ## 4. Evidence table
 
 ⛔ No empty RED or SUBJECT cells. A green result is reported with its red half or not at all.
-⛔ Money, schema and crypto rows: the RED is **designed by someone other than the assertion's author** — a second agent (`../../../../RELEASE_CYCLE.md` §4.2). Rows P0-A7…A10 are money-state rows and carry the placeholder.
+⛔ Money, schema and crypto rows: the RED is **designed by someone other than the assertion's author** — a second agent (`../../../RELEASE_CYCLE.md` §4.2). Rows P0-A7…A10 are money-state rows and carry the placeholder.
 
 | ID | 🟢 GREEN — must be true | 🔴 RED — must be *seen* to fail, and how | 🎯 SUBJECT — proves the right thing was measured | Tier | Result |
 |---|---|---|---|---|---|
@@ -88,7 +88,7 @@ Nothing shipped changes. The spike (if any) lives on `spike/b5-t3a-p0`, runs aga
 | `rust-wallet/src/monitor/task_check_for_proofs.rs` | ✅ | Selects `status IN ('sending','unproven','nosend')` — A10(a) re-verifies whether reqs still stick |
 | `rust-wallet/src/database/helpers.rs :: get_master_private_key_from_db` | ✅ | `XPrv::new(&seed)` — root `m` (§0, BRC-157 row) |
 | `rust-wallet/src/database/connection.rs :: WalletDatabase::migrate` | ✅ | Gates through `current_version < 25` — **the layer docs say V23/V24; the code is V25** (`migrations.rs :: migrate_v24_to_v25`). Copies must be opened by a build at the same version or read with plain SQLite, never migrated |
-| `research/A1_code_map.md` (numbers) | ✅ read | 114→115 backup rows, 431,476 B live PushDrop script, 615 KB `master`-prefix token scripts — the baselines E1/E2/E6 re-measure |
+| `../research/A1_code_map.md` (numbers) | ✅ read | 114→115 backup rows, 431,476 B live PushDrop script, 615 KB `master`-prefix token scripts — the baselines E1/E2/E6 re-measure |
 
 ## 6. Out of scope
 
@@ -150,14 +150,14 @@ Nothing to roll back: no product code, no schema. If the spike branch exists at 
 - [ ] Every evidence row GREEN **and** its RED observed (rows A7–A10: RED designed by the second agent, name recorded)
 - [ ] `scripts/preflight.ps1` run — result + date recorded below
 - [ ] `scripts/preflight.ps1 -NegativeControl` run — every T0 gate seen to fail
-- [ ] `../../../../0.4.0-beta.3/REGRESSION_SET.md` + `../../REGRESSION_ADDITIONS.md` run in full at this boundary — result recorded
+- [ ] `../../../0.4.0-beta.3/REGRESSION_SET.md` + `../../REGRESSION_ADDITIONS.md` run in full at this boundary — result recorded
 - [ ] Adversarial review of the evidence complete, four questions answered in writing
-- [ ] Any baseline lowered in `../../../../0.4.0-beta.3/HARNESS.md` §4, residuals listed with reasons
+- [ ] Any baseline lowered in `../../../0.4.0-beta.3/HARNESS.md` §4, residuals listed with reasons
 - [ ] Commit messages cite the row IDs they satisfy, and reference the phase issue (`Refs #N`)
-- [ ] **Pushed, and the phase's GitHub issue CLOSED** by the closing commit (`Closes #N`) — `../../../../RELEASE_CYCLE.md` §4.1a
+- [ ] **Pushed, and the phase's GitHub issue CLOSED** by the closing commit (`Closes #N`) — `../../../RELEASE_CYCLE.md` §4.1a
 - [ ] `spike/b5-t3a-p0` deleted (or never created) — recorded
 - [ ] `../../AAR_NOTES.md` swept
-- [ ] Context: memory saved · boundary decided (continue / fresh session) — `../../../../RELEASE_CYCLE.md` §4.6
+- [ ] Context: memory saved · boundary decided (continue / fresh session) — `../../../RELEASE_CYCLE.md` §4.6
 
 | Item | Result | Date | By |
 |---|---|---|---|

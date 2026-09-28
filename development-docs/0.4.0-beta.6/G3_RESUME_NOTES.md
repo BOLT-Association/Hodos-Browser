@@ -71,3 +71,14 @@ Owner decision 2026-09-28: remaining tracks run on **Opus** (Fable stopped for u
 - Reported: BRC-162 (PR #273) merged 2026-09-28, no 1-sat requirement ⇒ "held 1-sat coin" wording should read "held at any satoshi value"; money rule must be exact 25-byte match. createSignature + relinquishOutput are spend paths the scope missed.
 - ⚠️ GET /wallet/tokens (and likely /wallet/balance, /wallet/activity) readable by approved websites (domain_trust_gate; first-party-only covers POST/DELETE) — bypasses BRC-165 view prompt; P4-A0 measures; T5-P2 allow-list decides. list_token_outputs DB error → 200 [] (trip-wire 2 shape, display path) — P4-A8
 - Doc fixes: README "Basket and permission mechanics" still says BRC-147 MUST (should be 165); WATCH_fungibles.md stale (DO NOT BUILD, log stops 2026-08-29); decision-8 watch wording; T1-P5 cite P4-A6 + extend A10 to held token rows
+
+## T3a (P0/P1 Fable, rest Opus) — committed
+- P0 prove + measure · P1 round-trip harness · P2 split: P2.1 carry what matters · P2.2 write path cannot hurt money · P2.3 restore classifies & reports · P3 re-fetchable bytes · P4 freeze format + crash safety (reserves 16-byte device_id + extension)
+- Other tracks citing "T3a-P2": restore/BS-C2/report/high-water ⇒ P2.3; lock/baseline/BRC-177/size cap ⇒ P2.2
+- Awaiting independent RED: P0 A7–A10 · P1 A1,A2,A4 · P2.1 A2–A4 · P2.2 A1–A5,A8–A11 · P2.3 A1–A7,A10 · P3 A1–A6 · P4 A1–A9
+- Owner-h ≈4.75. K=3
+- get_backup_hash: CONFIRMED in code (error ⇒ Ok(None) ⇒ full backup broadcast; siblings get_last_backup_at, discarded set_* results, wallet_recover_onchain 6b). Logs: 0 error lines prod (09-05→09-28) + dev. Latent, not poisoning. Fix P2.2-A3; T3b-P6-A2 RED → "revert P2.2-A3"
+- ⚠️ BS-C2 worse: backup_found:false (also on indexer error) ⇒ WalletPanelPage doRecoverWallet silently falls back to coins-only /wallet/recover ⇒ degraded wallet; HYPOTHESIS its next backup supersedes/spends the good on-chain backup. P2.3-A2 reproduces first. Decision 6 tier ① "must work first" not true today
+- mark_failed on inconclusive oracle restores inputs on a timer (breaks BRC-177); 0 log hits
+- Owner Qs: P2.1 Q1 excluded-tables list (carry peerpay_outbox) · P2.2 Q1 mark_failed owner (rec T3a-P2.2; conflicts T4-P1 "unchanged") · Q2 size cap from P0 numbers · P2.3 Q1 never auto-offer coins-only scan when backup can't be checked · P3 Q1 don't strip scripts ≤1 KB · P4 Q1 intent table (inv 2) · Q2 header as GCM AAD (inv 3) · Q3 device_id 16 bytes
+- Doc fixes: T3b-P6 §0/A2 owner text; T3b-P5 §11 + others "T3a-P2" → P2.2/P2.3; T4-P1 §5 mark_failed note; REGRESSION_ADDITIONS R-RESTORE runnable from T3a-P1, green at P2.3; stale TaskValidateUtxos comment (T1-P6)
