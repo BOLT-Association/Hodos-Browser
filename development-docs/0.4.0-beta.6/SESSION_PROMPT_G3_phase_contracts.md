@@ -62,17 +62,19 @@ finds evidence that a decision is wrong, **stop and ask the owner** (working rul
 | **T5 Identity & privacy** | P1 servers prove who they are (incl. `/.well-known/auth` **server-role fix to the protocol**) · P2 dApp-reachable surface · P3 derived keys parts 1+2 (detector as a **child table** — SCOPE T3 §6a) + optional counterparty · P4 one OS account, one wallet · P5 usage ping (opt-out, three conditions) | 11, 12, 13, T5 Q2 |
 | **T6 Browser shell** | Group 1: P1 silent updates · P2 Exit quits the app + session restore · P3 small defects. Group 2: P4 apply-on-quit · P5 Tools tab claim · P6 Chrome bookmarks/history. Group 3: P7 brand prompts · P9 window globals · P10 pin/mute. ⛔ P8 dropped; split view + password import deferred | 14, T6 Q1/Q6 |
 
-## How to run it — ⚠️ confirm with the owner first
+## How to run it — ✅ decided by the owner 2026-09-28
 
-The previous session proposed, and the owner has **not yet confirmed**:
-
-1. **One agent per track, in parallel**, each writing its track's contracts — then **one integration pass**
-   by the orchestrating session over the cross-track edges. (Multi-agent runs need the owner's explicit OK.)
-2. **Model split:** **Opus** for T1, T3a, T3b and T5 (wallet data, schema, signing — invariants 2 and 3);
-   **Fable** for T0 build 2, T2, T4 and T6 (shell/UI) — and compare the two in the AAR, because the only
-   evidence so far is "comparable on a sample of two" from G2.
-
-Ask both as **one short question** before spawning anything.
+1. **One agent per track, in parallel** (8 agents: T0 build 2, T1, T2, T3a, T3b, T4, T5, T6), each writing
+   its track's contracts — then **one integration pass** by the orchestrating session over the
+   cross-track edges below. 👤 Owner: *"Yes, run one agent per track in parallel."* This is the explicit
+   opt-in for the multi-agent run.
+2. **Model split — hardest tracks on Fable:** **Fable** for **T1, T3a, T3b, T5** (money, backup, sync,
+   identity — schema and signing, invariants 2 and 3); **Opus** for **T0 build 2, T2, T4, T6**. 👤 Owner:
+   *"Shouldn't Fable be the hardest stuff?"* — the earlier Opus-on-hard proposal had no evidence behind
+   it (G2's only data point: "comparable on a sample of two"). ⭐ Record in `AAR_NOTES.md` how each
+   model's contracts fared at the owner's later review — that is the comparison.
+3. The owner expects to **review all contracts again** before G6, so optimise for correct and checkable,
+   not for polish.
 
 ## Cross-track edges the integration pass must close
 
