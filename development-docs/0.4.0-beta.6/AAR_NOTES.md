@@ -32,3 +32,15 @@ COST:       one review agent (~11 min); would have been weeks of re-investigatin
 INSTRUMENT: nothing checks that a ticket's status matches the code; closure is a manual edit that
             phase close does not require. Candidate: phase sign-off names the tickets it closes.
 ```
+
+## 2026-09-28 — G3's parallel Fable run hit the usage limit in ~12 minutes
+
+```
+WHAT:       G3 launched 8 per-track contract agents at once (4 Fable, 4 Opus). Each read ~275k tokens
+            of docs and code before writing. The account's usage limit was reached ~12 minutes in; the
+            Fable agents were stopped and the unfinished tracks restarted on Opus, 3 at a time.
+COST:       ~6 agents' in-flight work lost (their finished files were kept, 9f0c7dc); a wait for the
+            limit to reset; the planned Fable-vs-Opus comparison cut to what finished (T0, T4 = Opus).
+INSTRUMENT: none — agent count and model were chosen with no usage budget in view. Candidate: a
+            multi-agent plan states its expected token spend, and Fable-heavy batches run at end of day.
+```
