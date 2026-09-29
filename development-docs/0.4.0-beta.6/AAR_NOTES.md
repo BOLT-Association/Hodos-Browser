@@ -57,3 +57,26 @@ INSTRUMENT: the comparison needs the owner's review per contract (Fable- vs Opus
             Opus-controlled). Record it here at that review. Early signal only: the independent-control round
             earned its keep — every group found an assertion that could not fail.
 ```
+
+## 2026-09-28 — how a test passes with its feature missing: five shapes the control round found
+
+```
+WHAT:       The independent-control round (208 cells, 6 designers) found ~20 GREENs that would pass with the
+            feature absent. They fall into five repeatable shapes:
+            1. An OLDER guard already produces the green — the 1-sat floor, `is_p2pkh_script` len==25, the
+               basket filter — so the test proves the old guard, not the new classifier (T1-P5-A5a, T2-P1-A6,
+               T2-P3-A11, T3b-P5-A14).
+            2. The fixture is one today's code already handles — rescan already reaches index 28; a sender's
+               `1sat` basket is already honoured (T1-P6-A6, T2-P1-A2).
+            3. A helper turns an error into an answer BEFORE the test's switch — `check_tx_exists_on_chain`
+               maps Unknown to Ok(false) inside, so removing the caller's `.unwrap_or` changes nothing
+               (T1-P2-A10, T4-P1-A2b).
+            4. A cache or fallback supplies the result — PaidContentCache serves the second visit; a truncated
+               bulk body falls back to single-address fetch (T1-P1-A9, T1-P1-A2).
+            5. The control itself would hit production — a hosts-file fault blinds the installed wallet; a
+               release-profile binary opens the production data dir (T1-P2-A2, T4-P1-A9b).
+COST:       none yet — caught at G3, before any code. Each would have been a green that proved nothing.
+INSTRUMENT: the authors' own pre-mortems missed all of them; a second designer found them. Candidate for the
+            contract template: per §4 row, "which OLDER guard, cache or fallback would also make this green?" —
+            and a fixture rule: money fixtures need a >=2-sat case and a case today's code gets wrong.
+```
