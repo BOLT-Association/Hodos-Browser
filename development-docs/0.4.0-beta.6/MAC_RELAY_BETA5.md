@@ -9,6 +9,98 @@
 
 ---
 
+# 📋 ROUND W-29a (**Windows**) — 🚨 **macOS STARTS NOW, for one job only: the engine security release `v0.4.0-beta.5`.** 👤 Owner decision 2026-09-29. beta.6 *phase* work still waits for G6. **No app rebuild needed today; this round is docs only.**
+
+## §0 — TL;DR for macOS
+
+1. **Why now:** the public `v0.4.0-beta.4` engine lacks the fix for an **actively exploited** V8 bug. We ship an engine refresh **alone**, out of cycle, the way beta.4 shipped.
+2. **Your part:** build the macOS arm of the new engine, then verify it. ⭐ **The longest job in the whole release is yours:** a fresh Chromium `src` fetch on the Mac host (tens of GB). Start measuring now (§4 M1); start the fetch as soon as you've confirmed it can run before our fork pin exists (§4 M2).
+3. **Everything else in beta.6 is still planning.** Do not start any `B5-T1…T6` phase. The contracts are for reading only (round W-28a).
+4. 🪟 **Windows is the driver** for owner time (RELEASE_CYCLE §3.5). Bank any row that needs 👤 the owner, and list it in your round. Windows queues them in one sitting.
+
+## §1 — Why: the security fact (measured 2026-09-25, re-checked 2026-09-29)
+
+| | Value |
+|---|---|
+| Bug | **CVE-2026-85046**, V8 type confusion, CVSS 8.8, exploited in the wild |
+| Shipped beta.4 engine | `chromium-150.0.7871.187` → V8 `49df3678` (≈ 15.0.245.21): **no fix** |
+| Fix | V8 `085f765` *"[M150] [compiler] Don't inline Array.prototype.sort on mixed elements kinds"* (2026-09-01) |
+| Target | `150.0.21+ga61e9a5+chromium-150.0.7871.255` → V8 `4ceb8016` (≈ 15.0.245.40), which **contains** the fix |
+| 📏 Upstream 7871 head today | `a61e9a5c7b50…` = `.255`, **unchanged since 2026-09-23** (`git ls-remote`, 2026-09-29). Nothing newer on the branch |
+| 📏 Our fork today | `hodos/7871` = `9ccef04` = `pin-9ccef04/7871` (the beta.4 engine) |
+| Upstream delta | 4 CEF commits, all "Update to Chromium version …"; **none touches a file our fork changes**; zero Chromium commits `.187..255` touch the 16 Blink files our farbling patches edit ⇒ the patch rebase should be ~zero |
+
+Full evidence: `track-0-engine/SCOPE.md` §2.3. Plan: **`track-0-engine/SECURITY_RELEASE_PLAN.md`**. Read that one; it's 60 lines.
+
+## §2 — Where we are: beta.6 planning (so you know what you're coming back to)
+
+| Gate | State |
+|---|---|
+| G1 mission · G2 tracks | ✅ owner, 2026-09-27 (all 14 decisions: round W-27a) |
+| G3 phase contracts | ✅ 2026-09-28: 41 contracts, independent negative controls designed (round W-28a) |
+| G4 logistics | ✅ 2026-09-29: **nothing expires inside the cycle** (`G4_LOGISTICS.md`). 🍎 Two dates relevant to you: Apple Developer Program membership renews **2027-03-23**, and the Developer ID certs expire in 2031 (company 2031-08-13, personal 2031-03-25). 👤 Owner still to confirm which cert `MACOS_CERT_BASE64` holds |
+| **G5** comms + serialization | ⏸️ **paused for this security release**; resumes after promote (the Windows agent may draft it during build waits; it needs no owner time) |
+| G5.5 feasibility · G6 go/no-go | 👤 owner, after G5 |
+
+Since W-28a: `425040b` added prior-art reading notes (bsv-browser's `window.CWI` hardening; Brave bx402 v0.3.0) to three phase contracts. Docs only.
+
+## §3 — The release, step by step (who does what)
+
+| # | Step | 🪟 Windows | 🍎 macOS | 👤 Owner stop |
+|---|---|---|---|---|
+| 1 | **P1**: merge upstream `a61e9a5` into `hodos/7871` (**merge, not rebase**: no force-push); CRLF normalisation as its own commit; new pin `pin-<sha7>/7871`; drift audit vs a `.255` tree ⇒ exit 0 | does it | reads the result | ⛔ **fork push + pin tag** |
+| 2 | **P2**: Tier-1 engine build | incremental, ~5 h host time | ⭐ **fresh no-history `src` fetch**, then build | — |
+| 3 | Package assets `cef-binaries-{windows,macos}-<cefver>-g<sha>`; bump `CEF_ASSET` in **both** `release.yml` arms in one commit; bump `CEF_CHECKOUT` in both build scripts | Windows asset + the commit | macOS asset: report **name + sha256 + size**; **do not upload** | ⛔ **asset upload** |
+| 4 | `workflow_dispatch` validation build green on **both** platforms before any tag | dispatches | reads the mac job log | — |
+| 5 | **P5** verify (table in the plan) | Windows rows | **macOS rows (§4 M5)** | 👤 visual/native rows, `R-GOLD` real payment |
+| 6 | Tag `v0.4.0-beta.5`, build, **promote** | — | — | ⛔ 👤 **irreversible** |
+| 7 | Live check: feed serves **40005**; **beta.4 → beta.5 self-update** | Windows | **Sparkle on Mac** | 👤 |
+
+⚠️ Version rule (decision 1): `v0.4.0-beta.5` ⇒ build number **40005** > installed 40004. ⛔ Never `beta.4.1`: `release.yml` scores it 99 = final (`40099`), a silent Sparkle dead end.
+
+## §4 — 🍎 What macOS does, in order
+
+**M0 — Rebase.** No app rebuild: `git diff fb8be17..HEAD` outside docs = 6 comment/string lines (`handlers.rs`, `reconcile.rs`, `utxo_fetcher.rs`, `promote.yml`), re-measured 2026-09-29.
+
+**M1 — Measure the Mac build host and report numbers** (answer in round `M-29a`):
+- free disk on the build volume;
+- what is actually in the Chromium tree: does `chromium/src/.git` exist (the runbook says it was **deleted** to reclaim space — confirm), and what version `chromium/src/chrome/VERSION` says;
+- Xcode / macOS SDK versions in use; `depot_tools` present and updatable.
+
+**M2 — ⭐ Start the long pole early.** The tree is at `.187` with no history, so the cheap `--no-chromium-history` reuse does **not** apply. ⇒ a **fresh no-history `src` fetch** at `150.0.7871.255`. The Chromium tag is public, so the fetch *should* be able to start before our fork pin exists. ⚠️ **You confirm that**: if your checkout script can only fetch Chromium and CEF together from the pin, say so and wait for step 1. Nothing is lost; the pin comes within a day of owner OK.
+⚠️ `CEF_BUILD_RUNBOOK.md`'s "current known-good configuration" is **stale** (it still says branch 7103). Use the procedure from your 7871 builds (the P4f build), and note anything that differs.
+
+**M3 — Build** from the new pin when round W-29b (or later) posts it. ⛔ The **stale in-tree `src/cef` trap** (`--force-cef-update`): a green build with **zero** Hodos patches. The build log's `N patches total` must **list every `hodos_*` patch by name**, not just show a count.
+
+**M4 — Package, don't upload.** Report the asset name (`cef-binaries-macos-<cefver>-g<sha>.tar.bz2`), sha256 and size. The owner approves the upload.
+
+**M5 — Verify (P5, macOS rows)**, each with its negative control:
+| Row | Pass | Negative control |
+|---|---|---|
+| Engine identity | `CEF_VERSION` read from the **downloaded** artifact = the new build. ⛔ Never the Chromium version (P4e/P4f both said `.187`) | point the mac arm's `CEF_ASSET` at the old name ⇒ binding step **fails** |
+| Fix present | V8 version on `chrome://version` in a **tab** (not an overlay) = `15.0.245.40` | beta.4 reports `15.0.245.21` |
+| Farbling | rotation token with `engine=` = new `CEF_VERSION` (`FARBLING_RELEASE_GATE.md`) | harness `--negative-control` goes red |
+| Codecs | `canPlayType` avc1/mp4a ⇒ `probably`; real YouTube playback | stock prebuilt CEF ⇒ `""` |
+| Deployment floor | `vtool` minos of the new framework; floor stays `max(12.0, measured)` | CI minos guard |
+| Shell | minimal basket (youtube, x, github); relaunch | per `REGRESSION_SET.md` |
+| Update | installed beta.4 → Sparkle offers and applies beta.5 | — (after promote) |
+
+## §5 — Hazards carried from beta.3 (do not re-learn them)
+
+- 🚨 **Stop dev processes by exe path, never by name.** The Mac equivalent of `scripts/stop-dev.ps1`: match the build path, not `HodosBrowser` / `hodos-wallet`. The owner's production wallet shares the name (2026-09-01 incident, root `CLAUDE.md`).
+- **Name the layer your instrument reads.** `chrome://version` must be read in a **tab**; CDP lists the header and overlays as `type:"page"` too.
+- **A clean rebase is not a clean build.** This round touches no C++, but rebase and rebuild before measuring anything.
+
+## §6 — What Windows is doing meanwhile
+
+Step 1 (P1 merge + CRLF commit + drift audit) locally, then 👤 owner OK to push the fork. 📏 Windows tree measured today: `chromium/src` = `150.0.7871.187`, full history, **886 GB free**; the fork checkout's 1,409 modified files are **line-endings only** (`git diff --ignore-cr-at-eol` is empty), which is exactly the CRLF commit the plan schedules (SCOPE Q4). Then the Windows build (~5 h host time).
+
+## §7 — Answer with
+
+Round **`M-29a`**: M1's numbers; whether M2 can start before the pin (and if so, that it has started); anything in the plan that is wrong for macOS.
+
+---
+
 # 📋 ROUND W-28a (**Windows**) — 📑 **G3: every phase now has a contract (41). These are what macOS will execute.** 🍎 macOS still stands down until G6 (planning closed). **No rebuild: docs only.**
 
 ## §1 — Where they are

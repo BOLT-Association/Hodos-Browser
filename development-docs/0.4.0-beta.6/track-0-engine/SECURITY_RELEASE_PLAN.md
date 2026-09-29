@@ -1,6 +1,8 @@
 # Engine security release — `v0.4.0-beta.5` (Build 1 of B5-T0)
 
-**Written:** 2026-09-27, from G2 decision 1. **Status:** 📌 PLANNED — not started.
+**Written:** 2026-09-27, from G2 decision 1. **Status:** 🟡 **STARTED 2026-09-29** (👤 owner go; macOS tasked in relay round W-29a). Pre-flight checks done; step 1 next.
+
+**Pre-flight, 2026-09-29 (measured):** upstream `refs/heads/7871` still `a61e9a5` = `.255`, nothing newer in the CEF index · fork `hodos/7871` = `9ccef04` (the beta.4 engine) · `git diff fb8be17..HEAD` outside docs = the same 6 comment/string lines ⇒ still refresh-only · Windows tree: `chromium/src` at `150.0.7871.187`, 886 GB free; fork checkout's 1,409 modified files are CR-only (`git diff --ignore-cr-at-eol` empty) ⇒ the Q4 CRLF commit.
 **Evidence:** `SCOPE.md` §2.3 (the V8 fix), §4 (patch re-application), §5 P1/P2/P5 (phases), §7 (hours).
 
 ## What and why — one paragraph
