@@ -3,6 +3,8 @@
 **Written:** 2026-09-27, from G2 decision 1. **Status:** 🟡 **STARTED 2026-09-29** (👤 owner go; macOS tasked in relay round W-29a). Pre-flight checks done; step 1 next.
 
 **Pre-flight, 2026-09-29 (measured):** upstream `refs/heads/7871` still `a61e9a5` = `.255`, nothing newer in the CEF index · fork `hodos/7871` = `9ccef04` (the beta.4 engine) · `git diff fb8be17..HEAD` outside docs = the same 6 comment/string lines ⇒ still refresh-only · Windows tree: `chromium/src` at `150.0.7871.187`, 886 GB free; fork checkout's 1,409 modified files are CR-only (`git diff --ignore-cr-at-eol` empty) ⇒ the Q4 CRLF commit.
+
+**Step 1 ✅ 2026-09-29:** fork `hodos/7871` = `7d50c1cab` (merge `fda76cc37` of upstream `a61e9a5`, zero overlap; CRLF-only commit `7d50c1cab`), pin `pin-7d50c1c/7871` pushed (👤 owner OK), `CEF_CHECKOUT` bumped in both build scripts. Drift audit runs after the `.255` checkout (in progress on Windows). *(Correction to the step-1 row: the 1,409 CR-modified files in the Windows `chromium/src/cef` **copy** were a checkout artifact, not the Q4 set, and were not committed.)*
 **Evidence:** `SCOPE.md` §2.3 (the V8 fix), §4 (patch re-application), §5 P1/P2/P5 (phases), §7 (hours).
 
 ## What and why — one paragraph

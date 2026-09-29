@@ -9,6 +9,25 @@
 
 ---
 
+# 📋 ROUND W-29b (**Windows**) — 📌 **the new engine pin is PUSHED: `pin-7d50c1c/7871`. macOS may build from it (task M3 in W-29a).** No app rebuild.
+
+| | Value (📏 verified with `git ls-remote` after the push, 2026-09-29) |
+|---|---|
+| Fork `Hodos-Browser/cef` `hodos/7871` | `9ccef044f → 7d50c1cab0f4653e8dc3c2d75bb952b5131d77fa` (fast-forward, 👤 owner-approved) |
+| Pin tag | `pin-7d50c1c/7871` → same SHA |
+| `fda76cc37` | merge of upstream `a61e9a5` (CEF 150.0.21, Chromium **150.0.7871.255**). 4 upstream commits, **zero file overlap** with Hodos-changed files |
+| `7d50c1cab` | line endings only, the six libcef files from SCOPE §3.3 (`git diff --ignore-cr-at-eol` empty). Fork now has exactly upstream's 12 CR-bearing files, no more |
+| `CHROMIUM_BUILD_COMPATIBILITY.txt` | `refs/tags/150.0.7871.255`, depot_tools `f4fadaf6a5ba1bced9d3d9021060667b563bf583` |
+| Build scripts | `build_hodos_cef_mac.sh` + `.bat`: `CEF_CHECKOUT=7d50c1cab` (this push) |
+
+⚠️ **Two traps, both seen on Windows today:**
+- A pin change makes `automate-git.py` **delete `<tree>/chromium/src/cef`, including `binary_distrib/`**. Move the beta.4 macOS dist out first if you want to keep it (Windows moved its copy to `cef150/binary_distrib_9ccef044f`).
+- If you author in the standalone `<tree>/cef` checkout, a local `git checkout 7d50c1cab` there before the build makes the hashes match and the copy never refreshes. `--force-cef-update` (already in the script) is what prevents it. Don't drop it.
+
+🪟 Windows is at: Chromium `.187 → .255` incremental checkout running; then drift audit → gn/codec gate → build (~5 h).
+
+---
+
 # 📋 ROUND W-29a (**Windows**) — 🚨 **macOS STARTS NOW, for one job only: the engine security release `v0.4.0-beta.5`.** 👤 Owner decision 2026-09-29. beta.6 *phase* work still waits for G6. **No app rebuild needed today; this round is docs only.**
 
 ## §0 — TL;DR for macOS
@@ -93,7 +112,7 @@ Since W-28a: `425040b` added prior-art reading notes (bsv-browser's `window.CWI`
 
 ## §6 — What Windows is doing meanwhile
 
-Step 1 (P1 merge + CRLF commit + drift audit) locally, then 👤 owner OK to push the fork. 📏 Windows tree measured today: `chromium/src` = `150.0.7871.187`, full history, **886 GB free**; the fork checkout's 1,409 modified files are **line-endings only** (`git diff --ignore-cr-at-eol` is empty), which is exactly the CRLF commit the plan schedules (SCOPE Q4). Then the Windows build (~5 h host time).
+Step 1 (P1 merge + CRLF commit + drift audit) locally, then 👤 owner OK to push the fork. 📏 Windows tree measured today: `chromium/src` = `150.0.7871.187`, full history, **886 GB free**; the fork checkout's 1,409 modified files are **line-endings only** (`git diff --ignore-cr-at-eol` is empty). *(⚠️ Corrected later on 2026-09-29: those were a checkout artifact in the `chromium/src/cef` **copy**, not the Q4 set. Q4 is six committed files, fixed in `7d50c1cab`, round W-29b.)* Then the Windows build (~5 h host time).
 
 ## §7 — Answer with
 
