@@ -36,7 +36,7 @@ both compare that integer). ⛔ Not `beta.4.1` — the parser scores it 99 = fin
 | # | Step | Who / stop |
 |---|---|---|
 | 1 | **P1** — merge upstream into `hodos/7871`; CRLF commit; new pin tag `pin-<sha7>/7871`; `cef_patch_drift_audit.sh` against a `.255` tree ⇒ exit `0` | agent · ⛔ **fork push + pin tag = outward-facing → owner OK** |
-| 2 | **P2** — Tier-1 build, Windows (incremental, ~5 h host time) and macOS (⚠️ **fresh no-history `src` fetch first** — the Mac host's `src/.git` was deleted; tens of GB) | agent + 🍎 Mac agent via relay round |
+| 2 | **P2** — Tier-1 build, Windows (incremental, ~5 h host time) and macOS (⚠️ **fresh no-history `src` fetch first**; tens of GB). *Corrected 2026-09-29 per round M-29a:* the Mac `src/.git` is not deleted but a **shallow 1-commit repo at `.187`**, and a bare fetch against it wedged in 0.4.0, so the fresh fetch still applies, in a **new** tree `cef150_255` (started 09:12) | agent + 🍎 Mac agent via relay round |
 | 3 | Upload the two assets to the org repo's `cef-binaries` release; bump `CEF_ASSET` (both arms) + `CEF_CHECKOUT` | ⛔ **asset upload → owner OK** |
 | 4 | `workflow_dispatch` validation build green on **both** platforms before any tag | agent |
 | 5 | **P5** — verify (below) | agent + 👤 owner rows |
