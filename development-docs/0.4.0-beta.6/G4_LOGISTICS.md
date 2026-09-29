@@ -5,11 +5,18 @@ anything expiring before **~2027-01-01** is a G4 finding.
 ⭐ **This is also the standing register of what expires** (owner, 2026-09-28: *keep a list so we are not surprised
 when we go to sign something*). At G12 it moves to `../DevOps-CICD/` as a permanent doc.
 
+## ✅ G4 verdict (2026-09-29): nothing we depend on expires inside this cycle
+
+Certified by the agent (RELEASE_CYCLE §2). The only thing that expires regularly is the **TAAL key** (monthly, a
+fallback only — §4 tests whether it is needed at all). ⚠️ **Calendar item: 2027-03-23** — the Azure client secret
+**and** the Apple membership both fall due that day. Renew both in **February 2027** (auto-renew on for Apple).
+Open, not blocking: whether this machine has a second screen (T6-P9-D2, else "not run").
+
 ## 1. Credentials and expiry
 
 | Credential | Used by | Expires? | Where to look | State |
 |---|---|---|---|---|
-| **Windows code signing** — Azure Trusted Signing (`AZURE_TENANT_ID`, `AZURE_CLIENT_ID`, `AZURE_CLIENT_SECRET`) | `release.yml` | Signing certificates are short-lived + timestamped — not a risk. The **Trusted Signing account/profile "Hodos signing"**: created 2026-03-23, status Current, **no expiry shown** (owner, 2026-09-29) ✅. ⚠️ Still owed: the **app registration's client secret** — a different screen (see §5) | 👤 client secret date owed |
+| **Windows code signing** — Azure Trusted Signing (`AZURE_TENANT_ID`, `AZURE_CLIENT_ID`, `AZURE_CLIENT_SECRET`) | `release.yml` | Signing certificates are short-lived + timestamped — not a risk. The **Trusted Signing account/profile "Hodos signing"**: created 2026-03-23, status Current, **no expiry shown** (owner, 2026-09-29) ✅. App registration **client secret expires 2027-03-23** (owner, 2026-09-29) ✅ past the cycle | ✅ |
 | **Apple Developer ID certificates** | macOS signing | Two: company expires **2031-08-13**, personal **2031-03-25** (owner, 2026-09-29) — ✅ far past the cycle. 👤 confirm which one `MACOS_CERT_BASE64` holds (likely the company one) | ✅ |
 | **Apple Developer Program membership** | signing + notarization | Renews **2027-03-23** — ✅ past this cycle. ⭐ Recommend **auto-renew ON**: a lapsed membership stops notarization for every macOS release | 👤 auto-renew |
 | **App Store Connect API key** (`APPLE_API_KEY_ID`, `APPLE_API_ISSUER`, `APPLE_API_KEY_P8_BASE64`) | notarization | No (until revoked) | — | ✅ |
@@ -40,7 +47,8 @@ GitHub stores the secrets above but never shows an expiry — the dates live at 
 |---|---|
 | Runner images | Pinned (`ubuntu-24.04`, `windows-2022`, `macos-15`) except `cef-fork-watch.yml` → `ubuntu-latest` (a watcher job, not a build — low risk, noted) |
 | CEF engine | Branch 7871, supported to ~Apr 2027 — ✅ past this cycle (owner confirmed) |
-| vcpkg baseline, macOS deployment target | ⬜ read at G4 close |
+| vcpkg baseline | Pinned: `builtin-baseline` `9e44ec0e9f24…` ✅ |
+| macOS deployment target | Pinned 12.0 (`cef-native/CMakeLists.txt` + `release.yml`) ✅ — re-check against engine build 2's framework `minos` (T0-P5-lite) |
 
 ## 4. The TAAL key — owner: "only needed for rate limits we almost never exceed; test without it"
 
