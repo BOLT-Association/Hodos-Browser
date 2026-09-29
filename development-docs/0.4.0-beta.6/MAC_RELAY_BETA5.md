@@ -9,6 +9,62 @@
 
 ---
 
+# 📋 ROUND M-29a (**macOS**) — answers W-29a §7 · M0 ✅ · M1 measured · **M2 fetch STARTED 2026-09-29 09:12 from pin `7d50c1cab`, in a NEW tree** · 2 plan rows wrong for macOS · 👤 nothing needs the owner yet
+
+## §0 — TL;DR
+
+1. **M0 ✅** rebased onto `origin/0.4.0` (`acbf73b`, includes W-29b). No app rebuild (docs + build-script pin bump only).
+2. **M1:** 1.6 TB free on the build volume. ⚠️ **`chromium/src/.git` EXISTS**: it's a **shallow, 1-commit** repo at `.187`, not deleted. The plan/SCOPE row is stale (§2).
+3. **M2:** W-29b had already posted the pin before macOS got to M2, so "can it start before the pin?" had no practical effect this time. The answer is still recorded for next time in §3. **The fetch is running** in a **new** download dir, `/Volumes/CEFBuild/cef/cef150_255`. The beta.4 `.187` tree and its `binary_distrib/` are **untouched**, so the W-29b "pin change deletes `src/cef/binary_distrib`" trap doesn't touch the Mac beta.4 dist. **Fetch only**: no patching, no compile. M3 is a separate run (§4).
+4. 👤 **Owner: nothing today.** The next owner stop from macOS is the M4 asset **upload** OK.
+
+## §1 — M1: the Mac build host (📏 measured 2026-09-29, re-read before posting)
+
+| | Value |
+|---|---|
+| Build volume `/Volumes/CEFBuild` (external SanDisk 2 TB, APFS case-insensitive) | 1.8 TB, **210 GB used (12 %), 1.6 TB free** |
+| System disk `/` | **85 GB free** (nothing build-related lives there) |
+| `cef150/chromium/src/chrome/VERSION` | **`150.0.7871.187`** |
+| `cef150/chromium/src/.git` | **exists**: `git rev-parse --is-shallow-repository` = `true`, `rev-list --count HEAD` = **1**, HEAD `30f6543ae9` (2026-07-22) |
+| `cef150/chromium/src` size | 170 GB (incl. `out/`) |
+| `cef150/chromium/src/cef` (build copy) | `9ccef044f` (P4f = the beta.4 engine); `binary_distrib/` present |
+| Xcode / SDK / OS | Xcode **26.5 (17F42)**, macOS SDK **26.5**, macOS **26.6** |
+| depot_tools `cef150/depot_tools` | detached at **`f4fadaf6a`** (commit date 2026-06-01) = the pin in **both** `9ccef044f`'s and `7d50c1cab`'s `CHROMIUM_BUILD_COMPATIBILITY.txt`. `git fetch` works. Bundled Python 3.11.8 present |
+| Hardware | 8-core M1, 16 GB. System sleep timer is **1 minute**: every long job must run under `caffeinate` |
+
+## §2 — What in the plan is wrong (or different) for macOS
+
+1. ⚠️ **"the Mac host's `src/.git` was deleted"** (`SECURITY_RELEASE_PLAN.md` step 2, `SCOPE.md` §P1 unknown (3), W-29a M1). **Stale.** It *was* deleted, then **recovered as a shallow repo** in the 0.4.0 cycle (`0.4.0/CHROMIUM_BUILD_RELAY.md` §4–§5, ~line 770). The conclusion ("fresh no-history fetch needed") still holds, for a different reason: the tree is at `.187` ≠ `.255`, and a bare `git fetch` against this shallow repo **wedged** in 0.4.0 (18 min, 0 bytes, `SN` state, same doc §4). So the incremental path Windows uses is not the proven path on this box. Suggest correcting the plan/SCOPE wording; I haven't edited them (Windows owns them).
+2. ⚠️ **`build_hodos_cef_mac.sh` can't point at a second tree without also cloning a second depot_tools.** It derives *both* `CEF_CHROMIUM_DIR` and `CEF_DEPOT_TOOLS_DIR` from `CEF_BASE_DIR` with a hard-coded `cef150/` subdir. To keep the `.187` tree intact I call the fork's `automate-git.py` directly with **the script's exact flags**, plus `--depot-tools-dir` pointing at the existing (same-pin) depot_tools. Launcher: `/Volumes/CEFBuild/cef/cef150_255/m2_fetch.sh`. Not a bug; recorded so nobody "fixes" the tree layout mid-release.
+3. `CEF_BUILD_RUNBOOK.md` "current known-good configuration" still says 7103 (as W-29a warned). The macOS procedure actually in use is `~/launch_cef_build.sh` → `build_hodos_cef_mac.sh` (P4f, 2026-08-15, 853 siso steps, ~40 min incremental). No other differences found so far.
+
+## §3 — M2: could the fetch start before the pin? (answer for next time)
+
+**Not with our scripts as written.** `automate-git.py` clones the CEF fork at `--checkout` first, then reads `chromium_checkout` from **that commit's** `CHROMIUM_BUILD_COMPATIBILITY.txt` (`automate-git.py` ~1388–1445), so the Chromium tag comes *from* the pin. A pre-pin start would have needed either (a) `--checkout=a61e9a5` (upstream, same compat file) with `--url` still on our fork, then a second run at the pin, or (b) a hand-written `.gclient` + `gclient sync --no-history`. Both are plausible; **neither was tried**, because the pin was already on the fork (`git ls-remote`: `hodos/7871` = `pin-7d50c1c/7871` = `7d50c1cab0f4…`) when M2 started.
+
+**What is running (📏 2026-09-29):**
+
+| | Value |
+|---|---|
+| Started | **09:12:10**, `nohup` + `caffeinate -dimsu`, log `/Volumes/CEFBuild/cef/cef150_255/m2_fetch.log` |
+| Command | `automate-git.py --download-dir=…/cef150_255 --depot-tools-dir=…/cef150/depot_tools --url=https://github.com/Hodos-Browser/cef.git --branch=7871 --checkout=7d50c1cab --arm64-build --no-depot-tools-update --no-chromium-history --no-build --no-distrib` (automate-git.py is byte-identical at `9ccef044f` and `7d50c1cab`: `git diff` empty) |
+| CEF clone | `cef150_255/cef` at **`7d50c1cab`** "Normalize line endings…" ✅ |
+| `.gclient` | `url: …/chromium/src.git@150.0.7871.255`, `checkout_pgo_profiles: False` ✅ |
+| Chromium | `gclient sync --nohooks --no-history` → `git fetch origin 150.0.7871.255 --no-tags --depth=1` |
+| Progress | 09:12–~09:18: **0 bytes on disk, git in `SN`, 0 % CPU** (server-side pack preparation; this is also what the 0.4.0 wedge looked like, so I measured instead of waiting). Then data: `tmp_pack_56yV76` **407 MB at 09:19**, **470 MB at 09:19:22**; `git-remote-http` bytes_in 471,252,630 (nettop). ⚠️ gclient logs **`STALL DETECTED: gclient has been silent for 5 minutes`** at 0:05:00. That's a stdout-silence heuristic (git prints no progress to a non-tty), **not** a stalled transfer. **Don't kill it on that line.** Total size and ETA not yet known |
+
+**What `--no-build --no-distrib` does and doesn't do** (read from `automate-git.py` 1540–1600, 1651): sync, DEPS patch, `gclient runhooks`, copy the fork into `src/cef`. It does **not** run `gclient_hook.py`, so **no Hodos patches are applied yet** and a patch count now would read zero. That is expected, not the stale-copy trap.
+
+## §4 — Next on macOS (no owner time)
+
+- **M2 done** ⇒ assert `chrome/VERSION` = `150.0.7871.255` and `src/cef` HEAD `7d50c1cab` **before** M3. Do not trust the exit code alone.
+- **M3:** same command with `--no-build --no-distrib` replaced by `--minimal-distrib --client-distrib --no-debug-build --force-cef-update --force-build`, with `HODOS_FARBLING=1` exported (the launcher already exports it). Gate: every `hodos_*` patch listed **by name** in the patcher output, plus the P4f content checks (`hodos_session_cache.{h,cc}` exist, `PerturbBytes` in `analyser_node.cc`, etc.). ⚠️ A full (not incremental) compile on this 8-core M1: **no measured number yet for a from-scratch 150 build on this box** in this cycle. Expect hours, not minutes.
+- **M4:** package; report name + sha256 + size; **no upload**.
+
+🍎 macOS results above are this host's. **Do NOT inherit** the tree-state rows for Windows.
+
+---
+
 # 📋 ROUND W-29b (**Windows**) — 📌 **the new engine pin is PUSHED: `pin-7d50c1c/7871`. macOS may build from it (task M3 in W-29a).** No app rebuild.
 
 | | Value (📏 verified with `git ls-remote` after the push, 2026-09-29) |
