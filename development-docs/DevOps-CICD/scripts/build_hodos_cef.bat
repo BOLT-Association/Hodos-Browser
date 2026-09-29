@@ -3,9 +3,10 @@ REM ============================================
 REM CEF Build Script for Hodos Browser (Windows)
 REM
 REM VER-1: branch 7871 = CEF 150 = Chromium 150 (the M150 LTS line).
-REM Pinned point-release: 150.0.17+g94c1726+chromium-150.0.7871.187
-REM   -> CEF commit 94c1726, which pins Chromium refs/tags/150.0.7871.187
+REM Upstream base: 150.0.21+ga61e9a5+chromium-150.0.7871.255 (security refresh, v0.4.0-beta.5)
+REM   -> CEF commit a61e9a5, which pins Chromium refs/tags/150.0.7871.255
 REM      transitively via cef\CHROMIUM_BUILD_COMPATIBILITY.txt.
+REM   (was 150.0.17+g94c1726+chromium-150.0.7871.187 through v0.4.0-beta.4)
 REM
 REM Builds with proprietary codecs (H.264, AAC, MP3, VP9, AV1).
 REM
@@ -53,7 +54,7 @@ REM be reproducible, and patch content is part of the build. BUMP THIS every tim
 REM a patch lands on hodos/7871, and record the new SHA in the fork's
 REM HODOS_PATCHES.md. Upstream content is unchanged -- dfe5a2343 is
 REM 94c1726 (upstream 7871 head) plus our patch commits.
-set CEF_CHECKOUT=9ccef044f
+set CEF_CHECKOUT=7d50c1cab
 
 REM ⚠️ chromium\src\cef is a COPY of the standalone checkout, refreshed ONLY when
 REM the CEF checkout HASH changes (automate-git.py:1358-1360). If you manually

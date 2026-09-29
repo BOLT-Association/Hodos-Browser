@@ -39,9 +39,10 @@ set -euo pipefail
 # --------------------------------------------------
 
 # VER-1: branch 7871 = CEF 150 = Chromium 150 (the M150 LTS line).
-# Pinned point-release 150.0.17+g94c1726+chromium-150.0.7871.187 -> CEF commit
-# 94c1726, which pins Chromium refs/tags/150.0.7871.187 transitively via
-# cef/CHROMIUM_BUILD_COMPATIBILITY.txt.
+# Upstream base 150.0.21+ga61e9a5+chromium-150.0.7871.255 (security refresh,
+# v0.4.0-beta.5) -> CEF commit a61e9a5, which pins Chromium
+# refs/tags/150.0.7871.255 transitively via cef/CHROMIUM_BUILD_COMPATIBILITY.txt.
+# (was 150.0.17+g94c1726+chromium-150.0.7871.187 through v0.4.0-beta.4)
 #
 # Give 7871 its OWN tree and depot_tools; do not reuse an M136 tree.
 # automate-git.py hard-checkouts depot_tools to the commit its branch pins, so a
@@ -60,7 +61,7 @@ CEF_BRANCH="7871"
 # patch lands on hodos/7871, and record the new SHA in the fork's
 # HODOS_PATCHES.md. Upstream content is unchanged -- dfe5a2343 is 94c1726
 # (upstream 7871 head) plus our patch commits.
-CEF_CHECKOUT="9ccef044f"
+CEF_CHECKOUT="7d50c1cab"
 
 # ⚠️ <tree>/chromium/src/cef is a COPY of the standalone checkout, refreshed ONLY
 # when the CEF checkout HASH changes (automate-git.py:1358-1360). If you manually
@@ -392,7 +393,7 @@ fi
 log_info "Build Configuration"
 
 echo "  CEF Branch:     $CEF_BRANCH (CEF 150 / Chromium 150, M150 LTS)"
-echo "  CEF Checkout:   $CEF_CHECKOUT (150.0.17 -> chromium 150.0.7871.187)"
+echo "  CEF Checkout:   $CEF_CHECKOUT (150.0.21 -> chromium 150.0.7871.255)"
 echo "  Architecture:   $ARCH_LABEL ($BUILD_ARCH_FLAG)"
 echo "  GN_DEFINES:     $GN_DEFINES"
 echo "  Archive Format: $CEF_ARCHIVE_FORMAT"
