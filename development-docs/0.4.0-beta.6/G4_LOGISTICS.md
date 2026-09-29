@@ -24,15 +24,15 @@ GitHub stores the secrets above but never shows an expiry — the dates live at 
 
 ## 2. Environments — the physical things the phases need
 
-| Need | For | Have it? |
+| Need | For | State |
 |---|---|---|
-| The **build host** (the machine that compiles Chromium/CEF) | T0 engine build 2 | 👤 |
-| An **older installed build** to update from | T6-P1/P4 update tests, G10 | 👤 |
-| **Two user accounts** on one Windows machine (and two on one Mac) | T5-P4 one OS account, one wallet | 👤 |
-| **Two monitors at different scaling** (e.g. 100% + 150%) | T6-P9 — otherwise that row is recorded "not run" | 👤 |
-| A real **HandCash `.brc39` export** | T3b-P5 import | 👤 |
-| Your **real Chrome profile** | T6-P6 import | 👤 |
-| **Funded scratch wallets** (small amounts) | money rows T1–T4, T6-P5 | ✅ |
+| Engine build machine | T0 engine build 2 | ✅ this machine (`C:\cef\cef150` present); macOS on the MacBook Pro |
+| An older installed Hodos to update from | T6-P1/P4 update tests, G10 | ✅ the installed build at `%LOCALAPPDATA%\HodosBrowser\` |
+| Two user accounts on one computer | T5-P4 "one OS account, one wallet" — proves user B cannot open user A's wallet | 👤 create a second Windows user when that phase runs (free, 2 min); same on the Mac |
+| Two monitors at different scaling | T6-P9 only | optional — if not available, that row is recorded "not run" |
+| Your Chrome profile | T6-P6 import | ✅ Chrome is installed here |
+| A HandCash export file | T3b-P5 row A15 only: proves a file **exported from another wallet** imports into Hodos (decision 5/6, "move into or out of Hodos") | optional — only if you have or want a HandCash wallet; otherwise that row can use a file exported by the reference wallet-toolbox instead (to be amended in the contract at kickoff) |
+| Funded scratch wallets | money rows T1–T4, T6-P5 | ✅ |
 
 ## 3. CI and pins
 
@@ -42,9 +42,19 @@ GitHub stores the secrets above but never shows an expiry — the dates live at 
 | CEF engine | Branch 7871, supported to ~Apr 2027 — ✅ past this cycle (owner confirmed) |
 | vcpkg baseline, macOS deployment target | ⬜ read at G4 close |
 
-## 4. The TAAL key — recommendation
+## 4. The TAAL key — owner: "only needed for rate limits we almost never exceed; test without it"
 
-Shipping a low-privilege API key inside a client binary is normal for this kind of key. Anyone can extract it, so
-its only protection is that it can do little — broadcast, rate limits, no billing. That is acceptable **because TAAL
-is only the fallback** (GorillaPool is first). Worth doing: record the key's expiry here and check it each release —
-if it really rotates monthly, a build shipped mid-month has a dead fallback within weeks. No code change needed now.
+Probe 2026-09-29 (read-only, `GET https://arc.taal.com/v1/policy`): **200 without a key**, 200 with the shipped key.
+That proves reads work keyless — **not** that a broadcast does. The deciding test is one real broadcast through TAAL
+with no key (a few sats, scratch wallet). Proposed as a row in **B5-T1-P1** (the HTTP-client phase, which already
+touches every provider). If keyless broadcast works: remove the key and its monthly rotation; TAAL stays fallback.
+
+## 5. Where to look up each date
+
+| Date | Link | Steps |
+|---|---|---|
+| Azure client secret | https://portal.azure.com/#view/Microsoft_AAD_IAM/ActiveDirectoryMenuBlade/~/RegisteredApps | "All applications" → open the app whose **Application (client) ID** matches the `AZURE_CLIENT_ID` secret → **Certificates & secrets** → **Client secrets** → "Expires" column |
+| Azure Trusted Signing identity | https://portal.azure.com → search "Trusted Signing Accounts" | open the account → **Identity validation** → status / expiry |
+| Apple Developer ID certificate | https://developer.apple.com/account/resources/certificates/list | the **Developer ID Application** row → "Expiration" |
+| Apple Developer Program membership | https://developer.apple.com/account | **Membership details** → "Expiration date" |
+| Domain `hodosbrowser.com` | 👤 your registrar (which one?) | domain list → expiry / auto-renew |

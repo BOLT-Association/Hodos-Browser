@@ -36,6 +36,9 @@ and why. Generic reassurance is banned.>
 ⛔ No empty RED or SUBJECT cells. A green result is reported with its red half or not at all.
 ⛔ Money, schema and crypto rows: the RED (negative control) is **designed by someone other than the
 assertion's author** — a second agent (`../../../RELEASE_CYCLE.md` §4.2). Record who designed it.
+⛔ **Per row, ask: what OLDER check, cache or fallback would also make this pass?** If one would, the fixture
+must defeat it (e.g. a ≥ 2-sat case past the 1-sat floor; a cache miss; a case today's code gets wrong).
+Added 2026-09-28 after the G3 control round found ~20 GREENs that passed without their feature (`../../AAR_NOTES.md`).
 
 | ID | 🟢 GREEN — must be true | 🔴 RED — must be *seen* to fail, and how | 🎯 SUBJECT — proves the right thing was measured | Tier | Result |
 |---|---|---|---|---|---|
