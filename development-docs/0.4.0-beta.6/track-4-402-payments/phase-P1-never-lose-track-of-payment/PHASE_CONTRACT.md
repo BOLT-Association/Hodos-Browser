@@ -168,6 +168,19 @@ Assume P1 shipped and a user lost money or trust. Why?
 | 12 | A3's "don't mint" return still passed `dispatch_payment` and metered a spend, so the session cap was hit by a page that was never paid for | `P1-A8` |
 | 13 | Evidence gathered on Windows only (beta.3's A1–A8 were) and macOS diverged in the shared C++ | §9 macOS rows |
 
+### 8a. Prior art to read at kickoff (added 2026-09-29, from the owner's morning report)
+
+⛔ **A reading assignment, not a scope change.** Read the diffs before the refusal and retry rows' REDs are finalised; log them in `../../../PRIOR_ART.md` (rule 5).
+
+**`brave/bx402` v0.3.0, `e7864e8...b8da503`**. Verified 2026-09-29: 14 commits, 2026-09-24 → 29, release published 2026-09-29. ⚠️ **bx402 is the seller side**, an x402 gateway in front of paid paths (`src/x402.ts`, `dispatch.ts`, `discovery.ts`). It is not a paying wallet, and it is x402 (decision 9 deferred our adapter), not BRC-121. It is useful because it shows **what the other end does** in the failure cases P1 handles. Only commit messages have been read so far.
+
+| Their commit | What it says | Where it lands here |
+|---|---|---|
+| `7e8b65f`, `541e4ee` | A facilitator's verify refusal is answered with a **402**, and a refusal is told apart from a facilitator failure | The same split as our refused-vs-no-answer (`P1-A2a`–`c`). ⭐ A server answering a failed payment with **another 402** is exactly the input that could lead us to re-mint: `P1-A3a`–`c` should include a rig case where the refusal *is* a fresh 402 |
+| `f4dc6f4`, `b8da503` | "Keep the claim when the facilitator refuses a settlement", and a payment is refused again after its settlement was refused | The server remembers a refused payment and refuses it again. So re-sending the **same** BEEF (`P1-A3e` reuse) may be refused forever, not just once. Check this against the 20 s reuse window and `P1-A3c`'s "until it settles" |
+| `2265014`, `dc3881a` | A **pending** settlement is retried, with tests for the settlements the retry must leave alone | Their "leave alone" list is the counterpart to our "unknown ⇒ change nothing" (`P1-A2c`/`A2d`). Compare the two lists |
+| `bd50414`, `e5e4fb1` | Paid paths are listed in the x402 "Bazaar" directory only when enabled | Not P1. Relevant only if the x402 adapter returns (T4-P3, beta.7) |
+
 ## 9. Platforms
 
 | Platform | Rows that run here | Notes |

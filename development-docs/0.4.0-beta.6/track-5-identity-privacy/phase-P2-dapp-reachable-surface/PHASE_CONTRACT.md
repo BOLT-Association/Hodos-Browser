@@ -127,6 +127,20 @@ Part A and Part B land as separate commits (allow-list · globals · revoke · W
 | W7 migration narrowed a gate so internal traffic got ad-blocked / cookie-blocked and the wallet UI broke | `P2-A11` + `R-INTEXT` half (a) + minimal site basket |
 | The test drove an overlay, not a tab (the 0.4.0 CDP trap) | `P2-A5`/`A6` SUBJECT: `assert_tab` + `role=tab_<n>` |
 
+### 8a. Prior art to read at kickoff (added 2026-09-29, from the owner's morning report)
+
+⛔ **A reading assignment, not a scope change.** Read the diffs before `P2-A6` and the non-enumerable change are designed; record in `../../../PRIOR_ART.md` what we follow and what we do not (rule 5).
+
+**`bsv-blockchain/bsv-browser` `af3fdbd...baf14a0`** — the BSV mobile browser hardening its injected `window.CWI`, the same surface as our `CWIShimScript.h`. Range verified 2026-09-29: 11 commits, 2026-09-27 → 29; the webview ones are in `utils/webview/{cwiProvider,documentStartScript,messageSizeCeiling,walletEnvelope,walletResponseScript}.ts`, each with a test file. Only commit messages have been read so far.
+
+| Their commit | What it says | Where it lands here |
+|---|---|---|
+| `de88db6` | The provider accepted any message whose id matched; it now trusts only bridge-delivered replies and uses **crypto-random** request ids | ⭐ Our shim uses **sequential** ids (`String(nextId++)`), and `window.__hodos_walletResponse` is a plain writable global that any script in the page can call with a guessed id. ⚠️ **Their hole was cross-window message events. Ours is probably narrower:** a cross-origin frame cannot call a function on our window, and a script already in the page can replace `CWI` anyway. Decide at kickoff whether (a) random ids and (b) a response function the page cannot overwrite or call belong beside `P2-A6`'s non-enumerable change — making it non-enumerable does not stop anyone calling it. Record the answer either way |
+| `ae13035`, `baf14a0` | An oversize request was dropped silently and the page waited forever. It now gets an error envelope, and oversize responses are refused rather than injected | Our chunk path (`__hodos_walletResponseChunk`, 30 s stall timer) covers large **responses**. Check what an oversize **request** from the page does today: an error, or a hang |
+| `b7e3b69`, `dddf13e` | `getVersion` answered in the page (the SDK allows one second for discovery), but **only in frames where replies can land**. Answering it in a cross-origin iframe let discovery pass and the first real call hang | Our shim injects only in the main frame (ticket gating cascade), so the iframe trap should not apply. Confirm it, and note whether we have the one-second discovery problem at all |
+| `18c7b54`, `67a9e8c` | Canonical BRC-100 envelopes: `status: 'success'` (not `'ok'`), integer error codes 1–255, `WERR_*` names mapped to their assigned codes so the SDK keeps the message | Belongs mainly to **B5-T1-P2 — a failure says it failed** (its §8a). Here, only as a check that the allow-list's refusal body does not add a third error shape |
+| `1fc9ddf` | A string response was treated as pre-serialised JSON and embedded as script; that path is now separate so a string is always serialised, never executed | Our C++ delivers through `escapeJsonForJs` (`JsStringEscape.h`, the F6 fix). Worth confirming every delivery site goes through it |
+
 ## 9. Platforms
 
 | Platform | Rows that run here | Notes |

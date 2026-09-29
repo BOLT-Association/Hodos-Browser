@@ -92,3 +92,7 @@ dApps; a fix that removes nothing has done nothing.
 - dApp connect / `createAction` / BRC-121 paid retry — the shim is how they arrive.
 - ⭐ The **gold pill** payment indicator chain (`CLAUDE.md`, load-bearing UX safeguard).
 - `P13-R1`: the farbling acceptance battery still passes.
+
+## Prior art (added 2026-09-29)
+
+**`bsv-blockchain/bsv-browser` `af3fdbd...baf14a0`**: the BSV mobile browser hardened its `window.CWI` bridge on 2026-09-28/29. The fixes cover trusting only bridge-delivered replies, crypto-random request ids, oversize request and response errors, and answering `getVersion` only in frames where replies can land. ⚠️ Relevant to item 2: making `__hodos_walletResponse` non-enumerable hides it from enumeration, but it can still be **called** by the page with a guessed (sequential) id. Mapped commit by commit, with a reading of our threat model: `../track-5-identity-privacy/phase-P2-dapp-reachable-surface/PHASE_CONTRACT.md` §8a (B5-T5-P2 owns this ticket's items 1–3).

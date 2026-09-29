@@ -108,6 +108,10 @@ Four independent commits — envelope, `sendWith`, auto-unlock check, `wallet_cl
 | `wallet_cleanup` "fixed" by returning early on the first error, so a real ghost is never cleaned again | `P2-A11` |
 | The SDK version the owner's partners use (e.g. an older 1.x — the repo's own demo vendors `@bsv/sdk` **1.10.4**) decodes errors differently | ⚠️ **Not caught by a row** — `P2-A1` runs 2.8.7. Add a run against the 1.10.4 copy in `demos/brc121-402/node_modules` as a second SUBJECT, recorded as an observation, not a gate |
 
+### 8a. Prior art to read at kickoff (added 2026-09-29)
+
+⛔ A reading assignment, not a scope change. **`bsv-blockchain/bsv-browser` `18c7b54` + `67a9e8c`** (2026-09-29; commit messages read, not the diffs). A second BRC-100 browser fixing the **same error envelope** this phase designs. What the messages say: success replies must carry `status: 'success'` (`'ok'` was the SDK 2.0.x dialect). Error replies need an **integer code 1–255** and a bounded description. wallet-toolbox string codes all collapsed to 1. The SDK **replaces the description of any code outside 2–8** with a generic message. They now map `WERR_REVIEW_ACTIONS`, `WERR_INVALID_PARAMETER` and `WERR_INSUFFICIENT_FUNDS` to their assigned codes. ⇒ Check `P2-A1`'s SUBJECT (`instanceof WERR_REVIEW_ACTIONS`) and §12 Q4's `createAction` envelope against their mapping, and read `utils/webview/walletEnvelope.ts` before writing ours. Full list: `../../track-5-identity-privacy/phase-P2-dapp-reachable-surface/PHASE_CONTRACT.md` §8a.
+
 ## 9. Platforms
 
 | Platform | Rows that run here | Notes |
