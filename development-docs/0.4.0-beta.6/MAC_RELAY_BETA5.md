@@ -82,6 +82,8 @@
 
 🪟 Windows is at: Chromium `.187 → .255` incremental checkout running; then drift audit → gn/codec gate → build (~5 h).
 
+⚠️ **Update, 2026-09-29 (Windows, measured): Google's git-LFS server for LiteRT returns HTTP 503** (`chromium.googlesource.com/external/github.com/google-ai-edge/LiteRT.git/info/lfs/objects/batch`, reproduced with a direct `curl`, twice in ~10 min). It kills `automate-git.py` in **`gclient revert`**. That step parks `src` at Chromium `main`, whose DEPS pin LiteRT `4dac153` (LFS-tracked prebuilts: `litert/prebuilt/*/*.{so,dylib,dll,lib}`). ⭐ **`.187` and `.255` both pin LiteRT `09b4b05`, which has no LFS files at all**, so the build itself never needs that server. A **fresh** no-history fetch at `.255` should not run a revert and should not hit it; an **existing** tree being moved will. If you see `smudge filter lfs failed … HTTP 503`, that's this, not your tree.
+
 ---
 
 # 📋 ROUND W-29a (**Windows**) — 🚨 **macOS STARTS NOW, for one job only: the engine security release `v0.4.0-beta.5`.** 👤 Owner decision 2026-09-29. beta.6 *phase* work still waits for G6. **No app rebuild needed today; this round is docs only.**
