@@ -9,6 +9,22 @@
 
 ---
 
+# 📋 ROUND W-30b (**Windows**) — ✅ **beta.6 P1 landed: MessageBox accepts Hodos's handshake again.** Shared Rust only, **no C++**. 🍎 Nothing to rebuild in the shell; please run the wallet tests.
+
+**§1 — What landed (`origin/0.4.0`, `f07107a` code + `faded1b` docs).** 📏 Measured on Windows, dev wallet:
+- `rust-wallet/src/authfetch.rs`: the BRC-103 handshake nonce is now the `@bsv/sdk` `createNonce` format (48 bytes); the server's `initialResponse` is verified (nonce echo + signature by the key it names); an explicit port is kept in the handshake URL.
+- `rust-wallet/src/messagebox.rs`: `listMessages` follows MessageBox's new paging (`hasMore`/`nextOffset`); an error or unknown shape is an error, not an empty inbox.
+- `rust-wallet/tests/fixtures/authfetch_vectors.json`: SDK-generated test vectors (read by the tests via `include_str!`).
+- Live: 235 × `ERR_AUTH_MALFORMED` on the old binary → `handshake OK, reply signature verified` on the new one; a fresh self-PeerPay was delivered and received.
+
+**§2 — 🍎 For you (when convenient, no owner time needed):**
+1. `git fetch && git rebase origin/0.4.0`, then `cd rust-wallet && cargo test --workspace`. Expected: 0 failed; the new tests are named `p1_*` (13 in `authfetch::tests` + `messagebox::tests`). `p1_a2_wire_nonce_lengths` and `p1_a4_production_handshake_refuses_forged_reply` open a local TCP listener on `127.0.0.1:0`; say if macOS blocks it.
+2. Optional measurement: run the dev wallet and look for `AuthFetch: handshake OK, reply signature verified` from `TaskCheckPeerPay` in the wallet log within ~60 s.
+
+**§3 — Coming next (Windows):** beta.6 P2 `abortAction`, P3 amounts/broadcast, P4 recipient spoofing, P5 SDK-validator fixes. All shared Rust. A round will queue the macOS app rebuild on the same engine asset (`cef-binaries-macos-150.0.48-g7d50c1c`) before promote.
+
+---
+
 # 📋 ROUND W-30a (**Windows**) — ⛔ **beta.5 will NOT be promoted.** The release becomes **`v0.4.0-beta.6`** = the same verified engine + a BRC-103 handshake fix + advisory triage. Folders renumbered. 🍎 **Nothing to build now.**
 
 **§1 — What happened.** Windows finished beta.5 through the tagged, signed **draft** (run 36721540137; both engine assets pulled with md5s matching the uploads). The same day we found that **MessageBox has refused every Hodos BRC-103 handshake since 2026-09-23** (`400 ERR_AUTH_MALFORMED`): PeerPay notices are not delivered and incoming PeerPay is not received, on both platforms. **Measured cause:** our `initialNonce` is 32 bytes; ts-stack's security hardening (GHSA-qp3j-h5xf-p2p7, 2026-09-23) makes the server require the SDK's 48-byte format. The official SDK gets 200, our exact request gets 400, and our request with a 48-byte nonce gets 200. Ticket: `tickets/TICKET_messagebox_rejects_our_auth_handshake_since_2026_09_23.md`.

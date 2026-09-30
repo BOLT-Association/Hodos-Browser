@@ -211,6 +211,8 @@ while k.len() > 1 && k[0] == 0 { k = &k[1..]; }
 
 ### Rule 3: `Utils.toUTF8()` surrogate pair handling
 
+⚠️ **Since SDK v2, `Utils.toUTF8` is `new TextDecoder().decode(bytes)`** (checked in 2.8.11, 2026-09-30): invalid sequences become U+FFFD like `String::from_utf8_lossy`, **and one leading UTF-8 BOM (`EF BB BF`) is dropped**, which `from_utf8_lossy` does not do. `authfetch.rs :: sdk_to_utf8` handles both, with SDK vectors (`tests/fixtures/authfetch_vectors.json`); `certificate_handlers.rs :: js_to_utf8` does not strip the BOM (~1 nonce in 16.7M). The paragraph below describes the pre-v2 parser.
+
 TypeScript's `String.fromCharCode()` accepts surrogate values (0xD800-0xDFFF) and creates valid supplementary characters when paired. Rust's `char::from_u32()` rejects surrogates. Use `char::from_u32(code_point)` directly with the full code point, not computed surrogates. See `js_to_utf8()` in `certificate_handlers.rs`.
 
 ### Rule 4: Cross-implementation test vectors

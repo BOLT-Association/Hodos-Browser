@@ -1,13 +1,14 @@
 # v0.4.0-beta.6: engine security refresh + BRC-103 compatibility + advisory triage
 
-**Opened:** 2026-09-30 (👤 owner decision, this session). **Status:** 🟡 **SCOPED, ready for kickoff** (2026-09-30). 👤 The owner accepted `ADVISORY_TRIAGE.md` §2 as recommended. No code has been written yet. **New session? Start with `SESSION_PROMPT_beta6_kickoff.md`.**
+**Opened:** 2026-09-30 (👤 owner decision). **Status:** 🚧 **IN PROGRESS** — kickoff done, **P1 done and pushed**, P2 next (see the phase table under "Kickoff"). **New session? Start with `SESSION_PROMPT_beta6_P2_onward.md`.**
 
 ## ▶️ RESUME HERE
 
-1. **Read the triage:** `ADVISORY_TRIAGE.md` (this folder; 438 findings merged into 7 themes, §2 = recommended scope, §3 = rule-7 ground-truth checks already run). 👤 The owner selects which themes ship in this release. ⭐ First job after that: G2's **offline** test (run recorded Hodos responses through the hardened SDK's validators).
-2. **Phase contracts** for the selected items only (`../0.4.0-beta.7/PHASE_CONTRACT_TEMPLATE.md`). The harness is inherited from `../0.4.0-beta.3/HARNESS.md` + `../0.4.0-beta.7/HARNESS_DELTA.md`.
-3. **The nonce fix** (already approved by the owner, below).
-4. **Rebuild the app** on the **same verified engine asset** (`cef-binaries-*-150.0.48-g7d50c1c`, see the engine plan). Validation run, then the full step-5 checks, tag **`v0.4.0-beta.6`**, draft, promote.
+1. ✅ Triage (`ADVISORY_TRIAGE.md`), scope accepted; G2 offline test done (`G2_OFFLINE_VALIDATOR_RESULT.md`).
+2. ✅ Kickoff done; owner decisions recorded under "Kickoff" below.
+3. ✅ **P1 — the nonce fix** and handshake verification, done and pushed.
+4. ⭐ **P2 → P5**, in order (phase table below). Harness: `../0.4.0-beta.3/HARNESS.md` + `../0.4.0-beta.7/HARNESS_DELTA.md`.
+5. **Rebuild the app** on the **same verified engine asset** (`cef-binaries-*-150.0.48-g7d50c1c`, see the engine plan). Validation run, then the full step-5 checks, tag **`v0.4.0-beta.6`**, draft, promote.
 
 ## ✅ Kickoff, 2026-09-30
 
@@ -20,6 +21,16 @@
 5. **MessageBox recipient fees** (TSA-047) ⇒ research, beta.8 (`TICKET_messagebox_recipient_fees_unmeasured.md`).
 
 **Phases, in order:** P1 MessageBox handshake (nonce, server signature and nonce-echo checks, paging) → P2 `abortAction` → P3 amounts, cap and broadcast txid → P4 recipient-name spoofing in Send → P5 G2 fixes. Contracts to be written from `../0.4.0-beta.7/PHASE_CONTRACT_TEMPLATE.md`.
+
+| Phase | State |
+|---|---|
+| **P1** MessageBox handshake | ✅ **DONE 2026-09-30**, pushed (`f07107a` code, `faded1b` docs). Live: a fresh PeerPay delivered and received. `phase-P1-messagebox-handshake/PHASE_CONTRACT.md` |
+| **P2** `abortAction` | 📝 contract written (`phase-P2-abort-action/PHASE_CONTRACT.md`), REDs not yet designed, **no code**. ⭐ **Next session starts here** |
+| P3 amounts / cap / broadcast txid | ⬜ |
+| P4 recipient-name spoofing | ⬜ |
+| P5 G2 fixes (B1 `listActions`, B2 `listCertificates`, B3 `signAndProcess:false`) | ⬜ |
+
+❌ **Retracted 2026-09-30:** a claimed `/createHmac` / `/verifyHmac` divergence from the SDK (leading-zero key). The endpoints already strip, per `rust-wallet/src/crypto/CLAUDE.md` Rule 2; the claim was never checked against our code. Nothing to fix. Details: P1 contract §12.
 
 ## Why this release exists, and why it is not beta.5
 
