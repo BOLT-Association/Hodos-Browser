@@ -1,6 +1,6 @@
 # v0.4.0-beta.6: engine security refresh + BRC-103 compatibility + advisory triage
 
-**Opened:** 2026-09-30 (👤 owner decision). **Status:** 🚧 **IN PROGRESS** — kickoff done, **P1 done and pushed**, P2 next (see the phase table under "Kickoff"). **New session? Start with `SESSION_PROMPT_beta6_P2_onward.md`.**
+**Opened:** 2026-09-30 (👤 owner decision). **Status:** 🚧 **IN PROGRESS** — kickoff done, **P1 and P2 done and pushed**, P3 next (see the phase table under "Kickoff"). **New session? Start with `SESSION_PROMPT_beta6_P2_onward.md`.**
 
 ## ▶️ RESUME HERE
 
@@ -25,7 +25,7 @@
 | Phase | State |
 |---|---|
 | **P1** MessageBox handshake | ✅ **DONE 2026-09-30**, pushed (`f07107a` code, `faded1b` docs). Live: a fresh PeerPay delivered and received. `phase-P1-messagebox-handshake/PHASE_CONTRACT.md` |
-| **P2** `abortAction` | 📝 contract written (`phase-P2-abort-action/PHASE_CONTRACT.md`), REDs not yet designed, **no code**. ⭐ **Next session starts here** |
+| **P2** `abortAction` | ✅ done and pushed (`phase-P2-abort-action/PHASE_CONTRACT.md`): deadlock gone; status gate on the raw column; `nosend` only when **every** provider says not found (new `tx_status_unanimous`); status compare-and-set; waits on `create_action_lock` so it cannot land mid-broadcast (review finding); `signAction` refuses an aborted row. 25/25 negative controls |
 | P3 amounts / cap / broadcast txid | ⬜ |
 | P4 recipient-name spoofing | ⬜ |
 | P5 G2 fixes (B1 `listActions`, B2 `listCertificates`, B3 `signAndProcess:false`) | ⬜ |
