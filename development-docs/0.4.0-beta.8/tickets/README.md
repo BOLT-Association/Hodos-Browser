@@ -1,7 +1,7 @@
-# beta.7 tickets — intake
+# beta.8 tickets — intake
 
 Conventions follow `../../0.4.0-beta.7/tickets/README.md` (naming, statuses, method notes, negative
-controls). ⛔ A ticket is not work until beta.7 planning assigns it to a track.
+controls). ⛔ A ticket is not work until beta.8 planning assigns it to a track.
 
 ## Register
 
