@@ -9,6 +9,18 @@
 3. **The nonce fix** (already approved by the owner, below).
 4. **Rebuild the app** on the **same verified engine asset** (`cef-binaries-*-150.0.48-g7d50c1c`, see the engine plan). Validation run, then the full step-5 checks, tag **`v0.4.0-beta.6`**, draft, promote.
 
+## ✅ Kickoff, 2026-09-30
+
+**G2 offline test done:** `G2_OFFLINE_VALIDATOR_RESULT.md` (21 pass / 6 fail; the service-fee output **passes**). 👤 Owner decisions on the kickoff questions, all as recommended:
+
+1. **G2 fixes in beta.6:** B1 `listActions` statuses + input/output shapes, B2 `listCertificates` → `totalCertificates`, B3 honour `signAndProcess:false` (measure the dApp-supplied-inputs path before closing). B4, the error envelope and the `verifySignature` `self` bug go to beta.8 intake.
+2. **PeerPay fixture** `8a24596f…` stays untouched (its outbox row is `exhausted`); the nonce fix proves delivery with a **fresh small PeerPay**.
+3. **Nonce `keyID`:** match `@bsv/sdk` `createNonce` exactly, tested against Node-generated vectors.
+4. **`abortAction` origin binding** (TSA-042) needs a schema change ⇒ beta.8 (`TICKET_abortAction_not_bound_to_originating_site.md`). beta.6 fixes the re-lock, the release of inputs, and which statuses may be aborted.
+5. **MessageBox recipient fees** (TSA-047) ⇒ research, beta.8 (`TICKET_messagebox_recipient_fees_unmeasured.md`).
+
+**Phases, in order:** P1 MessageBox handshake (nonce, server signature and nonce-echo checks, paging) → P2 `abortAction` → P3 amounts, cap and broadcast txid → P4 recipient-name spoofing in Send → P5 G2 fixes. Contracts to be written from `../0.4.0-beta.7/PHASE_CONTRACT_TEMPLATE.md`.
+
 ## Why this release exists, and why it is not beta.5
 
 - The engine security refresh (Chromium `.255`, V8 fix) was built, verified on both platforms, tagged **`v0.4.0-beta.5`** and built as a **signed draft** on 2026-09-30. Record: `../0.4.0-beta.7/track-0-engine/SECURITY_RELEASE_PLAN.md` steps 1–6.
