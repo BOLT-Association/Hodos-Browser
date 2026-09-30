@@ -20,7 +20,7 @@
 - **The fix is present:** `chrome://version` in a **tab** reads `V8 15.0.245.40`, `CEF 150.0.48-7871.3582+g7d50c1c+chromium-150.0.7871.255`. Negative-control value (beta.4 = `15.0.245.21`) cited from SCOPE §2.1, not re-measured, because that would mean driving the owner's installed production browser.
 - **Farbling:** `farbling_seed_rotation_check.py --expect-cef +g7d50c1c` all contracts PASS; token `FARBLING-ROTATION-v1 engine=150.0.48-7871.3582+g7d50c1c+chromium-150.0.7871.255 exempt=53225ec8/53225ec8/53225ec8 large=0cdc9b48/0cdc9b48/0cdc9b48 farbled=0e4e6251/5565a0c8/0e4e6251 verdict=PASS`. **`--negative-control` went RED** as required (canvas, WebGL, audio and navigator all collapse to the exempt/native values).
 - **Codecs (`L7`)** in a tab (`role=tab_1`): Layer A GATE rows `probably`, AC-3 / E-AC-3 / bogus controls `""`; Layer B MP3 / AAC / H.264 decode, **AC-3 control did not decode**; youtube.com 1280×720 and twitch.tv live decoding; x.com blocked (logged out, no media element: site access, not decode).
-- ⏳ **Owed by the owner:** minimal basket (youtube, x, github), DPI cells #4/#6/#9, `R-GOLD` real payment.
+- ✅ **Owner rows, 2026-09-30:** minimal basket (youtube, x, github), DPI cells #4/#6/#9 and `R-GOLD` real payment run by 👤 the owner on the same dev build. Owner's words: *"I did all the tests on my end. Everything looks pretty good."* No defects reported; per-row detail not recorded.
 **Evidence:** `SCOPE.md` §2.3 (the V8 fix), §4 (patch re-application), §5 P1/P2/P5 (phases), §7 (hours).
 
 ## What and why — one paragraph
