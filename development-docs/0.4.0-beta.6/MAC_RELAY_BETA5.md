@@ -9,6 +9,36 @@
 
 ---
 
+# 📋 ROUND M-30b (**macOS**) — ✅ **M5 local rows all PASS on the new engine, each with its control. 📤 macOS asset UPLOADED (👤 owner OK 2026-09-30) and round-tripped.** 🪟 Over to you for the `CEF_ASSET` bump once the Windows asset is up.
+
+## §1 — Upload (step 3, macOS half) — 📏
+
+| | Value |
+|---|---|
+| Asset on `Hodos-Browser/Hodos-Browser` release `cef-binaries` | **`cef-binaries-macos-150.0.48-g7d50c1c.tar.bz2`**, 127,555,602 B, state `uploaded`, 2026-09-30T12:10:52Z. New name, **no `--clobber`**; the older `…150.0.43-g9ccef04` / `…150.0.42-g7dd0357` / `…150` / M136 assets are untouched |
+| Round trip (`gh release download`, same as CI) | 127,555,602 B · md5 **`80c478fcfae9271e8c76994b1e90d90c`** · sha256 `fd0f7837…22820`: **identical** to M-30a; `include/cef_version.h` in the downloaded file = `150.0.48-7871.3582+g7d50c1c+chromium-150.0.7871.255` |
+| For your commit | mac arm: `CEF_ASSET: cef-binaries-macos-150.0.48-g7d50c1c.tar.bz2` (currently `…150.0.43-g9ccef04…` at `release.yml:589`). Per FF7: bump both arms in one commit only after the Windows asset is also up |
+
+## §2 — M5 (P5 macOS rows) — 📏 dev build of `0.4.0` @ `9815101d` on the staged `.255` engine
+
+Staging: `cef-binaries/` backed up to `/Volumes/CEFBuild/artifacts/cef-binaries-9ccef04-backup` (diff identical), then `rm -rf` + `ditto` of the full distrib, wrapper rebuilt (`-std=c++20`, `-mmacosx-version-min=12.0`), `mac_build_run.sh --clean` build + helper copy + Sparkle embed + re-sign (launch step skipped). **LC_UUID `4C4C444D-5555-3144-A11A-A32F0EA03BA2` in the app bundle's framework = staged distrib = build dSYM.** All 5 helpers dated 06:02:37 (fresh, incl. Renderer); `codesign --verify --deep --strict` OK.
+
+| Row | Result | Control |
+|---|---|---|
+| **Fix present**: `chrome://version` read **in a tab** (the `/newtab` page target, `location.href` = `chrome://version/`) | ✅ **`JavaScript V8 15.0.245.40`**, `CEF 150.0.48-7871.3582+g7d50c1c+chromium-150.0.7871.255`, `Chromium 150.0.7871.255`; Executable/Module path = the dev bundle | beta.4 framework carries `15.0.245.21` and not `.40` (binary string, M-29b). ⚠️ No runtime beta.4 browser was launched for this: string-level control only |
+| **Farbling** (`farbling_seed_rotation_check.py --expect-cef +g7d50c1c`) | ✅ **all rows PASS** (canvas, WebGL, audio, navigator; determinism + unlinkability + large-canvas/readPixels controls). Token: `FARBLING-ROTATION-v1 engine=150.0.48-7871.3582+g7d50c1c+chromium-150.0.7871.255 exempt=a4f83858/a4f83858/a4f83858 large=9c12d258/9c12d258/9c12d258 farbled=6a0803ed/4270384c/6a0803ed verdict=PASS`. Harness asserted staged framework == bundle framework by LC_UUID | ✅ `--negative-control`: **RED on 7** (canvas/webgl/audio farbled≠exempt + unlinkability, navigator active), exit 0 as designed |
+| **Codecs** (`codec_check.py --layer both --attach`) | ✅ **PASS**: H.264 baseline/High, AAC-LC, MP3, VP9, AV1 ⇒ `probably`; decode receipts MP3/AAC/H.264; **YouTube** 1920×1080, video +325,191 B / audio +47,517 B in 3 s; Twitch H.264 live decoding. Recorded: HEVC `probably`, Dolby Vision `""`; x.com **BLOCKED** (no media element on the page: site access, not decode) | AC-3 / E-AC-3 / bogus ⇒ `""`; AC-3 decode refused (`NotSupportedError`) |
+| **Deployment floor** | `vtool` minos **12.0** on the framework, the shell binary and the wrapper flags ⇒ floor stays `max(12.0, 12.0)` = 12.0 | (CI minos guard runs in the dispatch) |
+| **Shell basket** | ✅ youtube.com / x.com / github.com in a tab: all `readyState=complete`, real titles, text 3,828 / 362 / 5,911 chars. Quit by exe path (0 procs left after 1 s) → **relaunch**: CDP back, `Chrome/150.0.7871.255` V8 `15.0.245.40`, github loads. `debug_output.log` (+ `.1`): **0** renderer-terminated/crash lines | — |
+
+**Not done here (not Mac-local):** Engine-identity row (needs the CI-downloaded artifact → step 4 dispatch), `R-GOLD` real payment (👤), DPI cells (Windows), Sparkle beta.4 → beta.5 (after promote).
+
+Dev stack stopped with `scripts/stop-dev.sh` (path-scoped: 8 dev procs, 0 non-dev). `cef-binaries/` in the Mac checkout is now the `.255` engine.
+
+🍎 Host-specific. **Do NOT inherit** these values for Windows.
+
+---
+
 # 📋 ROUND M-30a (**macOS**) — 📦 **M4 DONE: macOS asset packaged and verified locally. ⛔ NOT uploaded: waiting on 👤 owner OK (step 3).**
 
 ## §1 — The asset (📏 2026-09-30)
