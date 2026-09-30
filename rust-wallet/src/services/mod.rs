@@ -140,6 +140,19 @@ impl WalletServices {
             .await
     }
 
+    /// `tx_status`, where `NotFound` means every provider in the chain said not found.
+    /// For callers that release coins on "absent" (`abort_action`); see
+    /// `ProviderCollection::call_unanimous_not_found`.
+    pub async fn tx_status_unanimous(&self, txid: &str) -> Result<TxStatus, IndexerError> {
+        let txid = txid.to_string();
+        self.tx_status_chain
+            .call_unanimous_not_found(ProviderOp::TxStatus, soft_timeouts::TX_STATUS, move |p| {
+                let txid = txid.clone();
+                Box::pin(async move { p.tx_status(&txid).await })
+            })
+            .await
+    }
+
     pub async fn outspend(&self, txid: &str, vout: u32) -> Result<OutspendStatus, IndexerError> {
         let txid = txid.to_string();
         self.outspend_chain

@@ -67,6 +67,46 @@ impl<P: IndexerProvider + ?Sized> ProviderCollection<P> {
         F: Fn(Arc<P>) -> BoxFut<Result<R, IndexerError>>,
         R: Send + 'static,
     {
+        self.call_tracking(op, soft_timeout, f).await.0
+    }
+
+    /// `call`, except that `NotFound` means **every** eligible provider said not found.
+    ///
+    /// `call` returns the *last* error, so `Transport, Transport, NotFound` reads as
+    /// `NotFound` even though two providers never answered. That is fine for "is it
+    /// there?" and wrong for a caller that releases coins on "it is not there"
+    /// (`abort_action`, beta.6 P2). Here any provider that failed to answer turns a
+    /// `NotFound` into an error.
+    pub async fn call_unanimous_not_found<F, R>(
+        &self,
+        op: ProviderOp,
+        soft_timeout: Duration,
+        f: F,
+    ) -> Result<R, IndexerError>
+    where
+        F: Fn(Arc<P>) -> BoxFut<Result<R, IndexerError>>,
+        R: Send + 'static,
+    {
+        match self.call_tracking(op, soft_timeout, f).await {
+            (Err(IndexerError::NotFound), Some(failure)) => Err(IndexerError::InvalidResponse {
+                provider: "ProviderCollection",
+                reason: format!("not found by some providers, but not every provider answered: {}", failure),
+            }),
+            (result, _) => result,
+        }
+    }
+
+    /// The fallback loop. Also returns the last failure that was not `NotFound`.
+    async fn call_tracking<F, R>(
+        &self,
+        op: ProviderOp,
+        soft_timeout: Duration,
+        f: F,
+    ) -> (Result<R, IndexerError>, Option<String>)
+    where
+        F: Fn(Arc<P>) -> BoxFut<Result<R, IndexerError>>,
+        R: Send + 'static,
+    {
         // Snapshot the current provider order so we don't hold the lock across awaits.
         let snapshot: Vec<Arc<P>> = {
             let guard = self.providers.lock().expect("providers mutex poisoned");
@@ -74,6 +114,7 @@ impl<P: IndexerProvider + ?Sized> ProviderCollection<P> {
         };
 
         let mut last_err: Option<IndexerError> = None;
+        let mut failure: Option<String> = None;
 
         for provider in &snapshot {
             if !provider.supports(op) {
@@ -86,7 +127,7 @@ impl<P: IndexerProvider + ?Sized> ProviderCollection<P> {
             match tokio::time::timeout(soft_timeout, future).await {
                 Ok(Ok(value)) => {
                     self.bump(provider.name(), |s| s.successes += 1);
-                    return Ok(value);
+                    return (Ok(value), failure);
                 }
                 Ok(Err(IndexerError::NotFound)) => {
                     self.bump(provider.name(), |s| s.not_found += 1);
@@ -101,6 +142,7 @@ impl<P: IndexerProvider + ?Sized> ProviderCollection<P> {
                 }
                 Ok(Err(err)) => {
                     self.bump(provider.name(), |s| s.hard_errors += 1);
+                    failure = Some(format!("{}: {}", provider.name(), err));
                     last_err = Some(err);
                     // Advance to next provider without demoting (transport/4xx/5xx is
                     // not the "slow provider" signal that demotion targets).
@@ -108,6 +150,7 @@ impl<P: IndexerProvider + ?Sized> ProviderCollection<P> {
                 Err(_elapsed) => {
                     self.bump(provider.name(), |s| s.soft_timeouts += 1);
                     self.demote(provider.name());
+                    failure = Some(format!("{}: soft timeout", provider.name()));
                     last_err = Some(IndexerError::SoftTimeout(soft_timeout));
                     // Advance to next provider; the demoted one is now at the tail for
                     // subsequent calls.
@@ -116,10 +159,10 @@ impl<P: IndexerProvider + ?Sized> ProviderCollection<P> {
         }
 
         // Every eligible provider failed (or none were eligible).
-        Err(last_err.unwrap_or(IndexerError::InvalidResponse {
+        (Err(last_err.unwrap_or(IndexerError::InvalidResponse {
             provider: "ProviderCollection",
             reason: "no eligible providers for this op".to_string(),
-        }))
+        })), failure)
     }
 
     /// 5s base + 50ms per KiB, capped at 30s. Matches canonical `postBeef` formula.
@@ -240,6 +283,42 @@ mod tests {
             .map(|p| p as Arc<dyn IndexerProvider>)
             .collect();
         ProviderCollection::new(cast)
+    }
+
+    // --- call_unanimous_not_found (beta.6 P2) ---
+
+    async fn unanimous(behaviors: &[u8]) -> Result<Vec<u8>, IndexerError> {
+        let names = ["a", "b", "c", "d"];
+        let providers = behaviors.iter().zip(names).map(|(b, n)| Arc::new(TestProvider::new(n, *b))).collect();
+        collection_with(providers)
+            .call_unanimous_not_found(ProviderOp::RawTx, Duration::from_millis(100), |p| {
+                Box::pin(async move { p.get_raw_tx("anything").await })
+            })
+            .await
+    }
+
+    #[tokio::test]
+    async fn p2_unanimous_not_found_only_when_every_provider_says_so() {
+        assert!(matches!(unanimous(&[1, 1, 1, 1]).await, Err(IndexerError::NotFound)));
+        // `call` would say NotFound for these: a provider that never answered is not a "no".
+        for b in [[2, 1, 1, 1], [1, 2, 1, 1], [3, 1, 1, 1], [2, 2, 2, 1]] {
+            let r = unanimous(&b).await;
+            assert!(matches!(r, Err(IndexerError::InvalidResponse { .. })), "{:?}: {:?}", b, r);
+        }
+        // Any answer still wins, and an all-error chain stays an error.
+        assert!(unanimous(&[2, 1, 0, 1]).await.is_ok());
+        assert!(matches!(unanimous(&[1, 1, 1, 2]).await, Err(IndexerError::Transport(_))));
+    }
+
+    #[tokio::test]
+    async fn p2_call_keeps_its_last_error_semantics() {
+        let providers = [2u8, 1].iter().zip(["a", "b"]).map(|(b, n)| Arc::new(TestProvider::new(n, *b))).collect();
+        let r = collection_with(providers)
+            .call(ProviderOp::RawTx, Duration::from_millis(100), |p| {
+                Box::pin(async move { p.get_raw_tx("anything").await })
+            })
+            .await;
+        assert!(matches!(r, Err(IndexerError::NotFound)), "{:?}", r);
     }
 
     // --- adaptive_soft_timeout_for_payload ---

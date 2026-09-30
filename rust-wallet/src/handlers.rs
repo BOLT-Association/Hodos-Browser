@@ -9074,6 +9074,17 @@ pub async fn sign_action(
         // We need this to update any outputs that were created with the unsigned txid
         let old_txid = match tx_repo.get_by_reference(&req.reference) {
             Ok(Some(action)) => {
+                // beta.6 P2 (`P2-A7`): an abortAction committed after this call read the
+                // pending transaction. Its inputs are released; `update_txid` below would
+                // re-insert the row and the status write would un-abort it, then broadcast.
+                // `abort_action` sets `failed` under this same lock, so this check is ordered.
+                if action.status == ActionStatus::Failed {
+                    log::warn!("   ⛔ signAction refused: action {} was aborted", action.txid);
+                    return HttpResponse::Conflict().json(serde_json::json!({
+                        "error": "This action was aborted and can no longer be signed",
+                        "code": "ERR_ACTION_ABORTED",
+                    }));
+                }
                 log::info!("   📝 Old (unsigned) txid: {}", action.txid);
                 Some(action.txid)
             }
@@ -12493,90 +12504,205 @@ pub struct AbortActionResponse {
     pub aborted: bool,
 }
 
+/// Statuses of an action that never left the wallet by construction: it was never
+/// fully signed, so there is nothing a broadcaster could have been given.
+const ABORTABLE_NEVER_SENT: [&str; 3] = ["unsigned", "unprocessed", "nonfinal"];
+
+/// What the chain says about a `nosend` action before we release its coins.
+#[derive(Debug, PartialEq)]
+enum AbortChainVerdict {
+    /// Every provider said "not found" (given `tx_status_unanimous`).
+    Absent,
+    /// Some provider knows this txid, in any state.
+    Known(String),
+    /// The check itself failed.
+    Inconclusive(String),
+}
+
+/// beta.6 P2 (`P2-A3`). ⛔ Only "not found" from EVERY provider counts as absent
+/// (`WalletServices::tx_status_unanimous`; plain `tx_status` reports the last
+/// provider's `NotFound` even when earlier ones never answered).
+///
+/// A `nosend` transaction's signed bytes were handed to the dApp, which may broadcast
+/// them itself, and nothing tells the wallet. So any provider that *knows* the txid —
+/// mempool, mined, rejected, double-spend, orphan, unknown — is evidence it was sent,
+/// and the coins stay reserved for the existing backstops (`TaskCheckForProofs` NOSEND
+/// timeout, `TaskSweepReservations`). This is deliberately stricter than
+/// `check_tx_exists_on_chain`, which reads `Rejected`/`Unknown`/orphan as "does not
+/// exist": right for "is it on chain?", wrong for "did it ever leave?".
+fn abort_chain_verdict(
+    result: Result<crate::services::TxStatus, crate::services::IndexerError>,
+) -> AbortChainVerdict {
+    match result {
+        // Every provider said not found.
+        Err(crate::services::IndexerError::NotFound) => AbortChainVerdict::Absent,
+        Ok(status) => AbortChainVerdict::Known(format!(
+            "{:?}{}",
+            status.state,
+            status.raw_provider_status.map(|s| format!(" ({})", s)).unwrap_or_default()
+        )),
+        Err(e) => AbortChainVerdict::Inconclusive(e.to_string()),
+    }
+}
+
+fn abort_error(status: actix_web::http::StatusCode, code: &str, description: String) -> HttpResponse {
+    log::warn!("   ⛔ abortAction refused ({}): {}", code, description);
+    HttpResponse::build(status).json(serde_json::json!({
+        "status": "error",
+        "code": code,
+        "description": description,
+    }))
+}
+
 pub async fn abort_action(
     state: web::Data<AppState>,
     req: web::Json<AbortActionRequest>,
 ) -> HttpResponse {
-    log::info!("📋 /abortAction called");
-    log::info!("   Reference number: {}", req.reference_number);
+    let services = state.services.clone();
+    abort_action_with_chain(&state, &req.reference_number, move |txid| async move {
+        services.tx_status_unanimous(&txid).await
+    })
+    .await
+}
 
-    // Load action from database
+/// beta.6 P2. `abortAction` releases only what never left the wallet, and never hangs.
+///
+/// ⭐ Prior art: `reference/go-wallet-toolbox/pkg/storage/internal/actions/abort.go`
+/// (reference-or-txid lookup, outgoing only, abortable statuses, one unit of work with a
+/// status compare-and-set). One deliberate difference: go aborts `nosend` on its own
+/// broadcast evidence; we ask the chain, because the dApp holds the signed bytes.
+///
+/// ⛔ The DB lock is never held across the chain call, and never re-taken while held:
+/// the previous version held it and called `release_unbroadcast_transaction`, which
+/// locks it again — a `std::sync::Mutex`, so every abortable call deadlocked (TSA-260).
+///
+/// `chain` is injected so T1 can answer for the network.
+async fn abort_action_with_chain<F, Fut>(state: &AppState, reference: &str, chain: F) -> HttpResponse
+where
+    F: FnOnce(String) -> Fut,
+    Fut: std::future::Future<Output = Result<crate::services::TxStatus, crate::services::IndexerError>>,
+{
+    use actix_web::http::StatusCode;
     use crate::database::TransactionRepository;
-    let db = state.database.lock().unwrap();
-    let tx_repo = TransactionRepository::new(db.connection());
+    log::info!("📋 /abortAction called");
+    log::info!("   Reference: {}", reference);
 
-    // Find action by reference number
-    let action = match tx_repo.get_by_reference(&req.reference_number) {
-        Ok(Some(a)) => a,
-        Ok(None) => {
-            log::warn!("   ⚠️  Action not found: {}", req.reference_number);
-            return HttpResponse::NotFound().json(serde_json::json!({
-                "status": "error",
-                "code": "ERR_ACTION_NOT_FOUND",
-                "description": format!("Action not found: {}", req.reference_number)
-            }));
-        }
-        Err(e) => {
-            log::error!("   Failed to get action: {}", e);
-            return HttpResponse::InternalServerError().json(serde_json::json!({
-                "status": "error",
-                "code": "ERR_DATABASE",
-                "description": format!("Database error: {}", e)
-            }));
-        }
+    // ⛔ `nosend` does not mean "withheld": `create_action_internal` signs every send as
+    // `nosend` and then broadcasts it (and `sendWith` does the same for earlier ones),
+    // all under `create_action_lock`; `broadcast_nosend` takes it too. An abort landing
+    // inside one of those broadcasts would see "not found" (not indexed yet) and release
+    // the coins of a transaction about to be mined. Holding the lock waits them out —
+    // the role go-wallet-toolbox's "park the known tx" plays (`abort.go :: abortTx`).
+    let _create_action_guard = state.create_action_lock.lock().await;
+
+    // 1. Find it and read its status, then let go of the lock.
+    let (txid, reference, status, is_outgoing) = {
+        let db = match state.database.lock() {
+            Ok(g) => g,
+            Err(e) => return abort_error(StatusCode::INTERNAL_SERVER_ERROR, "ERR_DATABASE", format!("database lock failed: {}", e)),
+        };
+        let tx_repo = TransactionRepository::new(db.connection());
+        // By reference, then by txid (as go-wallet-toolbox does).
+        let found = match tx_repo.get_by_reference(reference) {
+            Ok(None) if reference.len() == 64 && reference.chars().all(|c| c.is_ascii_hexdigit()) => {
+                tx_repo.get_by_txid(reference)
+            }
+            other => other,
+        };
+        let action = match found {
+            Ok(Some(a)) => a,
+            Ok(None) => return abort_error(StatusCode::NOT_FOUND, "ERR_ACTION_NOT_FOUND",
+                                           format!("No action with reference or txid {}", reference)),
+            Err(e) => return abort_error(StatusCode::INTERNAL_SERVER_ERROR, "ERR_DATABASE", format!("database error: {}", e)),
+        };
+        // The raw column: `TransactionStatus::from_str` maps an unknown string to
+        // `unprocessed`, which is abortable. An unknown status must be refused.
+        let status = match tx_repo.get_broadcast_status(&action.txid) {
+            Ok(Some(s)) => s,
+            Ok(None) => return abort_error(StatusCode::INTERNAL_SERVER_ERROR, "ERR_DATABASE",
+                                           format!("action {} has no status", action.txid)),
+            Err(e) => return abort_error(StatusCode::INTERNAL_SERVER_ERROR, "ERR_DATABASE", format!("database error: {}", e)),
+        };
+        (action.txid, action.reference_number, status, action.is_outgoing)
     };
+    log::info!("   Found action {} (status: {}, outgoing: {})", txid, status, is_outgoing);
 
-    log::info!("   Found action: {}", action.txid);
-    log::info!("   Current status: {:?}", action.status);
-
-    // Check if action can be aborted
-    use crate::action_storage::ActionStatus;
-    match action.status {
-        ActionStatus::Confirmed => {
-            log::warn!("   ⚠️  Cannot abort confirmed transaction");
-            return HttpResponse::BadRequest().json(serde_json::json!({
-                "status": "error",
-                "code": "ERR_CANNOT_ABORT_CONFIRMED",
-                "description": "Cannot abort confirmed transaction"
-            }));
+    // 2. The gate.
+    if !is_outgoing {
+        return abort_error(StatusCode::BAD_REQUEST, "ERR_NOT_ABORTABLE",
+                           format!("Action {} is incoming; only outgoing actions can be aborted", txid));
+    }
+    if status == "nosend" {
+        match abort_chain_verdict(chain(txid.clone()).await) {
+            AbortChainVerdict::Absent => log::info!("   ✅ nosend {} is not known to the network", txid),
+            AbortChainVerdict::Known(s) => return abort_error(StatusCode::BAD_REQUEST, "ERR_NOT_ABORTABLE",
+                format!("Action {} is known to the network ({}); it may have been broadcast, so its coins stay reserved", txid, s)),
+            AbortChainVerdict::Inconclusive(e) => return abort_error(StatusCode::SERVICE_UNAVAILABLE, "ERR_ABORT_CHAIN_UNVERIFIED",
+                format!("Could not confirm that action {} was never broadcast ({}); nothing was released", txid, e)),
         }
-        ActionStatus::Aborted => {
-            log::info!("   ℹ️  Transaction already aborted");
-            return HttpResponse::Ok().json(AbortActionResponse { aborted: true });
-        }
-        _ => {}
+    } else if !ABORTABLE_NEVER_SENT.contains(&status.as_str()) {
+        return abort_error(StatusCode::BAD_REQUEST, "ERR_NOT_ABORTABLE",
+                           format!("Action {} has status '{}' and cannot be aborted", txid, status));
     }
 
-    // Update status to aborted
-    match tx_repo.update_status(&action.txid, ActionStatus::Aborted) {
-        Ok(_) => {
-            // beta.3, payment sitting — ⛔ flipping the status is not an abort.
-            //
-            // This used to be the WHOLE of abortAction: the inputs stayed reserved and
-            // the created outputs stayed `spendable = 1`, so a dApp that created an
-            // action and aborted it left a phantom coin referencing a transaction that
-            // will never exist — and unlike the refusal path there is no sweeper story,
-            // because nothing watches an aborted transaction.
-            //
-            // ⭐ `reference/go-wallet-toolbox/.../abort.go :: abortTx` does exactly what
-            // `release_unbroadcast_transaction` does, for exactly this reason.
-            //
-            // ⚠️ The reservation may still be under an unresolved placeholder we cannot
-            // name from here; the txid arm covers the resolved case, which is the one
-            // an aborted action is normally in.
-            let (disabled, restored) = release_unbroadcast_transaction(&state, &action.txid, None);
+    // 3. Release, as one unit of work under one lock hold: the status compare-and-set,
+    //    created outputs first, then inputs (Ghost Transaction Safety order — the same
+    //    steps as `release_unbroadcast_transaction`, which swallows its errors), then the
+    //    pending entry so `signAction` cannot sign it from memory.
+    //    `Err((true, _))` is a refusal, `Err((false, _))` a failure; both release nothing.
+    let failed = |e: &dyn std::fmt::Display| (false, e.to_string());
+    let released: Result<(usize, usize), (bool, String)> = (|| {
+        let db = state.database.lock().map_err(|e| failed(&e))?;
+        let txn = db.connection().unchecked_transaction().map_err(|e| failed(&e))?;
+        // A created output that another action already spends: aborting would leave that
+        // child spending a dead output, and aborting the child later would restore the
+        // dead output as spendable. go-wallet-toolbox disables it regardless (its
+        // reservations live elsewhere); we refuse — abort the child first.
+        let spent_by_other: i64 = txn.query_row(
+            "SELECT COUNT(*) FROM outputs WHERE txid = ?1 AND (spent_by IS NOT NULL
+               OR (spending_description IS NOT NULL AND spending_description != 'failed-tx-output'))",
+            rusqlite::params![txid], |r| r.get(0),
+        ).map_err(|e| failed(&e))?;
+        if spent_by_other > 0 {
+            return Err((true, format!("{} output(s) of action {} are already being spent by another action; abort that one first", spent_by_other, txid)));
+        }
+        let now = chrono::Utc::now().timestamp();
+        let changed = txn.execute(
+            "UPDATE transactions SET status = 'failed', failed_at = ?1, updated_at = ?1 WHERE txid = ?2 AND status = ?3",
+            rusqlite::params![now, txid, status],
+        ).map_err(|e| failed(&e))?;
+        if changed != 1 {
+            return Err((true, format!("status of {} changed while aborting; nothing was released", txid)));
+        }
+        let placeholder = PENDING_TRANSACTIONS.lock()
+            .map_err(|e| failed(&e))?
+            .get(&reference)
+            .and_then(|p| p.reservation_placeholder.clone());
+        let output_repo = crate::database::OutputRepository::new(&txn);
+        let disabled = output_repo.disable_by_txid(&txid).map_err(|e| failed(&e))?;
+        let mut restored = 0;
+        // Before signing the reservation carries the placeholder; after, the txid.
+        if let Some(ph) = placeholder.as_deref() {
+            restored += output_repo.restore_by_spending_description(ph).map_err(|e| failed(&e))?;
+        }
+        restored += output_repo.restore_by_spending_description(&txid).map_err(|e| failed(&e))?;
+        txn.commit().map_err(|e| failed(&e))?;
+        // Still under the DB lock, so `sign_action`'s update block (which re-checks the
+        // status under the same lock) sees either both changes or neither.
+        // A poisoned lock still holds the map; remove the entry regardless.
+        PENDING_TRANSACTIONS.lock().unwrap_or_else(|p| p.into_inner()).remove(&reference);
+        Ok((disabled, restored))
+    })();
+
+    match released {
+        Ok((disabled, restored)) => {
+            state.balance_cache.invalidate();
             log::info!("✅ Action aborted: {} — {} created output(s) disabled, {} input(s) restored",
-                       action.txid, disabled, restored);
+                       txid, disabled, restored);
             HttpResponse::Ok().json(AbortActionResponse { aborted: true })
         }
-        Err(e) => {
-            log::error!("   ❌ Failed to abort action: {}", e);
-            HttpResponse::InternalServerError().json(serde_json::json!({
-                "status": "error",
-                "code": "ERR_ABORT_FAILED",
-                "description": format!("Failed to abort action: {}", e)
-            }))
-        }
+        Err((true, e)) => abort_error(StatusCode::BAD_REQUEST, "ERR_NOT_ABORTABLE", e),
+        Err((false, e)) => abort_error(StatusCode::INTERNAL_SERVER_ERROR, "ERR_ABORT_FAILED", format!("Failed to abort action {}: {}", txid, e)),
     }
 }
 
@@ -20053,6 +20179,10 @@ pub async fn broadcast_nosend(
 
     log::info!("📡 /wallet/broadcast-nosend called: txid={}", &req.txid);
 
+    // beta.6 P2: the row stays `nosend` until this broadcast returns, so `abortAction`
+    // must not run in between (it would release the coins of a transaction being sent).
+    let _create_action_guard = state.create_action_lock.lock().await;
+
     // Fetch the raw tx from the DB (must be in nosend status to be safe).
     let raw_tx_hex = {
         let db = state.database.lock().unwrap();
@@ -21615,5 +21745,434 @@ mod token_reserved_selection_tests {
         let all = vec![utxo("two", 2), utxo("one", 1)];
         assert_eq!(picked(&select_all_spendable(&all)), vec!["two"]);
         assert_eq!(picked(&select_utxos_greedy(&all, 2, None, None, large_parent_bytes())), vec!["two"]);
+    }
+}
+
+// ============================================================================
+// beta.6 P2 — `abortAction` releases only what never left the wallet, and never
+// hangs. Real `abort_action` / `sign_action` over a real `WalletDatabase` on a temp
+// file; the chain is injected (`abort_action_with_chain`). Contract:
+// development-docs/0.4.0-beta.6/phase-P2-abort-action/PHASE_CONTRACT.md
+// ============================================================================
+#[cfg(test)]
+mod abort_action_tests {
+    use super::*;
+    use crate::services::{IndexerError, TxState, TxStatus};
+
+    fn app_state() -> web::Data<AppState> {
+        let path = std::env::temp_dir().join(format!("hodos_p2_abort_{}.db", uuid::Uuid::new_v4()));
+        let db = crate::database::WalletDatabase::new(path).unwrap();
+        db.connection().execute(
+            "INSERT INTO users (userId, identity_key, active_storage, created_at, updated_at)
+             VALUES (1, 'test_identity_key', 'local', 0, 0)",
+            [],
+        ).unwrap();
+        let database = std::sync::Arc::new(StdMutex::new(db));
+        web::Data::new(AppState {
+            database: database.clone(),
+            auth_sessions: std::sync::Arc::new(crate::auth_session::AuthSessionManager::new()),
+            balance_cache: std::sync::Arc::new(crate::balance_cache::BalanceCache::new()),
+            fee_rate_cache: std::sync::Arc::new(crate::fee_rate_cache::FeeRateCache::new()),
+            price_cache: std::sync::Arc::new(crate::price_cache::PriceCache::new(None)),
+            services: std::sync::Arc::new(crate::services::WalletServices::new()),
+            ship_cache: crate::overlay::ship_cache::ShipDiscoveryCache::new(),
+            utxo_selection_lock: std::sync::Arc::new(tokio::sync::Mutex::new(())),
+            create_action_lock: std::sync::Arc::new(tokio::sync::Mutex::new(())),
+            derived_key_cache: std::sync::Arc::new(StdMutex::new(HashMap::new())),
+            current_user_id: 1,
+            shutdown: tokio_util::sync::CancellationToken::new(),
+            sync_status: std::sync::Arc::new(std::sync::RwLock::new(SyncStatus::default())),
+            backup_check_needed: std::sync::Arc::new(StdMutex::new(None)),
+            recovery_just_completed: std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false)),
+            pay402_reuse: std::sync::Arc::new(StdMutex::new(HashMap::new())),
+            permission: std::sync::Arc::new(crate::permission_service::PermissionService::new()),
+        })
+    }
+
+    /// Where the input's reservation currently sits.
+    #[derive(Clone, Copy)]
+    enum Reserved { Placeholder, Txid }
+
+    struct Seeded { reference: String, txid: String, input_txid: String }
+
+    /// One action row with `status`, one created (change) output and one reserved
+    /// wallet input, plus the in-memory pending entry `sign_action` reads.
+    fn seed(state: &AppState, status: &str, outgoing: bool, reserved: Reserved) -> Seeded {
+        let reference = uuid::Uuid::new_v4().to_string();
+        let txid = hex::encode(rand::random::<[u8; 32]>());
+        let input_txid = hex::encode(rand::random::<[u8; 32]>());
+        let placeholder = new_reservation_placeholder();
+        let db = state.database.lock().unwrap();
+        let c = db.connection();
+        c.execute(
+            "INSERT INTO transactions (txid, reference_number, raw_tx, status, is_outgoing, satoshis, created_at, updated_at)
+             VALUES (?1, ?2, '', ?3, ?4, -1000, 0, 0)",
+            rusqlite::params![txid, reference, status, outgoing],
+        ).unwrap();
+        let tid = c.last_insert_rowid();
+        c.execute(
+            "INSERT INTO outputs (user_id, transaction_id, spendable, change, vout, satoshis, txid, created_at, updated_at)
+             VALUES (1, ?1, 1, 1, 0, 900, ?2, 0, 0)",
+            rusqlite::params![tid, txid],
+        ).unwrap();
+        let spending = match reserved { Reserved::Placeholder => placeholder.clone(), Reserved::Txid => txid.clone() };
+        c.execute(
+            "INSERT INTO outputs (user_id, spendable, vout, satoshis, txid, spending_description, created_at, updated_at)
+             VALUES (1, 0, 0, 1000, ?1, ?2, 0, 0)",
+            rusqlite::params![input_txid, spending],
+        ).unwrap();
+        let mut tx = Transaction::new();
+        tx.add_output(TxOutput::new(900, vec![0x6a]));
+        PENDING_TRANSACTIONS.lock().unwrap().insert(reference.clone(), PendingTransaction {
+            tx,
+            input_utxos: vec![],
+            user_input_infos: vec![],
+            brc29_info: None,
+            input_beef: None,
+            reservation_placeholder: Some(placeholder),
+            no_send: true,
+        });
+        Seeded { reference, txid, input_txid }
+    }
+
+    /// (action status, created output spendable, input spendable)
+    fn rows(state: &AppState, s: &Seeded) -> (String, i64, i64) {
+        let db = state.database.lock().unwrap();
+        let c = db.connection();
+        let status: String = c.query_row("SELECT status FROM transactions WHERE reference_number = ?1", [&s.reference], |r| r.get(0)).unwrap();
+        let created: i64 = c.query_row("SELECT spendable FROM outputs WHERE txid = ?1", [&s.txid], |r| r.get(0)).unwrap();
+        let input: i64 = c.query_row("SELECT spendable FROM outputs WHERE txid = ?1", [&s.input_txid], |r| r.get(0)).unwrap();
+        (status, created, input)
+    }
+
+    /// Every column of every `transactions` and `outputs` row, for "nothing changed".
+    fn snapshot(state: &AppState) -> Vec<String> {
+        let db = state.database.lock().unwrap();
+        let c = db.connection();
+        let mut all = Vec::new();
+        for table in ["transactions", "outputs"] {
+            let mut stmt = c.prepare(&format!("SELECT * FROM {} ORDER BY rowid", table)).unwrap();
+            let n = stmt.column_count();
+            let rows = stmt.query_map([], |r| {
+                (0..n).map(|i| r.get::<_, rusqlite::types::Value>(i).map(|v| format!("{:?}", v)))
+                    .collect::<rusqlite::Result<Vec<_>>>()
+            }).unwrap();
+            for row in rows { all.push(format!("{}: {}", table, row.unwrap().join("|"))); }
+        }
+        all
+    }
+
+    fn failed_at(state: &AppState, s: &Seeded) -> Option<i64> {
+        state.database.lock().unwrap().connection().query_row(
+            "SELECT failed_at FROM transactions WHERE reference_number = ?1", [&s.reference], |r| r.get(0)).unwrap()
+    }
+
+    fn pending_has(reference: &str) -> bool {
+        PENDING_TRANSACTIONS.lock().unwrap().contains_key(reference)
+    }
+
+    async fn body(resp: HttpResponse) -> (u16, serde_json::Value) {
+        let status = resp.status().as_u16();
+        let bytes = actix_web::body::to_bytes(resp.into_body()).await.unwrap_or_default();
+        (status, serde_json::from_slice(&bytes).unwrap_or(serde_json::Value::Null))
+    }
+
+    fn found(state: TxState) -> Result<TxStatus, IndexerError> {
+        Ok(TxStatus { txid: String::new(), state, block_height: None, block_hash: None,
+                      merkle_path_bump: None, raw_provider_status: None })
+    }
+
+    async fn abort_with(state: &AppState, reference: &str, chain: Result<TxStatus, IndexerError>) -> (u16, serde_json::Value) {
+        body(abort_action_with_chain(state, reference, move |_| async move { chain }).await).await
+    }
+
+    fn assert_released(state: &AppState, s: &Seeded) {
+        assert_eq!(rows(state, s), ("failed".into(), 0, 1),
+                   "(status, created output spendable, input spendable) after abort");
+        assert!(!pending_has(&s.reference), "pending entry survived the abort");
+        assert!(failed_at(state, s).is_some(), "failed_at not set: TaskUnFail would never re-check this action");
+    }
+
+    fn assert_untouched(state: &AppState, s: &Seeded, status: &str) {
+        assert_eq!(rows(state, s), (status.into(), 1, 0),
+                   "refused abort changed (status, created output spendable, input spendable)");
+    }
+
+    /// `P2-A1`: the real handler returns, for an abortable action. The old code held the
+    /// DB mutex and locked it again (std Mutex) — a deadlock, so this runs on its own
+    /// thread and waits 5 s.
+    #[test]
+    fn p2_a1_abort_of_an_unsigned_action_returns() {
+        let state = app_state();
+        let s = seed(&state, "unsigned", true, Reserved::Placeholder);
+        let (tx, rx) = std::sync::mpsc::channel();
+        let st = state.clone();
+        let reference = s.reference.clone();
+        std::thread::spawn(move || {
+            let rt = tokio::runtime::Builder::new_current_thread().enable_all().build().unwrap();
+            let out = rt.block_on(async {
+                let req = web::Json(AbortActionRequest { reference_number: reference });
+                body(abort_action(st, req).await).await
+            });
+            let _ = tx.send(out);
+        });
+        let (code, json) = rx.recv_timeout(std::time::Duration::from_secs(5))
+            .expect("abortAction HUNG: no response within 5 s");
+        assert_eq!((code, json["aborted"].as_bool()), (200, Some(true)), "{}", json);
+        assert_released(&state, &s);
+    }
+
+    /// `P2-A2`: statuses that may have reached the network, incoming actions and an
+    /// unknown status are refused by name, and nothing changes.
+    #[tokio::test]
+    async fn p2_a2_non_abortable_actions_are_refused_and_untouched() {
+        let state = app_state();
+        for status in ["sending", "unproven", "completed", "failed", "not-a-status"] {
+            let s = seed(&state, status, true, Reserved::Txid);
+            let before = snapshot(&state);
+            let (code, json) = abort_with(&state, &s.reference, Err(IndexerError::NotFound)).await;
+            assert_eq!((code, json["code"].as_str()), (400, Some("ERR_NOT_ABORTABLE")), "status {}: {}", status, json);
+            assert_eq!(snapshot(&state), before, "status {}: a refused abort changed the database", status);
+            assert_untouched(&state, &s, status);
+            assert!(pending_has(&s.reference), "status {}: pending entry removed by a refused abort", status);
+        }
+        let s = seed(&state, "unsigned", false, Reserved::Txid);
+        let (code, json) = abort_with(&state, &s.reference, Err(IndexerError::NotFound)).await;
+        assert_eq!((code, json["code"].as_str()), (400, Some("ERR_NOT_ABORTABLE")), "incoming: {}", json);
+        assert!(json["description"].as_str().unwrap_or("").contains("incoming"), "incoming: {}", json);
+        assert_untouched(&state, &s, "unsigned");
+    }
+
+    /// `P2-A3`: `nosend` is released only when every provider says "not found".
+    #[tokio::test]
+    async fn p2_a3_nosend_is_released_only_when_the_chain_says_absent() {
+        let state = app_state();
+        for (label, chain, want_code, want_err) in [
+            ("in mempool", found(TxState::InMempool), 400, "ERR_NOT_ABORTABLE"),
+            ("mined", found(TxState::Mined), 400, "ERR_NOT_ABORTABLE"),
+            ("rejected", found(TxState::Rejected), 400, "ERR_NOT_ABORTABLE"),
+            ("unknown state", found(TxState::Unknown), 400, "ERR_NOT_ABORTABLE"),
+            ("chain error", Err(IndexerError::Transport("down".into())), 503, "ERR_ABORT_CHAIN_UNVERIFIED"),
+        ] {
+            let s = seed(&state, "nosend", true, Reserved::Txid);
+            let (code, json) = abort_with(&state, &s.reference, chain).await;
+            assert_eq!((code, json["code"].as_str()), (want_code, Some(want_err)), "{}: {}", label, json);
+            assert_untouched(&state, &s, "nosend");
+        }
+        // Absent: released — reservation under the txid (signed) … The chain is asked
+        // exactly once, and never with the DB lock held (another request would stall
+        // behind a network call).
+        let s = seed(&state, "nosend", true, Reserved::Txid);
+        let db = state.database.clone();
+        let calls = std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(0));
+        let seen = calls.clone();
+        let resp = abort_action_with_chain(&state, &s.reference, move |_| async move {
+            seen.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+            assert!(db.try_lock().is_ok(), "DB lock was held during the chain call");
+            Err(IndexerError::NotFound)
+        }).await;
+        let (code, json) = body(resp).await;
+        assert_eq!((code, json["aborted"].as_bool()), (200, Some(true)), "absent: {}", json);
+        assert_eq!(calls.load(std::sync::atomic::Ordering::SeqCst), 1, "chain calls for one nosend abort");
+        assert_released(&state, &s);
+        // … and under the placeholder (the reservation not yet resolved to the txid).
+        let s = seed(&state, "nosend", true, Reserved::Placeholder);
+        let (code, json) = abort_with(&state, &s.reference, Err(IndexerError::NotFound)).await;
+        assert_eq!((code, json["aborted"].as_bool()), (200, Some(true)), "absent, placeholder: {}", json);
+        assert_released(&state, &s);
+    }
+
+    /// `P2-A3` (race): the action moved on while the chain was being asked — e.g. a
+    /// phase-2 `signAction` took it `nosend` → `sending`. The status compare-and-set
+    /// refuses and nothing is released.
+    #[tokio::test]
+    async fn p2_a3_status_change_during_chain_check_releases_nothing() {
+        let state = app_state();
+        let s = seed(&state, "nosend", true, Reserved::Txid);
+        let db = state.database.clone();
+        let txid = s.txid.clone();
+        let resp = abort_action_with_chain(&state, &s.reference, move |_| async move {
+            db.lock().unwrap().connection()
+                .execute("UPDATE transactions SET status = 'unproven' WHERE txid = ?1", [&txid]).unwrap();
+            Err(IndexerError::NotFound)
+        }).await;
+        let (code, json) = body(resp).await;
+        assert_eq!((code, json["code"].as_str()), (400, Some("ERR_NOT_ABORTABLE")), "{}", json);
+        assert!(json["description"].as_str().unwrap_or("").contains("changed while aborting"), "{}", json);
+        assert_untouched(&state, &s, "unproven");
+        assert!(pending_has(&s.reference), "pending entry removed by a refused abort");
+    }
+
+    /// `P2-A4`: abortable never-sent statuses are released: created outputs not
+    /// spendable, inputs restored, status `failed`, balance cache invalidated.
+    #[tokio::test]
+    async fn p2_a4_never_sent_actions_are_released() {
+        let state = app_state();
+        for (status, reserved) in [("unsigned", Reserved::Placeholder), ("unprocessed", Reserved::Placeholder),
+                                   ("nonfinal", Reserved::Txid)] {
+            let s = seed(&state, status, true, reserved);
+            state.balance_cache.set(123_456);
+            // The chain must not be asked for a never-sent action.
+            let (code, json) = abort_with(&state, &s.reference, found(TxState::Mined)).await;
+            assert_eq!((code, json["aborted"].as_bool()), (200, Some(true)), "status {}: {}", status, json);
+            assert_released(&state, &s);
+            assert_eq!(state.balance_cache.get(), None, "status {}: balance cache not invalidated", status);
+        }
+    }
+
+    /// `P2-A5`: after an abort, `signAction` on that reference cannot sign it.
+    #[tokio::test]
+    async fn p2_a5_sign_action_after_abort_is_not_found() {
+        let state = app_state();
+        let s = seed(&state, "unsigned", true, Reserved::Placeholder);
+        let (code, _) = abort_with(&state, &s.reference, Err(IndexerError::NotFound)).await;
+        assert_eq!(code, 200);
+        let req = serde_json::json!({ "reference": s.reference, "options": { "noSend": true } });
+        let (code, json) = body(sign_action(state.clone(), web::Bytes::from(req.to_string())).await).await;
+        assert_eq!((code, json["error"].as_str()), (404, Some("Transaction reference not found")),
+                   "signAction after abort: {}", json);
+        assert!(!pending_has(&s.reference));
+        assert_eq!(rows(&state, &s).0, "failed");
+    }
+
+    /// `P2-A6`: found by txid; a failed release is an error, never `aborted:true`, and
+    /// rolls back the status change.
+    #[tokio::test]
+    async fn p2_a6_lookup_by_txid_and_errors_are_not_swallowed() {
+        let state = app_state();
+        let s = seed(&state, "unsigned", true, Reserved::Txid);
+        let (code, json) = abort_with(&state, &s.txid, Err(IndexerError::NotFound)).await;
+        assert_eq!((code, json["aborted"].as_bool()), (200, Some(true)), "by txid: {}", json);
+        assert_released(&state, &s);
+
+        let (code, json) = abort_with(&state, "no-such-reference", Err(IndexerError::NotFound)).await;
+        assert_eq!((code, json["code"].as_str()), (404, Some("ERR_ACTION_NOT_FOUND")), "{}", json);
+
+        let s = seed(&state, "unsigned", true, Reserved::Txid);
+        state.database.lock().unwrap().connection().execute_batch(
+            "CREATE TRIGGER p2_inject BEFORE UPDATE ON outputs WHEN NEW.spendable = 1 BEGIN SELECT RAISE(ABORT, 'injected failure'); END;"
+        ).unwrap();
+        let (code, json) = abort_with(&state, &s.reference, Err(IndexerError::NotFound)).await;
+        state.database.lock().unwrap().connection().execute_batch("DROP TRIGGER p2_inject;").unwrap();
+        assert_eq!((code, json["code"].as_str()), (500, Some("ERR_ABORT_FAILED")), "{}", json);
+        assert_ne!(json["aborted"].as_bool(), Some(true));
+        assert_untouched(&state, &s, "unsigned");
+        assert!(pending_has(&s.reference), "pending entry removed by a failed abort");
+    }
+
+    /// `P2-A7`: a `signAction` that read the pending entry before an abort committed
+    /// must not sign after it. Simulated by the state it would find: entry still in
+    /// memory, row already `failed`. The control arm (row `unsigned`) proves the call
+    /// reaches the update block and would have rewritten the row.
+    #[tokio::test]
+    async fn p2_a7_sign_action_refuses_an_action_aborted_mid_flight() {
+        let state = app_state();
+        let control = seed(&state, "unsigned", true, Reserved::Placeholder);
+        let req = serde_json::json!({ "reference": control.reference, "options": { "noSend": true } });
+        let (code, json) = body(sign_action(state.clone(), web::Bytes::from(req.to_string())).await).await;
+        assert_eq!(code, 200, "control: signAction must succeed on a live action: {}", json);
+
+        let s = seed(&state, "failed", true, Reserved::Placeholder);
+        let req = serde_json::json!({ "reference": s.reference, "options": { "noSend": true } });
+        let (code, json) = body(sign_action(state.clone(), web::Bytes::from(req.to_string())).await).await;
+        assert_eq!((code, json["code"].as_str()), (409, Some("ERR_ACTION_ABORTED")), "{}", json);
+        let db = state.database.lock().unwrap();
+        let (status, txid): (String, String) = db.connection().query_row(
+            "SELECT status, txid FROM transactions WHERE reference_number = ?1", [&s.reference],
+            |r| Ok((r.get(0)?, r.get(1)?))).unwrap();
+        assert_eq!((status.as_str(), txid.as_str()), ("failed", s.txid.as_str()), "aborted row rewritten by signAction");
+    }
+
+    /// `P2-A4` edges: a second abort is refused and releases nothing; an unrelated
+    /// action is untouched; an `unsigned` action with no pending entry (process
+    /// restarted) is aborted but its placeholder reservation stays for the sweeper.
+    #[tokio::test]
+    async fn p2_a4_double_abort_isolation_and_no_pending_entry() {
+        let state = app_state();
+        let other = seed(&state, "unsigned", true, Reserved::Placeholder);
+        let s = seed(&state, "unsigned", true, Reserved::Placeholder);
+        let (code, _) = abort_with(&state, &s.reference, Err(IndexerError::NotFound)).await;
+        assert_eq!(code, 200);
+        assert_untouched(&state, &other, "unsigned");
+        assert!(pending_has(&other.reference), "unrelated pending entry removed");
+
+        // Its input is re-reserved by a new action; a second abort must not free it.
+        state.database.lock().unwrap().connection().execute(
+            "UPDATE outputs SET spendable = 0, spending_description = 'pending-new-action' WHERE txid = ?1",
+            [&s.input_txid]).unwrap();
+        let before = snapshot(&state);
+        let (code, json) = abort_with(&state, &s.reference, Err(IndexerError::NotFound)).await;
+        assert_eq!((code, json["code"].as_str()), (400, Some("ERR_NOT_ABORTABLE")), "second abort: {}", json);
+        assert_eq!(snapshot(&state), before, "second abort changed the database");
+
+        let s = seed(&state, "unsigned", true, Reserved::Placeholder);
+        PENDING_TRANSACTIONS.lock().unwrap().remove(&s.reference);
+        let (code, _) = abort_with(&state, &s.reference, Err(IndexerError::NotFound)).await;
+        assert_eq!(code, 200);
+        assert_eq!(rows(&state, &s), ("failed".into(), 0, 0), "placeholder reservation must wait for the sweeper");
+    }
+
+    /// `P2-A4` edge: an action whose created output another action already spends is
+    /// refused, and nothing changes.
+    #[tokio::test]
+    async fn p2_a4_action_with_a_spent_created_output_is_refused() {
+        let state = app_state();
+        let child = seed(&state, "nosend", true, Reserved::Txid);
+        let child_id: i64 = state.database.lock().unwrap().connection().query_row(
+            "SELECT id FROM transactions WHERE txid = ?1", [&child.txid], |r| r.get(0)).unwrap();
+        // Marked by description (a reservation) and by `spent_by` alone (a recorded spend).
+        for mark in ["spending_description = 'child-txid'", "spent_by = ?2"] {
+            let s = seed(&state, "nosend", true, Reserved::Txid);
+            let sql = format!("UPDATE outputs SET spendable = 0, {} WHERE txid = ?1", mark);
+            let db = state.database.lock().unwrap();
+            if mark.contains("?2") {
+                db.connection().execute(&sql, rusqlite::params![s.txid, child_id]).unwrap();
+            } else {
+                db.connection().execute(&sql, rusqlite::params![s.txid]).unwrap();
+            }
+            drop(db);
+            let before = snapshot(&state);
+            let (code, json) = abort_with(&state, &s.reference, Err(IndexerError::NotFound)).await;
+            assert_eq!((code, json["code"].as_str()), (400, Some("ERR_NOT_ABORTABLE")), "{}: {}", mark, json);
+            assert!(json["description"].as_str().unwrap_or("").contains("already being spent"), "{}: {}", mark, json);
+            assert_eq!(snapshot(&state), before, "{}: refused abort changed the database", mark);
+            assert!(pending_has(&s.reference));
+        }
+    }
+
+    /// `P2-A8`: abort waits for any in-flight createAction / sendWith / broadcast_nosend
+    /// (they hold `create_action_lock` while a `nosend` row is being broadcast), and
+    /// `broadcast_nosend` waits for an abort.
+    #[tokio::test]
+    async fn p2_a8_abort_and_broadcast_nosend_wait_for_create_action_lock() {
+        let state = app_state();
+        let s = seed(&state, "unsigned", true, Reserved::Placeholder);
+        let held = state.create_action_lock.clone().lock_owned().await;
+        let pending = abort_action_with_chain(&state, &s.reference, |_| async { Err(IndexerError::NotFound) });
+        let early = tokio::time::timeout(std::time::Duration::from_millis(300), pending).await;
+        assert!(early.is_err(), "abortAction ran while create_action_lock was held");
+        assert_untouched(&state, &s, "unsigned");
+
+        let req = serde_json::json!({ "txid": s.txid });
+        let early = tokio::time::timeout(std::time::Duration::from_millis(300),
+            broadcast_nosend(state.clone(), web::Bytes::from(req.to_string()))).await;
+        assert!(early.is_err(), "broadcast_nosend ran while create_action_lock was held");
+
+        drop(held);
+        let (code, json) = abort_with(&state, &s.reference, Err(IndexerError::NotFound)).await;
+        assert_eq!((code, json["aborted"].as_bool()), (200, Some(true)), "after the lock is free: {}", json);
+    }
+
+    #[test]
+    fn p2_a3_only_not_found_is_absent() {
+        assert_eq!(abort_chain_verdict(Err(IndexerError::NotFound)), AbortChainVerdict::Absent);
+        for st in [TxState::InMempool, TxState::Mined, TxState::Rejected, TxState::DoubleSpendAttempted, TxState::Unknown] {
+            assert!(matches!(abort_chain_verdict(found(st)), AbortChainVerdict::Known(_)));
+        }
+        for e in [IndexerError::SoftTimeout(std::time::Duration::from_secs(1)), IndexerError::Transport("x".into()),
+                  IndexerError::ProviderStatus { provider: "p", status: 500, body: String::new() },
+                  IndexerError::InvalidResponse { provider: "p", reason: String::new() }] {
+            assert!(matches!(abort_chain_verdict(Err(e)), AbortChainVerdict::Inconclusive(_)));
+        }
     }
 }
