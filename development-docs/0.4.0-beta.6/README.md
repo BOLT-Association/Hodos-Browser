@@ -1,6 +1,6 @@
 # v0.4.0-beta.6: engine security refresh + BRC-103 compatibility + advisory triage
 
-**Opened:** 2026-09-30 (👤 owner decision, this session). **Status:** 🟡 **TRIAGE DONE, awaiting the owner's scope decision** (2026-09-30). `ADVISORY_TRIAGE.md` §2 is the recommendation. No code has been written yet.
+**Opened:** 2026-09-30 (👤 owner decision, this session). **Status:** 🟡 **SCOPED, ready for kickoff** (2026-09-30). 👤 The owner accepted `ADVISORY_TRIAGE.md` §2 as recommended. No code has been written yet. **New session? Start with `SESSION_PROMPT_beta6_kickoff.md`.**
 
 ## ▶️ RESUME HERE
 

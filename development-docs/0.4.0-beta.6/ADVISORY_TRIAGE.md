@@ -70,7 +70,7 @@ The paid retry follows redirects carrying the payment headers and cookies cross-
 
 ---
 
-## 2. Recommendation for `v0.4.0-beta.6` (👤 owner decides)
+## 2. Scope for `v0.4.0-beta.6`: ✅ accepted as recommended by 👤 the owner, 2026-09-30
 
 | Theme | Recommend | Why |
 |---|---|---|
