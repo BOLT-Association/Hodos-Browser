@@ -1,7 +1,7 @@
 # 🚨 MessageBox rejects every AuthFetch handshake with `400 ERR_AUTH_MALFORMED` since 2026-09-23 — PeerPay notices are not delivered and incoming PeerPay is not received
 
 **Found:** 2026-09-30, while diagnosing an unrelated dApp connect, from the owner's orange-dot notice (*"payment sent, recipient not notified"*) on a PeerPay the owner sent to our own identity key at 07:23.
-**Status:** ⬜ UNASSIGNED · **Track:** unassigned. ⭐ Suggested: **B5-T5-P1 — servers prove who they are**, which rewrites `AuthFetchClient::handshake` and already lists `R-PEERPAY-DELIVERY` as at risk. 👤 Urgency (hotfix vs beta.6) is the owner's call. · **Filed by:** Claude (Opus 5.5), with the owner
+**Status:** ✅ **FIXED in beta.6 phase P1** (2026-09-30): `../../0.4.0-beta.6/phase-P1-messagebox-handshake/PHASE_CONTRACT.md`. Live: MessageBox accepts the handshake, a fresh PeerPay notice was delivered and received. The fixture below is untouched (outbox row still `exhausted`). · **Track:** was unassigned. ⭐ Suggested: **B5-T5-P1 — servers prove who they are**, which rewrites `AuthFetchClient::handshake` and already lists `R-PEERPAY-DELIVERY` as at risk. 👤 Urgency (hotfix vs beta.6) is the owner's call. · **Filed by:** Claude (Opus 5.5), with the owner
 
 > ⚠️ **Method note.** Everything below is **measurement from logs** (dev and installed wallet logs, read-only) except where marked *code reading*. **Not verified:** the cause. The MessageBox server's current handshake requirements were not read and no request was replayed. The outbox row for the stuck notice was not opened.
 
