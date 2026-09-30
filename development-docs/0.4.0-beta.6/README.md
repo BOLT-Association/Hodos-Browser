@@ -1,10 +1,10 @@
 # v0.4.0-beta.6: engine security refresh + BRC-103 compatibility + advisory triage
 
-**Opened:** 2026-09-30 (👤 owner decision, this session). **Status:** 🟡 **TRIAGE**. The advisory triage is running; no code has been written yet.
+**Opened:** 2026-09-30 (👤 owner decision, this session). **Status:** 🟡 **TRIAGE DONE, awaiting the owner's scope decision** (2026-09-30). `ADVISORY_TRIAGE.md` §2 is the recommendation. No code has been written yet.
 
 ## ▶️ RESUME HERE
 
-1. **Read the triage:** `ADVISORY_TRIAGE.md` (this folder; written when the eight triage agents finish). 👤 The owner selects which findings ship in this release.
+1. **Read the triage:** `ADVISORY_TRIAGE.md` (this folder; 438 findings merged into 7 themes, §2 = recommended scope, §3 = rule-7 ground-truth checks already run). 👤 The owner selects which themes ship in this release. ⭐ First job after that: G2's **offline** test (run recorded Hodos responses through the hardened SDK's validators).
 2. **Phase contracts** for the selected items only (`../0.4.0-beta.7/PHASE_CONTRACT_TEMPLATE.md`). The harness is inherited from `../0.4.0-beta.3/HARNESS.md` + `../0.4.0-beta.7/HARNESS_DELTA.md`.
 3. **The nonce fix** (already approved by the owner, below).
 4. **Rebuild the app** on the **same verified engine asset** (`cef-binaries-*-150.0.48-g7d50c1c`, see the engine plan). Validation run, then the full step-5 checks, tag **`v0.4.0-beta.6`**, draft, promote.
