@@ -117,6 +117,10 @@ Three commits: (1) Rust endpoint + internal-only listing, (2) Tools tab + card 1
 | Card 2 shows "nothing new" when the scan could not run | C1 |
 | The Tools tab's textarea cannot take focus or paste in the CEF overlay | U3 (native input, owner pastes a real block) |
 
+### 8a. A real test fixture (added 2026-09-30)
+
+👤 Owner: use the accidental 30-cent self-PeerPay as Card 1's first real claim. Txid `8a24596f7d5862c41c3fb3529df9fec4ab97a71dee2333571206144afb4ebd4e`, 1,470,588 sats, output 0, **dev** wallet. It was broadcast, but its MessageBox notice never arrived. Details: `../../tickets/TICKET_messagebox_rejects_our_auth_handshake_since_2026_09_23.md` §"Test fixture". ⚠️ Whether the outbox row still holds the derivation prefix and suffix has not been checked.
+
 ## 9. Platforms
 
 | Platform | Rows that run here | Notes |

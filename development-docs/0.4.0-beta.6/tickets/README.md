@@ -115,6 +115,8 @@ existing links use it. Describe the **symptom or the defect**, not the fix:
 | `TICKET_prompt_opens_behind_another_window_with_two_windows_open.md` | 📌 **ASSIGNED 2026-09-27** | **B5-T6 Browser shell** — from the 2026-09-25 beta.4 scare (Lead C); buggy, not broken | 2026-09-25 |
 | `TICKET_deleting_a_site_in_the_advanced_wallet_does_not_reach_the_browser.md` | 📌 **ASSIGNED 2026-09-27** | **B5-T5 Identity & privacy** — consent surface (Lead B); IPC role gate blocks our own wallet tab | 2026-09-25 |
 | `TICKET_find_bar_does_not_follow_tab_switches.md` | 📌 **ASSIGNED 2026-09-27** | **B5-T6 Browser shell** — adopt Chromium's per-tab find state | 2026-09-27 |
+| `TICKET_messagebox_rejects_our_auth_handshake_since_2026_09_23.md` | ⬜ **UNASSIGNED** | 🚨 live since 2026-09-23, all users. ⭐ suggest **B5-T5-P1**; 👤 owner: hotfix vs beta.6. Holds the Claim-a-payment test fixture (txid `8a24596f…`) | 2026-09-30 |
+| `TICKET_first_connect_times_out_because_wallet_discovery_waits_for_approval.md` | ⬜ **UNASSIGNED** | ⭐ suggest **B5-T5-P2**, with a review of what triggers the modal. Owner's repro confirms it | 2026-09-30 |
 
 👤 **Owner approved every proposed placement 2026-09-27** (G2 sitting) — the Track column is the assignment (D11); the ticket files' own `Status: UNASSIGNED` headers are superseded by this register.
 

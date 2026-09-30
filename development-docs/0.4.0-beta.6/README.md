@@ -41,6 +41,17 @@
 | G5.5–G6 | ⬜ not started — G5.5 feasibility, G6 go/no-go |
 | macOS | 🍎 **tasked 2026-09-29 for the security release only** (engine build + verify, relay round W-29a). beta.6 phase work still waits for G6 |
 
+### ⬜ Filed 2026-09-30, not yet placed: pick these up when G5 resumes
+
+👤 Owner, 2026-09-30: both belong in beta.6; the cycle stays flexible enough to take them. **They are UNASSIGNED.** Place them into their tracks and phase contracts at G5 before continuing, and re-check the owner-hours total at G5.5.
+
+| Ticket | One line | Suggested home |
+|---|---|---|
+| `tickets/TICKET_messagebox_rejects_our_auth_handshake_since_2026_09_23.md` | 🚨 MessageBox refuses our BRC-103 login (`ERR_AUTH_MALFORMED`) since 2026-09-23 in dev and installed alike. PeerPay money moves, but notices are not delivered and incoming PeerPay is not received. **Not** the header-size problem | **B5-T5-P1**. 👤 Owner decides hotfix vs beta.6 |
+| `tickets/TICKET_first_connect_times_out_because_wallet_discovery_waits_for_approval.md` | A new site's first connect times out because we hold its `getVersion` discovery call behind the connect prompt (owner's repro confirms it) | **B5-T5-P2**, with a call-by-call review of what triggers the modal |
+
+⭐ The first ticket also holds a **test fixture for B5-T6-P5 (Claim a payment)**: the owner's 30-cent self-PeerPay, txid `8a24596f…`, in the dev wallet. Do not clean it up.
+
 ### 🟡 2026-09-25 interruption — resolved as NOT an emergency
 
 A public beta.4 report ("permission prompts don't appear") turned out to be a **two-window Z-order bug**: the
