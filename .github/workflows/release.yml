@@ -142,7 +142,7 @@ jobs:
       # re-derives its expectation FROM THIS STRING — so bumping the engine is one
       # edit per arm, and a clobbered asset (name says one engine, bytes are
       # another) fails the build instead of shipping silently.
-      CEF_ASSET: cef-binaries-windows-150.0.43-g9ccef04.zip
+      CEF_ASSET: cef-binaries-windows-150.0.48-g7d50c1c.zip
 
     steps:
       - name: Checkout code
@@ -586,7 +586,7 @@ jobs:
       MACOSX_DEPLOYMENT_TARGET: "12.0"
       # ⛔ SINGLE DEFINITION of the CEF asset for this arm — see the Windows arm's
       # note. The "Assert the CEF engine" step re-derives its expectation from it.
-      CEF_ASSET: cef-binaries-macos-150.0.43-g9ccef04.tar.bz2
+      CEF_ASSET: cef-binaries-macos-150.0.48-g7d50c1c.tar.bz2
 
     steps:
       - name: Checkout code
