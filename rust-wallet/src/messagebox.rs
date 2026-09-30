@@ -84,6 +84,73 @@ impl MessageBoxError {
 /// (`main.rs :: enforce_dev_safeguard`), so the override cannot reach users.
 pub const MESSAGEBOX_MAX_BODY_BYTES: usize = 1_048_576;
 
+/// Upper bound on `listMessages` pages read in one poll (1000 messages per page).
+const LIST_MESSAGES_MAX_PAGES: usize = 20;
+
+/// Read every `listMessages` page. MessageBox pages its inbox (limit 1000, `hasMore` /
+/// `nextOffset`; live shape recorded 2026-09-30, B6-P1-A6). Follows the pages as
+/// `@bsv/message-box-client` `fetchMessagePages` does, bounded to `LIST_MESSAGES_MAX_PAGES`
+/// so a runaway server cannot loop us forever. `fetch_page(offset)` returns one page's JSON.
+async fn collect_message_pages<F, Fut>(mut fetch_page: F) -> Result<Vec<serde_json::Value>, MessageBoxError>
+where
+    F: FnMut(u64) -> Fut,
+    Fut: std::future::Future<Output = Result<serde_json::Value, MessageBoxError>>,
+{
+    let mut messages = Vec::new();
+    let mut offset: u64 = 0;
+    for page in 0..LIST_MESSAGES_MAX_PAGES {
+        let json = fetch_page(offset).await?;
+        let (page_messages, next) = parse_list_messages_page(&json, offset)?;
+        messages.extend(page_messages);
+        match next {
+            Some(n) => offset = n,
+            None => return Ok(messages),
+        }
+        if page + 1 == LIST_MESSAGES_MAX_PAGES {
+            // Unlike the official client (which throws), return what we have: every message
+            // we process is acknowledged and deleted, so the next poll starts further on.
+            // Messages we cannot process stay, and could hold later ones back — hence the warn.
+            warn!("MessageBox: listMessages stopped after {} pages with more pending", LIST_MESSAGES_MAX_PAGES);
+        }
+    }
+    Ok(messages)
+}
+
+/// Parse one `listMessages` page. Returns the page's messages and, when the server says more
+/// remain, the offset of the next page (`nextOffset` if it advances; else offset + count;
+/// else offset + the server's `limit` — the rule in `@bsv/message-box-client`
+/// `nextMessagePageOffset`).
+///
+/// ⛔ An error body or a shape without a `messages` array is an **error**, never "no messages":
+/// reading it as an empty inbox is what would silently hide incoming payments.
+/// A bare top-level array (the pre-paging shape) is still accepted as a single page.
+fn parse_list_messages_page(
+    json: &serde_json::Value,
+    offset: u64,
+) -> Result<(Vec<serde_json::Value>, Option<u64>), MessageBoxError> {
+    if let Some(arr) = json.as_array() {
+        return Ok((arr.clone(), None));
+    }
+    if json.get("status").and_then(|s| s.as_str()) == Some("error") {
+        return Err(MessageBoxError::Api(format!("listMessages error: {}", json)));
+    }
+    let messages = json.get("messages").and_then(|v| v.as_array()).cloned().ok_or_else(|| {
+        MessageBoxError::Api(format!("listMessages returned an unexpected shape: {:.200}", json.to_string()))
+    })?;
+    if json.get("hasMore").and_then(|v| v.as_bool()) != Some(true) {
+        return Ok((messages, None));
+    }
+    let next = match json.get("nextOffset").and_then(|v| v.as_u64()) {
+        Some(n) if n > offset => n,
+        _ if !messages.is_empty() => offset + messages.len() as u64,
+        _ => match json.get("limit").and_then(|v| v.as_u64()) {
+            Some(l) if l > 0 => offset + l,
+            _ => offset + 1000,
+        },
+    };
+    Ok((messages, Some(next)))
+}
+
 pub fn messagebox_max_body_bytes() -> usize {
     if std::env::var("HODOS_DEV").as_deref() == Ok("1") {
         if let Some(n) = std::env::var("HODOS_MESSAGEBOX_MAX_BODY_BYTES").ok().and_then(|s| s.parse::<usize>().ok()) {
@@ -247,40 +314,31 @@ impl MessageBoxClient {
     /// # Returns
     /// Vec of decrypted incoming messages
     pub async fn list_messages(&self, message_box: &str) -> Result<Vec<IncomingMessage>, MessageBoxError> {
-        let request_body = serde_json::json!({
-            "messageBox": message_box
-        });
-
-        let body_bytes = serde_json::to_vec(&request_body)?;
         let url = format!("{}/listMessages", MESSAGEBOX_URL);
 
-        let response = self.auth_client.fetch("POST", &url, Some(&body_bytes)).await?;
+        let messages = collect_message_pages(|offset| {
+            let url = url.clone();
+            async move {
+                let body_bytes = serde_json::to_vec(&serde_json::json!({
+                    "messageBox": message_box,
+                    "offset": offset
+                }))?;
+                let response = self.auth_client.fetch("POST", &url, Some(&body_bytes)).await?;
 
-        if !response.status().is_success() {
-            let status = response.status().as_u16();
-            let body = response.text().await.unwrap_or_default();
-            return Err(MessageBoxError::Api(format!("listMessages failed ({}): {}", status, body)));
-        }
+                if !response.status().is_success() {
+                    let status = response.status().as_u16();
+                    let body = response.text().await.unwrap_or_default();
+                    return Err(MessageBoxError::Api(format!("listMessages failed ({}): {}", status, body)));
+                }
 
-        let response_text = response.text().await.unwrap_or_default();
-        info!("MessageBox: listMessages raw response ({} chars): {}",
-            response_text.len(),
-            if response_text.len() > 500 { &response_text[..500] } else { &response_text }
-        );
-
-        let response_json: serde_json::Value = serde_json::from_str(&response_text)?;
-
-        // Handle both top-level array and wrapped { "messages": [...] } formats
-        let messages = if let Some(arr) = response_json.as_array() {
-            arr.clone()
-        } else if let Some(arr) = response_json.get("messages").and_then(|v| v.as_array()) {
-            info!("MessageBox: found messages inside 'messages' wrapper");
-            arr.clone()
-        } else {
-            warn!("MessageBox: listMessages returned unexpected format: {}",
-                if response_text.len() > 200 { &response_text[..200] } else { &response_text });
-            return Ok(Vec::new());
-        };
+                let response_text = response.text().await.unwrap_or_default();
+                // Char-safe preview: a byte slice at 500 panics when a multibyte character
+                // straddles it, and message bodies are sender-controlled.
+                let preview: String = response_text.chars().take(500).collect();
+                info!("MessageBox: listMessages raw response ({} chars): {}", response_text.len(), preview);
+                Ok(serde_json::from_str(&response_text)?)
+            }
+        }).await?;
 
         let mut result = Vec::new();
 
@@ -421,6 +479,79 @@ impl MessageBoxClient {
 mod tests {
     use super::*;
     use secp256k1::{Secp256k1, SecretKey, PublicKey};
+
+    // ── B6-P1-A6: listMessages paging ──────────────────────────────────────────────────
+    /// Verbatim from the dev wallet's first post-fix poll, 2026-09-30 14:44:36 -06:00.
+    const LIVE_EMPTY_PAGE: &str = r#"{"status":"success","messages":[],"limit":1000,"offset":0,"nextOffset":0,"hasMore":false}"#;
+
+    fn page(messages: usize, offset: u64, next: Option<u64>, has_more: bool) -> serde_json::Value {
+        let msgs: Vec<_> = (0..messages).map(|i| serde_json::json!({"messageId": format!("m{}", offset as usize + i), "sender": "02", "body": "x"})).collect();
+        let mut v = serde_json::json!({"status":"success","messages":msgs,"limit":1000,"offset":offset,"hasMore":has_more});
+        if let Some(n) = next { v["nextOffset"] = n.into(); }
+        v
+    }
+
+    #[test]
+    fn p1_a6_live_empty_page_is_empty_and_final() {
+        let (msgs, next) = parse_list_messages_page(&serde_json::from_str(LIVE_EMPTY_PAGE).unwrap(), 0).unwrap();
+        assert!(msgs.is_empty());
+        assert_eq!(next, None);
+    }
+
+    #[test]
+    fn p1_a6_has_more_yields_every_message_and_the_next_offset() {
+        let (msgs, next) = parse_list_messages_page(&page(3, 0, Some(1000), true), 0).unwrap();
+        assert_eq!(msgs.len(), 3, "page messages must all be returned");
+        assert_eq!(next, Some(1000), "nextOffset must be followed");
+        // nextOffset missing or not advancing ⇒ offset + count, then offset + limit
+        assert_eq!(parse_list_messages_page(&page(3, 1000, None, true), 1000).unwrap().1, Some(1003));
+        assert_eq!(parse_list_messages_page(&page(3, 1000, Some(1000), true), 1000).unwrap().1, Some(1003));
+        assert_eq!(parse_list_messages_page(&page(0, 1000, None, true), 1000).unwrap().1, Some(2000));
+        // last page
+        assert_eq!(parse_list_messages_page(&page(2, 1000, Some(1002), false), 1000).unwrap(), (page(2, 1000, None, false)["messages"].as_array().unwrap().clone(), None));
+    }
+
+    /// The loop, not just the parser: three pages, each message exactly once, offsets advance.
+    #[tokio::test]
+    async fn p1_a6_collects_every_page_once_with_advancing_offsets() {
+        let requested = std::sync::Mutex::new(Vec::new());
+        let msgs = collect_message_pages(|offset| {
+            requested.lock().unwrap().push(offset);
+            let json = match offset {
+                0 => page(1000, 0, Some(1000), true),
+                1000 => page(1000, 1000, Some(2000), true),
+                2000 => page(7, 2000, Some(2007), false),
+                other => panic!("unexpected offset {}", other),
+            };
+            async move { Ok(json) }
+        }).await.unwrap();
+        assert_eq!(*requested.lock().unwrap(), vec![0, 1000, 2000], "offsets must advance page by page");
+        let ids: std::collections::HashSet<_> = msgs.iter().map(|m| m["messageId"].as_str().unwrap().to_string()).collect();
+        assert_eq!((msgs.len(), ids.len()), (2007, 2007), "every message exactly once");
+    }
+
+    /// A server that always says `hasMore` cannot loop us forever.
+    #[tokio::test]
+    async fn p1_a6_endless_has_more_stops_at_the_page_cap() {
+        let calls = std::sync::atomic::AtomicUsize::new(0);
+        let msgs = collect_message_pages(|offset| {
+            calls.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+            async move { Ok(page(1, offset, None, true)) }
+        }).await.unwrap();
+        assert_eq!(calls.load(std::sync::atomic::Ordering::SeqCst), LIST_MESSAGES_MAX_PAGES);
+        assert_eq!(msgs.len(), LIST_MESSAGES_MAX_PAGES);
+    }
+
+    #[test]
+    fn p1_a6_error_or_unknown_shape_is_an_error_not_an_empty_inbox() {
+        let err = parse_list_messages_page(&serde_json::json!({"status":"error","code":"ERR_X","description":"nope"}), 0);
+        assert!(err.is_err(), "an error body must not read as 'no messages'");
+        let odd = parse_list_messages_page(&serde_json::json!({"status":"success","items":[{"messageId":"a"}]}), 0);
+        assert!(odd.is_err(), "an unknown shape must not read as 'no messages'");
+        // pre-paging shape still accepted
+        let (msgs, next) = parse_list_messages_page(&serde_json::json!([{"messageId":"a"}]), 0).unwrap();
+        assert_eq!((msgs.len(), next), (1, None));
+    }
 
     fn test_keypair() -> (Vec<u8>, Vec<u8>) {
         let secp = Secp256k1::new();
