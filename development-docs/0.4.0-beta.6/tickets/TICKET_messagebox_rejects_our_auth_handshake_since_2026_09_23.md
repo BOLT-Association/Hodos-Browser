@@ -7,6 +7,23 @@
 
 ---
 
+## ✅ Root cause — measured 2026-09-30
+
+**Only Hodos is affected, and the cause is our handshake nonce length.** Measured against the live `messagebox.babbage.systems` with a throwaway key (scratch Node probes, `@bsv/sdk` 2.8.11):
+
+| Request to `/.well-known/auth` | Result |
+|---|---|
+| Official SDK `AuthFetch` end to end (`listMessages`) | **200** `{"status":"success",…}` |
+| Our exact 4-field `initialRequest`, `initialNonce` = **32** random bytes (what `authfetch.rs :: generate_nonce_base64` makes) | **400 `ERR_AUTH_MALFORMED`** |
+| The same, plus the SDK's `requestedCertificates` | **400** (not the cause) |
+| Our exact 4 fields, `initialNonce` = **48** random bytes | **200** `initialResponse` |
+
+The SDK sends a 48-byte (64-character) `initialNonce`. The server's validator also expects `x-bsv-auth-your-nonce` to be 48 bytes, and request `nonce` and `request-id` to be 32 (`auth-express-middleware/src/index.ts :: validateGeneralAuthRequest`). ⇒ The fix is **the handshake's initial nonce only**. The per-request nonce and request id stay 32 bytes.
+
+**What changed, and was it announced:** the middleware was hardened in `bsv-blockchain/ts-stack` `b3155fa2` ("Merge commit from fork", 2026-09-22 12:05 UTC) and published as security advisory **GHSA-qp3j-h5xf-p2p7** (2026-09-23, high), *"Coordinated ts-stack trust-boundary vulnerabilities across wallet, authentication, messaging, overlay, and storage packages"*. MessageBox was redeployed about 07:48 UTC on 2026-09-23. There was no "update your wallet before" notice. The advisory itself was the announcement, and nothing in our process watches advisories.
+
+⚠️ **Bigger than this ticket:** that advisory lists about 76 findings (TSA-001…076) in the reference stack we port patterns from. Several name areas our Rust wallet re-implements: AuthFetch redirects and response bounds (TSA-015/016/027), manifest-discovery SSRF (TSA-046), certifier SSRF (TSA-066), cross-origin partial-action signing (TSA-042), truthy security verdicts (TSA-040). Also GHSA-2qqx-463q-2qhq (2026-09-16, critical, identity from an unsigned field) and GHSA-5vmp-9hjc-rfwp (2026-09-10, critical). Triage against Hodos is owed; the owner decides where.
+
 ## What happens
 
 Every BRC-103 handshake our AuthFetch client makes to `messagebox.babbage.systems` is refused:
