@@ -103,6 +103,7 @@ existing links use it. Describe the **symptom or the defect**, not the fix:
 | `TICKET_createSignature_requires_counterparty.md` | 📌 **ASSIGNED 2026-09-27** | **B5-T5 Identity & privacy** — (moved from beta.3; check against the spec first; signing code — invariant 3) | beta.3 |
 | `TICKET_edit_limits_modal_usability.md` | 📌 **ASSIGNED 2026-09-27** | **B5-T6 Browser shell** — ⛔ **item 4 dropped** (owner 2026-09-27: do not store a declined permission; the user is simply re-prompted) | beta.3 |
 | `TICKET_loopback_host_form_wallet_routing.md` | 📌 **ASSIGNED 2026-09-27** | **B5-T5 Identity & privacy** — moved from T1 (T1 SCOPE Q3; rows W4/W6/W7/W8 are trust-boundary work) | beta.3 |
+| `TICKET_headerless_loopback_requests_are_trusted_as_wallet_ui.md` | 📌 **ASSIGNED 2026-09-30** | **B5-T5 Identity & privacy, phase P2** — moved from beta.8 intake (👤 owner 2026-09-30): per-launch secret (`W9`, `P2-A14`) + `IsInternalOrigin` first-party-only (answers `P2-A9`); TSA-322 | 2026-09-30 |
 | `TICKET_modal_info_tooltip_overflows_modal.md` | 📌 **ASSIGNED 2026-09-27** | **B5-T6 Browser shell** — (moved from beta.3; low) | beta.3 |
 | `TICKET_signaction_response_not_brc100_shape.md` | 📌 **ASSIGNED 2026-09-27** | **B5-T1 Money path** — (moved from beta.3; ⚠️ **money**: a fatal broadcast failure returns success) | beta.3 |
 | `TICKET_synced_outputs_store_a_fabricated_locking_script.md` | 📌 **ASSIGNED 2026-09-27** | **B5-T1 Money path** — (moved from beta.3; ⭐ would fool the Track 1 classifier) | beta.3 |
