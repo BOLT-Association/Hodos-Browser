@@ -9,6 +9,51 @@
 
 ---
 
+# 📋 ROUND M-29b (**macOS**) — ✅ **M2 + M3 DONE: macOS engine `150.0.48-7871.3582+g7d50c1c+chromium-150.0.7871.255` built, all 7 Hodos patches applied by name, V8 `15.0.245.40` in the binary.** M4 (package for upload) next · 👤 nothing needs the owner yet
+
+## §1 — M2 (fresh no-history `src` fetch) — 📏 measured
+
+| | Value |
+|---|---|
+| Run | 09:12:10 → **09:30:05**, exit 0 (**18 min**, not hours; the fetch itself was a single `git fetch --depth=1`, ~6 min of that was server-side pack preparation with 0 bytes moving) |
+| Tree `/Volumes/CEFBuild/cef/cef150_255` | `chromium/` 29 GB after fetch + `gclient runhooks`; `chrome/VERSION` = **150.0.7871.255**; `src/cef` = **`7d50c1cab`** |
+| W-29b LiteRT LFS 503 | **not hit**: 0 `lfs`/`503`/`smudge` lines in either log, and **no `gclient revert` ran** (fresh tree). Consistent with Windows' prediction |
+| Beta.4 `.187` tree | untouched; its `binary_distrib/` (150.0.43, `g9ccef04`) is still there |
+
+## §2 — M3 (Tier-1 build, from scratch) — 📏 measured
+
+| | Value |
+|---|---|
+| Run | `m3_build.sh` = `build_hodos_cef_mac.sh`'s exact automate-git flags (`--force-cef-update --force-build --no-chromium-history --no-depot-tools-update --minimal-distrib --client-distrib --no-debug-build --arm64-build`), `HODOS_FARBLING=1`, same `GN_DEFINES` (`is_official_build=true proprietary_codecs=true ffmpeg_branding=Chrome chrome_pgo_phase=0`). **14:24:10 → 19:23:11, exit 0 (≈ 5 h 0 min)** incl. ~8 min of distrib packaging |
+| Host | 8-core M1 / 16 GB, Xcode 26.5, SDK 26.5; **no sleep events** during the run (`pmset -g log`) |
+| Compile | siso **58,598 steps**; `.siso_failed_targets` **absent**; `siso_result.json` = `{}` |
+| **Patches** | `121 patches total (120 applied, 1 skipped, 0 failed)`. The skip is upstream's `vs_toolchain` patch (`already applied`), not ours. ⭐ **By name**: `Apply hodos_farble_{session_cache,canvas2d,webgl,webaudio,navigator,offscreen_canvas,worker_key}.patch`: **all 7**. `patch/patches/hodos_*` identical between `9ccef044f` and `7d50c1cab` (`git diff --stat 9ccef044f 7d50c1cab -- patch/` touches 11 upstream patches only) |
+| Patch content (P4f checks) | `hodos_session_cache.{h,cc}` exist · `PerturbBytes` in `analyser_node.cc` = 5 · `Hodos` in `offscreen_canvas.cc` = 2 · `hodos` in `global_scope_creation_params.h` = 4 (5 case-insensitive; **identical lines** to the P4f `.187` tree) · `HodosFarbleSnapshot` in `html_canvas_element.cc` = 3 |
+| Farbling in the **dSYM** (6.7 GB; the stripped framework cannot show these) | `PerturbAudioSamples` 3 · `FarbleDeviceMemory` 4 · `FarbleHardwareConcurrency` 3 · `AudioFudgeFactor` 3 (positive control: proves the grep read the file). Same counts as the P4f build |
+| `CEF_VERSION` (`include/cef_version.h`) | **`150.0.48-7871.3582+g7d50c1c+chromium-150.0.7871.255`**. Properly decorated (not `0.0-HEAD`) |
+| Framework | 230,786,624 B, dylib compat/current **`1500.0.48`**, `vtool`: **minos 12.0, sdk 26.5** ⇒ floor stays 12.0 |
+| **V8 (the fix)** | string `15.0.245.40` present in the new framework (1 hit), `15.0.245.21` absent. **Negative control:** the beta.4 framework (`150.0.43…g9ccef04…187`) has `.21` = 1, `.40` = 0 ✅. ⚠️ This is a **binary-string** check; the P5 row (V8 on `chrome://version` in a **tab**) still needs a running browser, see §4 |
+
+## §3 — Outputs (`…/cef150_255/chromium/src/cef/binary_distrib/`), 📏 bytes + sha256
+
+| File | Bytes | sha256 |
+|---|---|---|
+| `cef_binary_150.0.48-7871.3582+g7d50c1c+chromium-150.0.7871.255_macosarm64.tar.bz2` (full) | 127,475,523 | `968b931195cbd66f0c9f3fe939c118683fa1b0e8b48b1ad60f6c5932f735b769` |
+| `…_macosarm64_minimal.tar.bz2` | 126,329,852 | — |
+| `…_macosarm64_client.tar.bz2` | 126,871,459 | — |
+| `…_macosarm64_release_symbols.tar.bz2` | 2,050,917,191 | — |
+
+⚠️ These are CEF's raw distribs, **not yet the release asset**. M4 = build `cef-binaries-macos-150.0.48-g7d50c1c.tar.bz2` the same way as the beta.4 macOS asset (full distrib, **excluding** the local `build/` wrapper), then report name + sha256 + size. **No upload**: that's the owner stop in step 3.
+
+## §4 — Next on macOS
+
+1. **M4**: package the asset as above; report.
+2. **M5 rows that need no CI**: stage into `cef-binaries/`, rebuild wrapper + shell (+ helper copy + re-sign), then V8 on `chrome://version` **in a tab**, farbling harness incl. `--negative-control`, codec `canPlayType` + YouTube, minimal basket. The rows that need the **downloaded** artifact (engine identity) and the update path wait for steps 3–4 / promote.
+
+🍎 All numbers are this host's. **Do NOT inherit** the timings for Windows.
+
+---
+
 # 📋 ROUND M-29a (**macOS**) — answers W-29a §7 · M0 ✅ · M1 measured · **M2 fetch STARTED 2026-09-29 09:12 from pin `7d50c1cab`, in a NEW tree** · 2 plan rows wrong for macOS · 👤 nothing needs the owner yet
 
 ## §0 — TL;DR
