@@ -181,6 +181,12 @@ Assume P1 shipped and a user lost money or trust. Why?
 | `2265014`, `dc3881a` | A **pending** settlement is retried, with tests for the settlements the retry must leave alone | Their "leave alone" list is the counterpart to our "unknown ⇒ change nothing" (`P1-A2c`/`A2d`). Compare the two lists |
 | `bd50414`, `e5e4fb1` | Paid paths are listed in the x402 "Bazaar" directory only when enabled | Not P1. Relevant only if the x402 adapter returns (T4-P3, beta.7) |
 
+**BRC-105 amendment, 2026-09-29** (added 2026-09-30 from the owner's morning report; spec `https://github.com/bsv-blockchain/BRCs/blob/master/payments/0105.md`, rationale in BRCs PR #285). ⚠️ Neither the spec nor the PR has been read by a T4 session yet; the claims below are the report's.
+- The amendment adds an optional 402 response header, `x-bsv-payment-known-txids`: the service lists transactions it already holds and the payer may leave them out of the payment's ancestry. The size effects are the author's measurements and belong to **B5-T4-P2** (its §8a).
+- ⭐ **For this phase, §8 item 6 of the amended spec:** if a payer omits an ancestor the service **cannot** actually resolve, the service refuses the payment **after it has been broadcast**, so the money moves, no service is given, and every retry repeats the loss. Check our ordering against it: `pay_402` mints `nosend` and `broadcast_nosend` runs only after the paid retry returns 200. That should keep us out of the case, **unless the service broadcasts the BEEF it received while refusing**. Find out whether a BRC-121 server may do that, and whether `P1-A2a`–`c` (refused vs no answer) need a row for it.
+- ⚠️ **We are a BRC-121 payer, not BRC-105.** We have no BRC-105 client (measured 2026-09-23, `TICKET_brc121_client_has_no_body_transport_for_large_beef.md`), and a grep of `rust-wallet/src`, `cef-native/{src,include}` and `frontend/src` on 2026-09-30 finds `x-bsv-payment` once: a comment in `HttpRequestInterceptor.h` about our own retry. Nothing reads `x-bsv-payment-known-txids`. So "honour the header" only arises if BRC-121 adopts it. That is the same shape as the body-transport question, which waits on our BRCs issue #261. 👤 Owner's call; note the link and do not decide it here.
+- Implementation fixes cited in the PR: ts-stack #660 (payer side), go-wallet-toolbox #1049 (service side). Unread.
+
 ## 9. Platforms
 
 | Platform | Rows that run here | Notes |

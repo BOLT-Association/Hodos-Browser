@@ -96,6 +96,16 @@ Revert the commit: the 431 arm returns to `retryable = (status == 431) || 5xx`; 
 | 7 | Evidence gathered on Windows only | §9 |
 | 8 | The 431 path's failure page promised "consolidating your coins" that T1 has not built | §2 last line; copy reviewed in A2b's T3 run |
 
+### 8a. Prior art to read at kickoff (added 2026-09-30, from the owner's morning report)
+
+⛔ **A reading assignment, not a scope change.** Log it in `../../../PRIOR_ART.md` (rule 5).
+
+**BRC-105 amendment, 2026-09-29.** Spec `https://github.com/bsv-blockchain/BRCs/blob/master/payments/0105.md`, rationale in BRCs PR #285. Unread by a T4 session; the figures are the PR author's measurements, not ours.
+- A new optional 402 response header, `x-bsv-payment-known-txids`, lists transactions the service already holds, and the payer may omit them from the payment's ancestry. The PR reports the payment header staying **flat at 594 bytes** instead of growing **302 bytes per payment**, and payers hitting a **hard stop at 13 consecutive payments** without it. ⭐ That growth is the same pressure that produces this phase's oversized-header 431.
+- ⛔ **It collides with `R-BEEFOUT`** (§3: trimming ancestry is forbidden). The amendment is a protocol-sanctioned exception to trimming, limited to txids the service has **declared** it holds. If it is ever adopted, `R-BEEFOUT` needs that exception written in, not quietly relaxed, and the amended spec's §8 item 6 failure (an omitted ancestor the service cannot resolve ⇒ refused after broadcast) becomes a `B5-T4-P1` row (its §8a).
+- ⚠️ We are a **BRC-121** payer; the header is BRC-105's. Adoption waits on the same place as body transport: our BRCs issue #261. 👤 Owner's call; this phase does not implement it.
+- Related fixes cited in the PR: ts-stack #660 (payer), go-wallet-toolbox #1049 (service). Unread.
+
 ## 9. Platforms
 
 | Platform | Rows that run here | Notes |

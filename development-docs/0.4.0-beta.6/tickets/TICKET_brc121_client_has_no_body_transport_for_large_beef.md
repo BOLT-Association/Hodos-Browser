@@ -98,4 +98,5 @@ carries it has been measured against the transport's limit."* That row already e
 - ts-stack PR #569: `https://github.com/bsv-blockchain/ts-stack/pull/569`
 - Our reading of #569: the same folder, `NOTES.md` §8
 - Our budget: `rust-wallet/src/handlers.rs`, the `P11-11-A7` comment above `large_parent_bytes()`'s 402 sibling
+- ⏳ **Related, 2026-09-30:** BRC-105 was amended 2026-09-29 (PR #285) with `x-bsv-payment-known-txids`, which lets a payer omit ancestry the service already holds. That is a second answer to the same oversized-payment problem, and it bears on what #261 should ask BRC-121 to adopt. Filed as reading in `../track-4-402-payments/phase-P2-431-path/PHASE_CONTRACT.md` §8a.
 - `../track-4-402-payments/X402_INTEGRATION.md` — the product-level record of which 402 flavour Hodos speaks

@@ -141,6 +141,14 @@ Part A and Part B land as separate commits (allow-list · globals · revoke · W
 | `18c7b54`, `67a9e8c` | Canonical BRC-100 envelopes: `status: 'success'` (not `'ok'`), integer error codes 1–255, `WERR_*` names mapped to their assigned codes so the SDK keeps the message | Belongs mainly to **B5-T1-P2 — a failure says it failed** (its §8a). Here, only as a check that the allow-list's refusal body does not add a third error shape |
 | `1fc9ddf` | A string response was treated as pre-serialised JSON and embedded as script; that path is now separate so a string is always serialised, never executed | Our C++ delivers through `escapeJsonForJs` (`JsStringEscape.h`, the F6 fix). Worth confirming every delivery site goes through it |
 
+**Added 2026-09-30 (owner's morning report): BRC-100 conformance pages at `fast.brc.dev`.** ts-stack PR #679 (`https://github.com/bsv-blockchain/ts-stack/pull/679`) fixed six conformance bugs, which it says were found by running every `fast.brc.dev` test page against BSV Browser. Neither the site nor the code has been opened here.
+- ⭐ **Inference, not verified:** the same pages could be a ready-made conformance run against Hodos, for this phase's allow-list (does a legitimate BRC-100 call still work after the list lands?) and for the harness (`../../HARNESS_DELTA.md` §4). ⚠️ Before any of it counts as evidence, apply the negative-control rule: show a page goes red when the call it tests is broken, and that it drove a **tab**, not an overlay.
+- Fixes in #679 that look closest to our paths, per its PR body. No beta.6 phase owns discovery or certificates, so they are recorded here to be routed at kickoff:
+  - `discoverBy*` rejected certifier descriptions outside BRC-100's 5–50 byte limit, and the default SocialCert and Metanet Trust Services descriptions exceed it
+  - `discoverByIdentityKey` / `discoverByAttributes` ignored `limit` and `offset`
+  - `acquireCertificate` issuance results were always rejected, because the fields come back encrypted
+  - the no-send abort-ownership fix: filed at `../../track-1-money-path/phase-P3-reservations-and-money-index/PHASE_CONTRACT.md` §8a
+
 ## 9. Platforms
 
 | Platform | Rows that run here | Notes |

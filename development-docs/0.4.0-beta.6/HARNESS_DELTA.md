@@ -100,6 +100,14 @@ The owner intends to expand the harness; **not now**. Three research tasks were 
 ⛔ **Research is advisory until read and decided on.** Nothing in it changes the standard by existing.
 Adopting an item is a decision recorded here with a reason, the same as lowering a baseline.
 
+### Candidate, 2026-09-30 — not adopted: `fast.brc.dev` BRC-100 conformance pages
+
+ts-stack PR #679 reports finding six conformance bugs by running every `fast.brc.dev` page against BSV
+Browser. That makes it a candidate external conformance run for Hodos, unopened so far. ⛔ It gets a
+decision recorded here like any other item. Before it can count as evidence it needs a negative control
+per page (red when the call is broken) and a subject check (a tab, not one of our overlays). Detail and
+routing: `track-5-identity-privacy/phase-P2-dapp-reachable-surface/PHASE_CONTRACT.md` §8a.
+
 ### The two items from (c) that bear on beta.5 directly
 
 | Item | Why it matters to this release |

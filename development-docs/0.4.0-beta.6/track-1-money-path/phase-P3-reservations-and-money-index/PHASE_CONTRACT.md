@@ -124,6 +124,15 @@ Every path that spends the wallet's money picks coins from **one table the walle
 | A restore from an old backup yields an empty index because `import_entities` never triggers the rebuild | `P3-A12` |
 | The pill stops firing because `create_action_internal`'s success path moved | `P3-A15` |
 
+### 8a. Prior art to read at kickoff (added 2026-09-30, from the owner's morning report)
+
+⛔ **A reading assignment, not a scope change.** Log it in `../../../PRIOR_ART.md` (rule 5).
+
+**ts-stack PR #679** (`https://github.com/bsv-blockchain/ts-stack/pull/679`) and follow-up **#690** (`…/pull/690`). PR bodies read by the morning report only; code unread. Per #679, a **no-send action could not be released or aborted after signing**. Now **only the app that created it** may abort it, by txid or by its reference, and #690 drops that ownership once the action is broadcast.
+- ⭐ Check against the seam in §2: `release_unbroadcast_transaction` is called by `abort_action`, `pay_402`, `release_nosend` and `resolution_failed_response`. Can a signed `nosend` row be released today? And can a site other than the one that created it abort it (`/abortAction` and `/wallet/release-nosend` reachability is **B5-T5-P2**'s list)?
+- wallet-toolbox is the authoritative reference (rule 5). Record whether we follow the "creator-only, until broadcast" rule and why.
+- The same PR's discovery and certificate fixes are filed at `../../track-5-identity-privacy/phase-P2-dapp-reachable-surface/PHASE_CONTRACT.md` §8a.
+
 ## 9. Platforms
 
 | Platform | Rows that run here | Notes |
