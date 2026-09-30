@@ -8,7 +8,7 @@ general (next session). Lead B still to be checked.
 **Was:** 🔴 OPEN — investigate and fix today. ⛔ **Nothing is decided about the version number or
 the release yet** (see §6).
 **Folder name is date + symptom on purpose** — not a version number, so it cannot collide with a
-planning folder the way `0.4.0-beta.4/` did. beta.5 planning is paused: `../0.4.0-beta.6/README.md`
+planning folder the way `0.4.0-beta.4/` did. beta.5 planning is paused: `../0.4.0-beta.7/README.md`
 §"▶️ RESUME HERE".
 
 ---
@@ -103,5 +103,5 @@ run writes its own log.
 - **Version for the fix release.** The next number is `v0.4.0-beta.5` — which is also the name of the
   planning folder. Options: ship the fix as beta.5 and rename planning to a **version-neutral codename**
   (so this never happens again), or rename it beta.6. Recommendation: codename.
-- Whether the **engine security refresh** (`../0.4.0-beta.6/track-0-engine/SCOPE.md`) rides with this fix
+- Whether the **engine security refresh** (`../0.4.0-beta.7/track-0-engine/SCOPE.md`) rides with this fix
   or follows it.

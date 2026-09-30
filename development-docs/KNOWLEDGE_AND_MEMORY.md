@@ -2,7 +2,7 @@
 
 **Created:** 2026-09-25, 👤 owner decision during beta.5 planning. **Version: v1.**
 **Applies to:** every agent on every machine (🪟 Windows, 🍎 macOS) and every human on the project.
-**Supersedes:** the research ticket `0.4.0-beta.6/tickets/TICKET_knowledge_and_memory_architecture.md`
+**Supersedes:** the research ticket `0.4.0-beta.7/tickets/TICKET_knowledge_and_memory_architecture.md`
 (its questions are answered or carried as open items in §6).
 
 > ⭐ **The one rule.** *If another person or agent would ever need it, it goes in the repo.* An agent's
@@ -80,5 +80,5 @@ approves changes; each change bumps the version and gets a line in §7, like `RE
 ## 7. Changelog
 
 - **v1 — 2026-09-25.** Created from the owner's decision to adopt the knowledge-and-memory research
-  ticket as a shared policy for both machines, announced to macOS in `0.4.0-beta.6/MAC_RELAY_BETA5.md`
+  ticket as a shared policy for both machines, announced to macOS in `0.4.0-beta.7/MAC_RELAY_BETA5.md`
   round `W-25a`.

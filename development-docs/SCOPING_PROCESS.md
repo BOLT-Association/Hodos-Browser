@@ -2,7 +2,7 @@
 
 **Opened:** 2026-08-29. **Status:** 🚧 **FIRST CUT.** The four stages and their exit conditions are
 settled; the adoption list in §7 is proposed and awaits owner decision.
-**Feedback loop:** `0.4.0-beta.6/` is the first release run through this. Amend from what actually
+**Feedback loop:** `0.4.0-beta.7/` is the first release run through this. Amend from what actually
 happens there, not from what should have worked.
 
 > **What this is.** A reusable procedure for scoping a sprint or sub-sprint before implementation.
@@ -197,7 +197,7 @@ overrides the other, and this document never lowers a harness standard.**
 ## 5. Research inputs
 
 Three research tasks were dispatched 2026-08-29 to feed this process. Outputs live in
-`0.4.0-beta.6/research/`.
+`0.4.0-beta.7/research/`.
 
 | Task | Output | Status |
 |---|---|---|
@@ -365,7 +365,7 @@ WebKit is LGPL/BSD. Same standing rule as the `go-private-backup-cache` review �
 ⭐ **Consequence for stage 2 (Telescope):** a question that needs prior art is a **research task**, and
 the telescope output must say so and give the reading list. It must **not** be written up as a
 two-option decision for the owner. That mistake was made and corrected on 2026-08-30 — see
-`0.4.0-beta.6/README.md` §"Research questions owed".
+`0.4.0-beta.7/README.md` §"Research questions owed".
 
 ### 7c-ii. Product intent vs project intent — ✅ **ADOPTED 2026-08-30** *(owner, 2026-08-30)*
 

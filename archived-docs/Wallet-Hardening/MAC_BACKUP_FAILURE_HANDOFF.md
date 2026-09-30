@@ -16,8 +16,8 @@ This lines up with a known event: the **Backup double-spend cascade incident of 
 - Related commits: `8dd3d2c` (incident report), `3a6fd2e` (three backup pipeline bugs from the incident),
   `9ba106b` (disabled TaskValidateUtxos + reconcile — false external-spend bug), `1fa686f` (chain-truth
   hardening: backup adoption / double-spend verification).
-- Backup system reference: `development-docs/0.4.0-beta.6/track-3-backup-sync/ONCHAIN_BACKUP_SYSTEM.md`,
-  `development-docs/0.4.0-beta.6/track-3-backup-sync/research/ONCHAIN_BACKUP_REVIEW.md`.
+- Backup system reference: `development-docs/0.4.0-beta.7/track-3-backup-sync/ONCHAIN_BACKUP_SYSTEM.md`,
+  `development-docs/0.4.0-beta.7/track-3-backup-sync/research/ONCHAIN_BACKUP_REVIEW.md`.
 
 ## The likely diagnosis (owner's insight — confirm it)
 

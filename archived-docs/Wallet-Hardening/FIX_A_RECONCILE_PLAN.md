@@ -6,9 +6,9 @@
 > spent the phantom, and — if the successor's change pays a wallet-owned address —
 > records the real UTXO and marks the phantom spent, so backups can fund again.
 >
-> Companion: [`ONCHAIN_BACKUP_REVIEW.md`](../../development-docs/0.4.0-beta.6/track-3-backup-sync/research/ONCHAIN_BACKUP_REVIEW.md) (§1 the field
+> Companion: [`ONCHAIN_BACKUP_REVIEW.md`](../../development-docs/0.4.0-beta.7/track-3-backup-sync/research/ONCHAIN_BACKUP_REVIEW.md) (§1 the field
 > bug, §5 why `/wallet/sync` can't do this) and
-> [`FIX_B_CRASH_SAFETY_SHUTDOWN_PLAN.md`](../../development-docs/0.4.0-beta.6/track-3-backup-sync/research/FIX_B_CRASH_SAFETY_SHUTDOWN_PLAN.md)
+> [`FIX_B_CRASH_SAFETY_SHUTDOWN_PLAN.md`](../../development-docs/0.4.0-beta.7/track-3-backup-sync/research/FIX_B_CRASH_SAFETY_SHUTDOWN_PLAN.md)
 > (prevents *new* divergences; Fix A heals *existing* ones).
 
 **Status:** design complete, hardened against adversarial review. NOT implemented.

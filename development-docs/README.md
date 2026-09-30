@@ -4,25 +4,25 @@ This folder contains feature research, design exploration, and implementation gu
 
 ⛔ **The root holds only living, cross-release documents** — `README.md`, `RELEASE_CYCLE.md`,
 `SCOPING_PROCESS.md`, `PRIOR_ART.md`, `MACOS_CATCHUP_PLAYBOOK.md`, `KNOWLEDGE_AND_MEMORY.md`. Release-specific work lives in a
-release folder (`0.4.0-beta.6/` is current — planned as beta.5 until the 2026-09-27 rename; intake for the next one is `0.4.0-beta.7/`); finished work lives in `archived-docs/`.
+release folder (`0.4.0-beta.7/` is current — planned as beta.5 until the 2026-09-27 rename; intake for the next one is `0.4.0-beta.8/`); finished work lives in `archived-docs/`.
 
 ## Where things moved (2026-09-25)
 
 | Was | Now |
 |---|---|
-| `Final-MVP-Sprint/` | `archived-docs/Final-MVP-Sprint/` — backup lessons in `0.4.0-beta.6/track-3-backup-sync/BACKUP_HISTORY_OVERVIEW.md` |
-| `Wallet-Hardening/` | `archived-docs/Wallet-Hardening/`, except three docs the backup plan cites → `0.4.0-beta.6/track-3-backup-sync/research/` |
+| `Final-MVP-Sprint/` | `archived-docs/Final-MVP-Sprint/` — backup lessons in `0.4.0-beta.7/track-3-backup-sync/BACKUP_HISTORY_OVERVIEW.md` |
+| `Wallet-Hardening/` | `archived-docs/Wallet-Hardening/`, except three docs the backup plan cites → `0.4.0-beta.7/track-3-backup-sync/research/` |
 | `Dolphin Milk + Edwin Integration/` | `Future-Features/Dolphin Milk + Edwin Integration/` |
-| `0.4.0-beta.6/track-3-opns-naming/` | `Future-Features/Decentralized-Naming/OPNS_TRACK_SCOPE_beta5_deferred.md` — OpNS is out of beta.5 |
-| 16 open tickets in `0.4.0-beta.3/` | `0.4.0-beta.6/tickets/` |
+| `0.4.0-beta.7/track-3-opns-naming/` | `Future-Features/Decentralized-Naming/OPNS_TRACK_SCOPE_beta5_deferred.md` — OpNS is out of beta.5 |
+| 16 open tickets in `0.4.0-beta.3/` | `0.4.0-beta.7/tickets/` |
 
 ## Where things moved (2026-09-24)
 
 | Was (root) | Now |
 |---|---|
-| `0.4.0-beta.4/` (the next-release plan) | **`0.4.0-beta.6/`** — the beta.4 version was spent by a hotfix; see that README |
-| `X402_INTEGRATION.md`, `ONCHAIN_BACKUP_SYSTEM.md` | `0.4.0-beta.6/` — inputs to this cycle's tracks |
-| six loose `TICKET_*.md` (BRC-121 remint, debug-log filtering, knowledge architecture, screenshots in history, profile-lock message, reservation ownership) | `0.4.0-beta.6/tickets/` |
+| `0.4.0-beta.4/` (the next-release plan) | **`0.4.0-beta.7/`** — the beta.4 version was spent by a hotfix; see that README |
+| `X402_INTEGRATION.md`, `ONCHAIN_BACKUP_SYSTEM.md` | `0.4.0-beta.7/` — inputs to this cycle's tracks |
+| six loose `TICKET_*.md` (BRC-121 remint, debug-log filtering, knowledge architecture, screenshots in history, profile-lock message, reservation ownership) | `0.4.0-beta.7/tickets/` |
 | `TICKET_farbling_constant_seed_shipped.md` | `archived-docs/tickets/` — **closed with evidence** first |
 | `QR_SCAN_*.md` ×3, `AUDIT_SCOPE.md`, `FUTURE_AUTO_APPROVE_ENGINE_ARCHITECTURE.md` | `archived-docs/` |
 | `MACOS_SPRINT_HANDOVER_20260501.md` | `archived-docs/Mac-port/` — superseded by the playbook |
@@ -38,7 +38,7 @@ Two pieces were split out and are live:
 
 | Topic | Now lives at |
 |---|---|
-| 1Sat Ordinals + BSV21 | **`development-docs/0.4.0-beta.6/track-2-1sat-ordinals/`** — now beta.5, Track 2 (moved 2026-08-29 as "beta.4 sprint 2"; renamed 2026-09-24). Read `BSV-Tokens/` first; the trust ratings are in that README. |
+| 1Sat Ordinals + BSV21 | **`development-docs/0.4.0-beta.7/track-2-1sat-ordinals/`** — now beta.5, Track 2 (moved 2026-08-29 as "beta.4 sprint 2"; renamed 2026-09-24). Read `BSV-Tokens/` first; the trust ratings are in that README. |
 | Demo example sites | **`demos/README.md`** (repo root) — runnable code, not docs |
 | Demo *videos* | **`Marston Enterprises/Hodos/Marketing/Videos/README.md`** — outside this repo. No video files in this repo, ever. |
 

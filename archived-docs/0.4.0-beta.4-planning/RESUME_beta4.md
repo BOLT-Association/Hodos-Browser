@@ -20,8 +20,8 @@ written.** The next stage is the **microscope pass**, and it should not start un
 ⛔ **Do not re-scope.** The order and the three kickoff decisions are settled (§4 below).
 
 ```
-1. Read  0.4.0-beta.6/README.md         ← scope, the four tracks, decisions on record
-2. Read  0.4.0-beta.6/TELESCOPE.md      ← the cross-track edges + how to split the microscope work
+1. Read  0.4.0-beta.7/README.md         ← scope, the four tracks, decisions on record
+2. Read  0.4.0-beta.7/TELESCOPE.md      ← the cross-track edges + how to split the microscope work
 3. Then run the FIRST MICROSCOPE STEP — described in plain terms in §3 below
 ```
 
@@ -127,7 +127,7 @@ development-docs/
 │   ├── HARNESS.md              ← the standard beta.4 inherits (do not fork)
 │   ├── REGRESSION_SET.md       ← the standing checks beta.4 inherits
 │   └── TICKET_token_outputs_destroyed_by_dust_paths.md   ← the beta.3 floor ships from here
-└── 0.4.0-beta.6/
+└── 0.4.0-beta.7/
     ├── RESUME_beta4.md         ← you are here
     ├── README.md               ← scope, four tracks, decisions, verified code findings
     ├── RELEASE_PLAN.md          ← track + candidate phase breakdown, no phase detail
@@ -149,7 +149,7 @@ Also: root `CLAUDE.md` — now carries the five working rules and points at `SCO
 ## 7. Paste this to restart
 
 ```
-Read development-docs/0.4.0-beta.6/RESUME_beta4.md in full, then README.md and TELESCOPE.md.
+Read development-docs/0.4.0-beta.7/RESUME_beta4.md in full, then README.md and TELESCOPE.md.
 
 beta.3 has shipped. Start the beta.4 microscope pass with M0 — the edge session described in
 RESUME §3. M0 owns two RESEARCH questions and nothing else:

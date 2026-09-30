@@ -834,7 +834,7 @@ to promote.** There is no late window. The practical rule:
   rebuild *plus* re-seeding, not just a rebuild.
 
 *(Written 2026-08-17, from the `minimumSystemVersion` finding — see
-`development-docs/0.4.0-beta.6/tickets/TICKET_appcast_missing_minimum_system_version.md`. That defect was
+`development-docs/0.4.0-beta.7/tickets/TICKET_appcast_missing_minimum_system_version.md`. That defect was
 caught while beta.2 was still an unpromoted draft, which is the only reason "fix it in the next
 build" was available.)*
 

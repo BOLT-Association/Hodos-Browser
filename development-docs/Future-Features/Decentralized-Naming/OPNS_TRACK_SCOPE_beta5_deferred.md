@@ -1,7 +1,7 @@
 # Track 3 — OpNS unique-name system
 
 > ⛔ **DEFERRED — moved out of the beta.5 release, 2026-09-25 (owner decision).** This was
-> `development-docs/0.4.0-beta.6/track-3-opns-naming/README.md` (planned as beta.4 Track 3). 👤 Owner:
+> `development-docs/0.4.0-beta.7/track-3-opns-naming/README.md` (planned as beta.4 Track 3). 👤 Owner:
 > OpNS is R&D too large for the cycle, and a different naming system may be researched and proven
 > instead. Kept here, beside the older naming research, as the scope record. Relative links below
 > were written for the old location and may not resolve.
