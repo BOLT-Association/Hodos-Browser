@@ -9,6 +9,40 @@
 
 ---
 
+# 📋 ROUND M-30a (**macOS**) — 📦 **M4 DONE: macOS asset packaged and verified locally. ⛔ NOT uploaded: waiting on 👤 owner OK (step 3).**
+
+## §1 — The asset (📏 2026-09-30)
+
+| | Value |
+|---|---|
+| Name | **`cef-binaries-macos-150.0.48-g7d50c1c.tar.bz2`** (matches `release.yml`'s regex `^cef-binaries-macos-([0-9][0-9.]*)-(g[0-9a-f]+)\.tar\.bz2$`) |
+| Size | **127,555,602 B** |
+| sha256 | `fd0f7837382fdbaf190598d9e9d159b5beb5c19d8a0de17a3b596014afe22820` |
+| md5 (what CI's download step logs) | `80c478fcfae9271e8c76994b1e90d90c` |
+| Local path | `/Volumes/CEFBuild/artifacts/pkg_7d50c1c/` |
+| Built how | same recipe as beta.4's `…150.0.43-g9ccef04`: `ditto` the **full** distrib (`cef_binary_150.0.48-7871.3582+g7d50c1c+chromium-150.0.7871.255_macosarm64`, not `_minimal`) to `cef-binaries/`, then `tar -cjf <name> cef-binaries/`. **No `build/` wrapper** in it |
+
+## §2 — Verified out of the tarball (fresh extract, not the source dir)
+
+| Check | Result |
+|---|---|
+| Layout vs the beta.4 asset | top-level entries **identical**; **1,638** entries in both |
+| `release.yml` engine assertion, run locally with its exact regex + `sed` against the extracted `include/cef_version.h` | **PASS**: `150.0.48-7871.3582+g7d50c1c+chromium-150.0.7871.255` |
+| ⛔ Negative control: same tarball, `CEF_ASSET` = beta.4's name `…150.0.43-g9ccef04…` | **FAIL (mismatch)**, as it must |
+| Framework md5, extracted vs build output | identical, `a931e9371b86470f00585dd3e88029cf`; whole tree `diff -rq` identical |
+| V8 `15.0.245.40` in the extracted framework | present · `vtool` minos **12.0** |
+
+## §3 — What's next and who
+
+- 👤 **Owner stop (step 3): upload.** When Windows queues it, the command is:
+  `gh release upload cef-binaries /Volumes/CEFBuild/artifacts/pkg_7d50c1c/cef-binaries-macos-150.0.48-g7d50c1c.tar.bz2 --repo Hodos-Browser/Hodos-Browser` (**never `--clobber`**; new name). Mac can run it on the owner's word; afterwards: download it back and compare md5.
+- 🪟 Windows: the `CEF_ASSET` bump (both arms, one commit) stays yours, after **both** assets are up (0.4.0 FF7 rule: never a half-swapped `release.yml`).
+- 🍎 Mac meanwhile: M5 local rows (stage into `cef-binaries/`, rebuild wrapper + shell + helper copy + re-sign, V8 in a **tab**, farbling harness incl. `--negative-control`, codecs, basket). No owner time.
+
+🍎 Host-specific. **Do NOT inherit** sizes/hashes for Windows.
+
+---
+
 # 📋 ROUND M-29b (**macOS**) — ✅ **M2 + M3 DONE: macOS engine `150.0.48-7871.3582+g7d50c1c+chromium-150.0.7871.255` built, all 7 Hodos patches applied by name, V8 `15.0.245.40` in the binary.** M4 (package for upload) next · 👤 nothing needs the owner yet
 
 ## §1 — M2 (fresh no-history `src` fetch) — 📏 measured
