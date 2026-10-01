@@ -8,8 +8,10 @@
 //! 1. POST to overlay lookup with `service: "ls_identity"`, `query: { identityKey, certifiers }`
 //! 2. Parse BEEF outputs from response
 //! 3. Decode PushDrop script to extract certificate JSON
-//! 4. Decrypt publicly-revealed fields using "anyone" key (privkey = 0x01)
-//! 5. Map certificate type to name/avatar fields
+//! 4. **Check the certificate** (beta.6 P4): signed by its certifier, the certifier is
+//!    one we trust, and — when resolving a key — its subject IS that key
+//! 5. Decrypt publicly-revealed fields using "anyone" key (privkey = 0x01)
+//! 6. Map certificate type to name/avatar fields
 //!
 //! Resolution is best-effort — never blocks sending. Returns None on any failure.
 
@@ -35,6 +37,10 @@ const CACHE_TTL_SECS: u64 = 600;
 /// Trusted certifier public keys
 const CERTIFIER_METANET: &str = "03daf815fe38f83da0ad83b5bedc520aa488aef5cbb93a93c67a7fe60406cbffe8";
 const CERTIFIER_SOCIALCERT: &str = "02cf6cdf466951d8dfc9e7c9367511d0007ed6fba35ed42d425cc412fd6cfd4a17";
+
+/// The certifiers whose certificates name a payment recipient. The overlay query asks
+/// for these, but a lookup host can return anything — so the answer is checked too.
+const TRUSTED_CERTIFIERS: [&str; 2] = [CERTIFIER_METANET, CERTIFIER_SOCIALCERT];
 
 /// Certificate type IDs (base64-encoded)
 const TYPE_TWITTER: &str = "vdDWvftf1H+5+ZprUw123kjHlywH+v20aPQTuXgMpNc=";
@@ -169,7 +175,7 @@ impl IdentityResolver {
             "service": "ls_identity",
             "query": {
                 "attributes": { "any": query },
-                "certifiers": [CERTIFIER_METANET, CERTIFIER_SOCIALCERT],
+                "certifiers": TRUSTED_CERTIFIERS,
                 "limit": limit
             }
         });
@@ -268,8 +274,7 @@ impl IdentityResolver {
         let cert: serde_json::Value = serde_json::from_str(&cert_json_str).ok()?;
 
         // Extract the subject (identity key) from the certificate
-        let subject = cert.get("subject").and_then(|v| v.as_str())?;
-        self.extract_identity_from_certificate(&cert, subject)
+        self.extract_identity_from_certificate(&cert, None, &TRUSTED_CERTIFIERS)
     }
 
     /// Query a single overlay endpoint for identity certificates
@@ -278,7 +283,7 @@ impl IdentityResolver {
             "service": "ls_identity",
             "query": {
                 "identityKey": identity_key,
-                "certifiers": [CERTIFIER_METANET, CERTIFIER_SOCIALCERT]
+                "certifiers": TRUSTED_CERTIFIERS
             }
         });
 
@@ -385,17 +390,31 @@ impl IdentityResolver {
             })
             .ok()?;
 
-        self.extract_identity_from_certificate(&cert, identity_key)
+        self.extract_identity_from_certificate(&cert, Some(identity_key), &TRUSTED_CERTIFIERS)
     }
 
-    /// Extract name/avatar from a BRC-52 certificate by decrypting public fields
+    /// Extract name/avatar from a BRC-52 certificate by decrypting public fields — only
+    /// once `check_certificate` has accepted it. `expected_subject` is the key being
+    /// resolved (`resolve`), or `None` for a name search, where the identity IS the
+    /// certificate's subject.
     fn extract_identity_from_certificate(
         &self,
         cert: &serde_json::Value,
-        identity_key: &str,
+        expected_subject: Option<&str>,
+        trusted_certifiers: &[&str],
     ) -> Option<ResolvedIdentity> {
+        let subject = match check_certificate(cert, expected_subject, trusted_certifiers) {
+            Ok(subject) => subject,
+            Err(e) => {
+                // debug, not warn: the text names the key being paid, and a hostile host
+                // can produce one per keystroke (adversarial review).
+                debug!("IdentityResolver: certificate refused: {}", e);
+                return None;
+            }
+        };
+        let identity_key = subject.as_str();
+        let subject = identity_key;
         let cert_type = cert.get("type").and_then(|v| v.as_str()).unwrap_or("");
-        let subject = cert.get("subject").and_then(|v| v.as_str()).unwrap_or("");
         let certifier = cert.get("certifier").and_then(|v| v.as_str()).unwrap_or("");
         let serial_number = cert.get("serialNumber").and_then(|v| v.as_str());
 
@@ -655,6 +674,48 @@ impl IdentityResolver {
 }
 
 /// Map certifier pubkey to human-readable name
+/// beta.6 P4 (TSA-077 / -283, 5vmp F8d). Whether a certificate from an overlay host may
+/// put a name next to a key in Send. Returns the subject (lowercase hex).
+///
+/// ⛔ Before this, any certificate a lookup host returned was decrypted and shown: an
+/// unsigned or self-made one, one from any certifier, and — in `resolve` — one about
+/// a **different** key, displayed as the name of the key the user typed.
+///
+/// 1. the certifier is one we trust (`TRUSTED_CERTIFIERS`);
+/// 2. the certifier's BRC-52 signature verifies (`certificate::verifier`, the same check
+///    `acquireCertificate` uses, keyed by the original base64 type/serial);
+/// 3. when resolving a key, the subject is that key.
+///
+/// ⭐ Prior art: wallet-toolbox `identityUtils.ts` (post-advisory) does these three, plus
+/// two that prove the **subject** chose to publish (the PushDrop locking key and field
+/// signature). Those do not bind a name to a key and are not done here; revocation
+/// and chain evidence are beta.7 T5.
+fn check_certificate(
+    cert: &serde_json::Value,
+    expected_subject: Option<&str>,
+    trusted_certifiers: &[&str],
+) -> Result<String, String> {
+    let certifier = cert.get("certifier").and_then(|v| v.as_str()).unwrap_or("").to_lowercase();
+    if !trusted_certifiers.iter().any(|t| t.eq_ignore_ascii_case(&certifier)) {
+        return Err(format!("certifier {} is not trusted", certifier));
+    }
+    let parsed = crate::certificate::parser::parse_certificate_from_json(cert)
+        .map_err(|e| format!("not a certificate: {:?}", e))?;
+    crate::certificate::verifier::verify_certificate_signature_with_keyid(
+        &parsed,
+        cert.get("type").and_then(|v| v.as_str()),
+        cert.get("serialNumber").and_then(|v| v.as_str()),
+    )
+    .map_err(|e| format!("certifier signature does not verify: {:?}", e))?;
+    let subject = hex::encode(&parsed.subject);
+    if let Some(expected) = expected_subject {
+        if !expected.eq_ignore_ascii_case(&subject) {
+            return Err(format!("certificate is about {}, not the key asked about ({})", subject, expected));
+        }
+    }
+    Ok(subject)
+}
+
 fn certifier_name(certifier_hex: &str) -> &str {
     match certifier_hex {
         CERTIFIER_METANET => "Metanet Trust",
@@ -666,6 +727,116 @@ fn certifier_name(certifier_hex: &str) -> &str {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    // ------------------------------------------------------------------------
+    // beta.6 P4 — a name is shown for a key only from a certificate a trusted
+    // certifier signed, about that key. Vectors made by @bsv/sdk (the reference
+    // implementation), never by our code: tests/fixtures/identity_cert_vectors.json,
+    // generated by development-docs/0.4.0-beta.6/g2-validator/gen_identity_cert_vectors.mjs.
+    // ------------------------------------------------------------------------
+
+    fn vectors() -> serde_json::Value {
+        serde_json::from_str(include_str!("../tests/fixtures/identity_cert_vectors.json")).unwrap()
+    }
+
+    /// Resolve `case` as the production code does, with the vectors' certifier as the
+    /// trusted one (the real trusted certifiers' private keys are not ours to sign with).
+    fn resolve_case(v: &serde_json::Value, case: &str, asked: Option<&str>) -> Option<ResolvedIdentity> {
+        let trusted = v["trusted_certifier"].as_str().unwrap();
+        IdentityResolver::new().extract_identity_from_certificate(&v["cases"][case]["cert"], asked, &[trusted])
+    }
+
+    #[test]
+    fn p4_a1_genuine_certificate_names_its_subject() {
+        let v = vectors();
+        let subject = v["subject"].as_str().unwrap();
+        for asked in [Some(subject), Some(&subject.to_uppercase()[..]), None] {
+            let r = resolve_case(&v, "genuine", asked).unwrap_or_else(|| panic!("genuine certificate refused (asked {:?})", asked));
+            assert_eq!((r.name.as_str(), r.identity_key.as_str()), (v["expected_name"].as_str().unwrap(), subject));
+        }
+    }
+
+    #[test]
+    fn p4_a2_unsigned_untrusted_or_forged_certificates_name_nobody() {
+        let v = vectors();
+        let subject = v["subject"].as_str().unwrap();
+        let trusted = v["trusted_certifier"].as_str().unwrap();
+        // Each of these decrypts to a name in the SDK; none may be shown, and each must be
+        // refused by the check named here. Every case is checked before failing.
+        let mut leaks = Vec::new();
+        for (case, why) in [("untrusted_certifier", "is not trusted"), ("forged_certifier", "does not verify"),
+                            ("bad_signature", "does not verify"), ("field_swap", "does not verify")] {
+            for asked in [Some(subject), None] {
+                match check_certificate(&v["cases"][case]["cert"], asked, &[trusted]) {
+                    Err(e) if e.contains(why) => {}
+                    other => leaks.push(format!("{} (asked {:?}): {:?}", case, asked, other)),
+                }
+                if resolve_case(&v, case, asked).is_some() {
+                    leaks.push(format!("{} shown as a name (asked {:?})", case, asked));
+                }
+            }
+        }
+        assert!(leaks.is_empty(), "refused for the wrong reason or shown: {:#?}", leaks);
+    }
+
+    #[test]
+    fn p4_a3_certificate_about_another_key_is_not_that_keys_name() {
+        let v = vectors();
+        let other = v["other_key"].as_str().unwrap();
+        assert!(resolve_case(&v, "genuine", Some(other)).is_none(),
+                "a genuine certificate about one key was shown as the name of the key asked about");
+    }
+
+    /// `P4-A5` (live, network): real certificates from the identity overlay still pass
+    /// the new check. Without this, a verifier that refused everything would pass every
+    /// T1 row and blank every name in Send. Run: `cargo test -- --ignored p4_a5`.
+    #[tokio::test]
+    #[ignore]
+    async fn p4_a5_live_overlay_certificates_still_resolve() {
+        let resolver = IdentityResolver::new();
+        let mut shown = 0;
+        for q in ["john", "alex", "bsv"] {
+            let found = resolver.search(q, 10).await;
+            println!("P4-A5 live: query {:?} -> {} verified identities: {:?}", q, found.len(),
+                     found.iter().map(|r| r.source.as_str()).collect::<Vec<_>>());
+            shown += found.len();
+        }
+        assert!(shown > 0, "no live overlay certificate passed the check");
+
+        // Every raw certificate the overlay returns, and why any is refused.
+        let (mut ok, mut refused) = (0, Vec::new());
+        for q in ["john", "bsv", "a"] {
+            let body = serde_json::json!({ "service": "ls_identity",
+                "query": { "attributes": { "any": q }, "certifiers": TRUSTED_CERTIFIERS, "limit": 25 } });
+            let json: serde_json::Value = resolver.http_client.post(STATIC_OVERLAY_ENDPOINTS[0])
+                .json(&body).send().await.unwrap().json().await.unwrap();
+            for o in json["outputs"].as_array().cloned().unwrap_or_default() {
+                let bytes: Vec<u8> = o["beef"].as_array().map(|a| a.iter().filter_map(|v| v.as_u64().map(|n| n as u8)).collect())
+                    .unwrap_or_else(|| { use base64::Engine as _; base64::engine::general_purpose::STANDARD.decode(o["beef"].as_str().unwrap_or("")).unwrap_or_default() });
+                let Ok(beef) = Beef::from_bytes(&bytes) else { refused.push("beef".to_string()); continue };
+                let tx = ParsedTransaction::from_bytes(beef.main_transaction().unwrap()).unwrap();
+                let script = &tx.outputs[o["outputIndex"].as_u64().unwrap() as usize].script;
+                let cert: serde_json::Value = serde_json::from_slice(&pushdrop::decode(script).unwrap().fields[0]).unwrap();
+                match check_certificate(&cert, None, &TRUSTED_CERTIFIERS) {
+                    Ok(_) => ok += 1,
+                    Err(e) => refused.push(e),
+                }
+            }
+        }
+        println!("P4-A5 live raw: {} certificates pass, {} refused: {:?}", ok, refused.len(), refused);
+        assert!(refused.is_empty(), "real overlay certificates refused: {:?}", refused);
+    }
+
+    #[test]
+    fn p4_a4_production_trusts_exactly_the_two_known_certifiers() {
+        assert_eq!(TRUSTED_CERTIFIERS, [CERTIFIER_METANET, CERTIFIER_SOCIALCERT]);
+        // The vectors' certifier is not one of them, so a genuine-looking test certificate
+        // never passes the production list.
+        let v = vectors();
+        assert!(IdentityResolver::new()
+            .extract_identity_from_certificate(&v["cases"]["genuine"]["cert"], None, &TRUSTED_CERTIFIERS)
+            .is_none());
+    }
 
     #[test]
     fn test_certifier_name_metanet() {
@@ -691,9 +862,9 @@ mod tests {
             "certifier": CERTIFIER_SOCIALCERT,
             "fields": {}
         });
-        // Should return None because no fields can be decrypted (dummy key),
+        // Returns None: a dummy certificate fails check_certificate (beta.6 P4),
         // but should not panic
-        let result = resolver.extract_identity_from_certificate(&cert, "02a1a1a1");
+        let result = resolver.extract_identity_from_certificate(&cert, Some("02a1a1a1"), &TRUSTED_CERTIFIERS);
         assert!(result.is_none()); // No decryptable fields with dummy key
     }
 
@@ -706,7 +877,7 @@ mod tests {
             "certifier": CERTIFIER_METANET,
             "fields": {}
         });
-        let result = resolver.extract_identity_from_certificate(&cert, "03b2b2b2");
+        let result = resolver.extract_identity_from_certificate(&cert, Some("03b2b2b2"), &TRUSTED_CERTIFIERS);
         assert!(result.is_none());
     }
 

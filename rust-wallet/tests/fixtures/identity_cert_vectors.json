@@ -1,0 +1,135 @@
+{
+  "generator": "development-docs/0.4.0-beta.6/g2-validator/gen_identity_cert_vectors.mjs",
+  "sdk": "@bsv/sdk 2.8.11",
+  "trusted_certifier": "034f355bdcb7cc0af728ef3cceb9615d90684bb5b2ca5f859ab0f0b704075871aa",
+  "subject": "023c72addb4fdf09af94f0c94d7fe92a386a7e70cf8a1d85916386bb2535c7b1b1",
+  "other_key": "032c0b7cf95324a07d05398b240174dc0c2be444d96b159aa6c7f7b1e668680991",
+  "expected_name": "alice",
+  "cases": {
+    "genuine": {
+      "cert": {
+        "type": "vdDWvftf1H+5+ZprUw123kjHlywH+v20aPQTuXgMpNc=",
+        "serialNumber": "BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc=",
+        "subject": "023c72addb4fdf09af94f0c94d7fe92a386a7e70cf8a1d85916386bb2535c7b1b1",
+        "certifier": "034f355bdcb7cc0af728ef3cceb9615d90684bb5b2ca5f859ab0f0b704075871aa",
+        "revocationOutpoint": "0000000000000000000000000000000000000000000000000000000000000000.0",
+        "fields": {
+          "userName": "hcI/LNjMzcC5D+4wieWTuzutpA8mJZM1AVrEDlxH/2hA7R5v/Sz2S6jPxPOSIOiNSDVgGg4=",
+          "profilePhoto": "s5KsledXtGEUNv916m6wg3YETR2beHI3LY5/Ldmxc+uqEQ1AHNlpv2d1UFHt2iWO+TYGrDpq3jCqan86i/AFcnIe5W4Tg4Qju4kmfPo="
+        },
+        "keyring": {
+          "userName": "WI8f+nIjHNidh1NYMEl8l+yYkx4cG+aAayU+bl1UMUtrJvDrsAC0pSVU+RK49eeYvAUtI4kyEJ8sdOn6DFtd510K6GXsNzAWy8ZHzp7T3ic=",
+          "profilePhoto": "+QhgFnTmT9G/zqLODp4aVxnZ02M50VwKsHU0ZvVOk6rtFD/nOAAUxFMZbg5ZefYkxvyyI/eKL36zNt8oNO1f5u6XvKRPcautgbVhcQecqOs="
+        },
+        "signature": "3044022019545305a890d1ea6ed9ba772d8679c8f7a060655115a4dbd227838b78a2e0ff022010bafa96357297fa3336bed92bda22031399c3f48b57f0f93cfbf47f91ffdd45"
+      },
+      "sdk": {
+        "verifies": true,
+        "decrypted": {
+          "userName": "alice",
+          "profilePhoto": "https://example.com/alice.png"
+        }
+      }
+    },
+    "field_swap": {
+      "cert": {
+        "type": "vdDWvftf1H+5+ZprUw123kjHlywH+v20aPQTuXgMpNc=",
+        "serialNumber": "BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc=",
+        "subject": "023c72addb4fdf09af94f0c94d7fe92a386a7e70cf8a1d85916386bb2535c7b1b1",
+        "certifier": "034f355bdcb7cc0af728ef3cceb9615d90684bb5b2ca5f859ab0f0b704075871aa",
+        "revocationOutpoint": "0000000000000000000000000000000000000000000000000000000000000000.0",
+        "fields": {
+          "userName": "rVMczuVmcTJ/ycs+EM0R9rBVa9UwVWIanfkvONG0C1WUXa4PRYeQIYPqOG7JY24NGme//8Q=",
+          "profilePhoto": "o6J0oyD8THPsA/uQlVFmct7qpuAVLjlHxuRFP2mij+PmEsq/CjJ5KIzDsRJ+dQXNudry0QhQDr2xROStd+lanNxd3J1qH7srhlVveN8="
+        },
+        "keyring": {
+          "userName": "iPccBodIT3jKcmMmgDd6pChH6LYlvG+cwhWCWDyPiwRImgR2UHxKaynS4Nk+RMtvdtKvjzyjYYUgwmxRoi4bvBM/6zO+bDovS1+prxOEqlY=",
+          "profilePhoto": "t9wzm/GSjZ9NTBTqh+YF8DcpfKCHXeBoSQavXz53610maZX9Vcck60UaUP4atAlWY7qdt5+27PYnDsGysMFSxSEnamiEK6FXddZTQMwTWNA="
+        },
+        "signature": "3044022019545305a890d1ea6ed9ba772d8679c8f7a060655115a4dbd227838b78a2e0ff022010bafa96357297fa3336bed92bda22031399c3f48b57f0f93cfbf47f91ffdd45"
+      },
+      "sdk": {
+        "verifies": false,
+        "decrypted": {
+          "userName": "alice",
+          "profilePhoto": "https://example.com/alice.png"
+        }
+      }
+    },
+    "untrusted_certifier": {
+      "cert": {
+        "type": "vdDWvftf1H+5+ZprUw123kjHlywH+v20aPQTuXgMpNc=",
+        "serialNumber": "BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc=",
+        "subject": "023c72addb4fdf09af94f0c94d7fe92a386a7e70cf8a1d85916386bb2535c7b1b1",
+        "certifier": "02466d7fcae563e5cb09a0d1870bb580344804617879a14949cf22285f1bae3f27",
+        "revocationOutpoint": "0000000000000000000000000000000000000000000000000000000000000000.0",
+        "fields": {
+          "userName": "rVMczuVmcTJ/ycs+EM0R9rBVa9UwVWIanfkvONG0C1WUXa4PRYeQIYPqOG7JY24NGme//8Q=",
+          "profilePhoto": "o6J0oyD8THPsA/uQlVFmct7qpuAVLjlHxuRFP2mij+PmEsq/CjJ5KIzDsRJ+dQXNudry0QhQDr2xROStd+lanNxd3J1qH7srhlVveN8="
+        },
+        "keyring": {
+          "userName": "iPccBodIT3jKcmMmgDd6pChH6LYlvG+cwhWCWDyPiwRImgR2UHxKaynS4Nk+RMtvdtKvjzyjYYUgwmxRoi4bvBM/6zO+bDovS1+prxOEqlY=",
+          "profilePhoto": "t9wzm/GSjZ9NTBTqh+YF8DcpfKCHXeBoSQavXz53610maZX9Vcck60UaUP4atAlWY7qdt5+27PYnDsGysMFSxSEnamiEK6FXddZTQMwTWNA="
+        },
+        "signature": "304502210093575b96e7abff9681bdec9543877c9d36d6be05e5e0000bf99a911ff0da9c2302203460e9dc91288d3498aa7993403a8887c8940c63eab174c7f75ec903123f160d"
+      },
+      "sdk": {
+        "verifies": true,
+        "decrypted": {
+          "userName": "alice",
+          "profilePhoto": "https://example.com/alice.png"
+        }
+      }
+    },
+    "forged_certifier": {
+      "cert": {
+        "type": "vdDWvftf1H+5+ZprUw123kjHlywH+v20aPQTuXgMpNc=",
+        "serialNumber": "BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc=",
+        "subject": "023c72addb4fdf09af94f0c94d7fe92a386a7e70cf8a1d85916386bb2535c7b1b1",
+        "certifier": "034f355bdcb7cc0af728ef3cceb9615d90684bb5b2ca5f859ab0f0b704075871aa",
+        "revocationOutpoint": "0000000000000000000000000000000000000000000000000000000000000000.0",
+        "fields": {
+          "userName": "rVMczuVmcTJ/ycs+EM0R9rBVa9UwVWIanfkvONG0C1WUXa4PRYeQIYPqOG7JY24NGme//8Q=",
+          "profilePhoto": "o6J0oyD8THPsA/uQlVFmct7qpuAVLjlHxuRFP2mij+PmEsq/CjJ5KIzDsRJ+dQXNudry0QhQDr2xROStd+lanNxd3J1qH7srhlVveN8="
+        },
+        "keyring": {
+          "userName": "iPccBodIT3jKcmMmgDd6pChH6LYlvG+cwhWCWDyPiwRImgR2UHxKaynS4Nk+RMtvdtKvjzyjYYUgwmxRoi4bvBM/6zO+bDovS1+prxOEqlY=",
+          "profilePhoto": "t9wzm/GSjZ9NTBTqh+YF8DcpfKCHXeBoSQavXz53610maZX9Vcck60UaUP4atAlWY7qdt5+27PYnDsGysMFSxSEnamiEK6FXddZTQMwTWNA="
+        },
+        "signature": "304502210093575b96e7abff9681bdec9543877c9d36d6be05e5e0000bf99a911ff0da9c2302203460e9dc91288d3498aa7993403a8887c8940c63eab174c7f75ec903123f160d"
+      },
+      "sdk": {
+        "verifies": false,
+        "decrypted": {
+          "userName": "alice",
+          "profilePhoto": "https://example.com/alice.png"
+        }
+      }
+    },
+    "bad_signature": {
+      "cert": {
+        "type": "vdDWvftf1H+5+ZprUw123kjHlywH+v20aPQTuXgMpNc=",
+        "serialNumber": "BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc=",
+        "subject": "023c72addb4fdf09af94f0c94d7fe92a386a7e70cf8a1d85916386bb2535c7b1b1",
+        "certifier": "034f355bdcb7cc0af728ef3cceb9615d90684bb5b2ca5f859ab0f0b704075871aa",
+        "revocationOutpoint": "0000000000000000000000000000000000000000000000000000000000000000.0",
+        "fields": {
+          "userName": "hcI/LNjMzcC5D+4wieWTuzutpA8mJZM1AVrEDlxH/2hA7R5v/Sz2S6jPxPOSIOiNSDVgGg4=",
+          "profilePhoto": "s5KsledXtGEUNv916m6wg3YETR2beHI3LY5/Ldmxc+uqEQ1AHNlpv2d1UFHt2iWO+TYGrDpq3jCqan86i/AFcnIe5W4Tg4Qju4kmfPo="
+        },
+        "keyring": {
+          "userName": "WI8f+nIjHNidh1NYMEl8l+yYkx4cG+aAayU+bl1UMUtrJvDrsAC0pSVU+RK49eeYvAUtI4kyEJ8sdOn6DFtd510K6GXsNzAWy8ZHzp7T3ic=",
+          "profilePhoto": "+QhgFnTmT9G/zqLODp4aVxnZ02M50VwKsHU0ZvVOk6rtFD/nOAAUxFMZbg5ZefYkxvyyI/eKL36zNt8oNO1f5u6XvKRPcautgbVhcQecqOs="
+        },
+        "signature": "3044022019545305a890d1ea6ed9ba772d8679c8f7a060655115a4dbd227838b78a2e0ff022010bafa96357297fa3336bed92bda22031399c3f48b57f0f93cfbf47f91ffdd44"
+      },
+      "sdk": {
+        "verifies": false,
+        "decrypted": {
+          "userName": "alice",
+          "profilePhoto": "https://example.com/alice.png"
+        }
+      }
+    }
+  }
+}
