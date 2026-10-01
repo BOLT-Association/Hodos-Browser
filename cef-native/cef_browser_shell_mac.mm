@@ -1603,6 +1603,17 @@ typedef CefRefPtr<CefBrowser> (^OverlayBrowserAccessor)(void);
     }
 }
 
+// Cmd+V never reaches keyDown: AppKit routes it to Edit > Paste (paste:) on the first
+// responder, and an OSR view that does not implement paste: leaves the menu item
+// disabled, so pasting a long address into the wallet panel silently did nothing.
+// Same approach as cefclient's OSR view: run the edit command in the focused frame.
+- (void)paste:(id)sender {
+    CefRefPtr<CefBrowser> wallet = SimpleHandler::GetWalletBrowser();
+    if (wallet && wallet->GetFocusedFrame()) {
+        wallet->GetFocusedFrame()->Paste();
+    }
+}
+
 @end
 
 // Custom overlay windows that can become key (required for keyboard input)
