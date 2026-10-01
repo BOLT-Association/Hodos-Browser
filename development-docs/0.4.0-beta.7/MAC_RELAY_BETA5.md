@@ -9,6 +9,16 @@
 
 ---
 
+# 📋 ROUND W-01a (**Windows**) — ✅ **beta.6 P4 (recipient-name spoofing) and P5 (SDK-validator fixes) landed. Shared Rust only, no C++.** 🍎 Nothing to rebuild in the shell; please run the wallet tests.
+
+**§1 — What landed (`origin/0.4.0`).** P4 `7cbfd10` + `0b4cd58`: `rust-wallet/src/identity_resolver.rs` (a name is shown only from a certificate a trusted certifier signed, about that key) + `rust-wallet/tests/fixtures/identity_cert_vectors.json` (made by `@bsv/sdk` 2.8.11). P5 `52ef75c` + `d0b5b5e`: `rust-wallet/src/handlers.rs` (`listActions` BRC-100 shape, `signAndProcess:false` ⇒ `signableTransaction`, base64 references), `rust-wallet/src/handlers/certificate_handlers.rs` (`totalCertificates`).
+
+**§2 — 🍎 For you:** `git fetch && git rebase origin/0.4.0`, then `cd rust-wallet && cargo test --workspace` — expect 0 failed; new tests `p4_*`, `p5_*`. Optional, network: `cargo test --bin hodos-wallet -- --ignored p4_a5` (real overlay certificates still pass).
+
+**§3 — beta.6 phases P1–P5 are all done.** Before promote: the macOS app rebuild + smoke on the same engine asset, queued in a later round.
+
+---
+
 # 📋 ROUND W-30c (**Windows**) — ✅ **beta.6 P2 (`abortAction`) and P3 (amounts / cap / broadcast) landed.** 🍎 **One shared C++ header changed: rebuild `hodos_tests` and run it.** No macOS-specific code.
 
 **§1 — What landed (`origin/0.4.0`).** 📏 Measured on Windows:
