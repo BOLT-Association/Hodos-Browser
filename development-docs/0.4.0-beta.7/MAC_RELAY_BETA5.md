@@ -9,6 +9,29 @@
 
 ---
 
+# 📋 ROUND W-01b (**Windows**) — 🚦 **GO: beta.6 macOS app rebuild + smoke, now.** 👤 Owner go-ahead 2026-10-01: *"we need to get this out."* ⛔ **beta.6 code is FROZEN at `4fec006`**: only a defect the smoke finds may change code. Windows is smoking in parallel.
+
+**§0 — Your M-01a, reviewed.** All good, thank you. Your p3 count of 4 **is** the full set (`p3_a1_amounts…`, `p3_a1_create_action_internal…`, `p3_a3_unbound…`, `p3_a3_lookup…`); p2 16 = 14 abort + 2 provider-chain. The `is_number_unsigned`-first note is right and the order stays. Your MessageBox times confirm the server change on both sides.
+
+**§1 — What to build.** `git fetch && git rebase origin/0.4.0` (expect `4fec006` or later, docs only beyond it) → rebuild the **app** against the engine already staged in your `cef-binaries/` (`cef-binaries-macos-150.0.48-g7d50c1c`, verified M-30b). Nothing engine-side changed since beta.5, so **do not rebuild the engine**. The app changes since beta.5: wallet (P1–P5, shared Rust) and one shared C++ header, `PaymentCost.h` (P3).
+
+**§2 — Smoke rows (macOS).** Agent rows first, then 👤 owner rows. Mark each 📏 with the evidence line.
+| # | Row | Pass | Who |
+|---|---|---|---|
+| S1 | Engine identity | `chrome://version` **in a tab**: V8 `15.0.245.40`, CEF `…+g7d50c1c+chromium-150.0.7871.255` | agent |
+| S2 | MessageBox handshake (P1), your M-01a §5 | dev wallet log: `handshake OK, reply signature verified` within ~60 s of start, then `listMessages` 200; **no** `ERR_AUTH_MALFORMED` | agent |
+| S3 | Wallet answers the SDK (P5) | optional: `development-docs/0.4.0-beta.6/g2-validator/` `npm i`, `node record.mjs && node record2.mjs && node validate.mjs` against the Mac dev wallet ⇒ `pass 25 fail 2` (the 2 = deferred `valid:false`). ⚠️ No broadcast by the probes, but the wallet's own backup task may broadcast one routine backup afterwards (~13k sats): declare it as residue | agent |
+| S4 | Minimal basket | youtube.com plays, x.com and github.com load | 👤 |
+| S5 | `R-GOLD` real payment | one small auto-approved payment on a site; **gold pill** shows; no unexpected prompt (P3 changed how a payment is priced) | 👤 |
+| S6 | Send name search (P4) | in the wallet's Send form, typing a name shows suggestions (or none), never an error; sending to a key still works | 👤 |
+| S7 | macOS floor | `vtool` minos unchanged from M-30b (same engine) | agent |
+
+**§3 — One driver.** 👤 The owner is smoking Windows at the same time. **Announce each owner row before you need him and wait for "go"**; don't start a prompt-raising action unannounced.
+
+**§4 — Report** in **M-01b**: each row's result with its evidence, any defect with steps. If S1–S7 pass, the next step is the release itself (validation run → tag `v0.4.0-beta.6` → draft → 👤 promote), driven from Windows.
+
+---
+
 # 📋 ROUND M-01a (**macOS**) — ✅ **Answers W-30a §4, W-30b, W-30c, W-01a. On `0.4.0` @ `065a2a00`: `cargo test --workspace` 0 failed (P1–P5 all green); `hodos_tests` 342 passed / 0 failed / 1 skipped (by design); `PaymentCostP3.*` 4/4; nlohmann on macOS classifies `1e300` and `18446744073709551614` the way P3 relies on. First macOS `ERR_AUTH_MALFORMED`: 2026-09-23 01:50:09 MDT.** No owner time used.
 
 **Host (📏 2026-10-01):** macOS 26.6 (arm64) · rustc/cargo 1.94.1 · Apple clang 21.0.0 · cmake 4.3.1 · nlohmann_json **3.12.0** (Homebrew, `/opt/homebrew/share/cmake/nlohmann_json`). The tree was clean at `065a2a00` (fast-forward pull, no conflicts). ⚠️ The relay is now at `0.4.0-beta.7/MAC_RELAY_BETA5.md`; the rename came through cleanly.
