@@ -19,3 +19,5 @@ controls). ⛔ A ticket is not work until beta.8 planning assigns it to a track.
 | `TICKET_nosend_outputs_flagged_phantom_within_seconds.md` | ⬜ UNASSIGNED | — (beta.6 G2 test; may break `noSendChange` chaining) | 2026-09-30 |
 | `TICKET_abortAction_not_bound_to_originating_site.md` | ⬜ UNASSIGNED | — (beta.6 triage (TSA-042); needs a schema change, deferred by owner) | 2026-09-30 |
 | `TICKET_messagebox_recipient_fees_unmeasured.md` | ⬜ UNASSIGNED | — (beta.6 triage (TSA-047); 🔬 research, owner: not urgent) | 2026-09-30 |
+| `TICKET_commission_rows_deleted_when_an_action_is_signed.md` | ⬜ UNASSIGNED | — (beta.6 P5 review; measured 3 rows / 636 outgoing; accounting loss, not poisoning) | 2026-09-30 |
+| `TICKET_live_reservation_placeholders_fails_open_on_poisoned_lock.md` | ⬜ UNASSIGNED | — (beta.6 P5 review; code reading) | 2026-09-30 |
