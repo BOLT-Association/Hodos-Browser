@@ -4646,10 +4646,19 @@ pub async fn create_action(
         match check_domain_approved(&http_req, db.connection(), state.current_user_id) {
             Ok(Some(perm)) => {
                 if !engine_authorized_payment {
-                    // Check per-transaction spending limit
-                    let total_sats: i64 = req.outputs.iter()
-                        .filter_map(|o| o.satoshis)
-                        .sum();
+                    // Check per-transaction spending limit. beta.6 P3: the same amount
+                    // check as create_action_internal — `.sum()` panicked on overflow in
+                    // debug builds and, in release, wrapped negative and skipped the cap.
+                    let total_sats: i64 = match validate_output_amounts(&req.outputs) {
+                        Ok(t) => t,
+                        Err(e) => {
+                            drop(db);
+                            return HttpResponse::BadRequest().json(serde_json::json!({
+                                "error": e,
+                                "code": "ERR_INVALID_OUTPUT_AMOUNT"
+                            }));
+                        }
+                    };
                     if total_sats > 0 {
                         let bsv_price = state.price_cache.get_cached()
                             .or_else(|| state.price_cache.get_stale())
@@ -4789,6 +4798,30 @@ fn extract_cert_identifiers_from_pushdrop(script_hex: &str) -> Option<(Vec<u8>, 
 /// Handles: serialization lock, UTXO selection, tx building, signing, BEEF,
 /// broadcast, change output tracking, rollback on failure.
 /// Skips domain permission check (caller is responsible).
+/// The most satoshis that can exist: 21,000,000 BSV.
+pub(crate) const MAX_SATOSHIS: i64 = 2_100_000_000_000_000;
+
+/// beta.6 P3 (`P3-A1`). Every requested output amount is a real amount of money:
+/// 0 ..= `MAX_SATOSHIS`, and so is their sum. Returns the sum. Outputs without an
+/// amount (`sendMax`) are skipped, as before.
+///
+/// ⛔ A negative output used to flow into funding arithmetic, `TxOutput` and, on
+/// `noSend`, basket rows (`total_output += sats`, unchecked `i64`), and let the sum
+/// be steered to anything — including under the spending cap.
+pub(crate) fn validate_output_amounts(outputs: &[CreateActionOutput]) -> Result<i64, String> {
+    let mut total: i64 = 0;
+    for (i, output) in outputs.iter().enumerate() {
+        let Some(sats) = output.satoshis else { continue };
+        if sats < 0 {
+            return Err(format!("Output {}: satoshis {} is negative", i, sats));
+        }
+        // Also bounds each output: one above the maximum makes the sum above it.
+        total = total.checked_add(sats).filter(|t| *t <= MAX_SATOSHIS)
+            .ok_or_else(|| format!("Outputs sum to more than {} satoshis", MAX_SATOSHIS))?;
+    }
+    Ok(total)
+}
+
 pub(crate) async fn create_action_internal(
     state: web::Data<AppState>,
     req: CreateActionRequest,
@@ -4803,6 +4836,20 @@ pub(crate) async fn create_action_internal(
     // ============================================================
     let _create_action_guard = state.create_action_lock.lock().await;
     log::info!("   🔒 createAction serialization lock acquired");
+
+    // beta.6 P3 (`P3-A1`, TSA-148/-069): amounts are checked before anything is selected
+    // or reserved. Every builder (dApp createAction, send, PeerPay, Paymail, pay_402)
+    // comes through here.
+    let total_output = match validate_output_amounts(&req.outputs) {
+        Ok(total) => total,
+        Err(e) => {
+            log::error!("   ❌ {}", e);
+            return HttpResponse::BadRequest().json(serde_json::json!({
+                "error": e,
+                "code": "ERR_INVALID_OUTPUT_AMOUNT"
+            }));
+        }
+    };
 
     // ============================================================
     // BRC-100 Basket/Tag Validation (Phase 2 from implementation plan)
@@ -5040,11 +5087,10 @@ pub(crate) async fn create_action_internal(
         log::info!("   💰 Send max mode: will select all UTXOs and calculate output amount after fee");
     }
 
-    // Calculate total output amount
-    let mut total_output: i64 = 0;
+    // Total output amount: validated at the top of this function.
+    let mut total_output: i64 = total_output;
     for (i, output) in req.outputs.iter().enumerate() {
         if let Some(sats) = output.satoshis {
-            total_output += sats;
             log::info!("   Output {}: {} satoshis", i, sats);
         }
     }
@@ -7082,10 +7128,31 @@ pub(crate) async fn check_tx_exists_on_chain(
     services: &crate::services::WalletServices,
     txid: &str,
 ) -> Result<bool, String> {
-    use crate::services::TxState;
     log::info!("   🔍 Checking if transaction exists on-chain: {}", txid);
+    tx_exists_verdict(services.tx_status(txid).await)
+}
 
-    match services.tx_status(txid).await {
+/// beta.6 P3. The lookup behind `accept_broadcast_result`: is OUR txid known?
+/// ⛔ Absent only on the `NotFound` **variant** — every provider said so
+/// (`tx_status_unanimous`). `tx_exists_verdict` matches error *text* ("not found"),
+/// which would read "some providers did not answer" as absent and release the inputs
+/// of a transaction that may be in mempool (found by the adversarial review).
+fn broadcast_lookup_verdict(
+    result: Result<crate::services::TxStatus, crate::services::IndexerError>,
+) -> Result<bool, String> {
+    match result {
+        Err(crate::services::IndexerError::NotFound) => Ok(false),
+        Err(e) => Err(e.to_string()),
+        ok => tx_exists_verdict(ok),
+    }
+}
+
+/// The verdict behind `check_tx_exists_on_chain`, over one `tx_status` answer.
+fn tx_exists_verdict(
+    result: Result<crate::services::TxStatus, crate::services::IndexerError>,
+) -> Result<bool, String> {
+    use crate::services::TxState;
+    match result {
         Ok(status) => {
             // Honour ARC's richer vocabulary when the responding provider is ARC.
             // Orphan/stale = tx is NOT reliably on network — return false.
@@ -9681,77 +9748,10 @@ pub(crate) async fn broadcast_transaction(
 
     match services.broadcast_beef(&beef_bytes).await {
         Ok(br) => {
-            log::info!(
-                "   🎉 {} accepted: txid={}, status={}",
-                br.provider,
-                &br.txid[..br.txid.len().min(32)],
-                br.tx_status
-            );
-
-            // txid collision detection — mirrors handlers.rs (pre-1.6d.D) :8222-8239.
-            // BEEF ancestry can legitimately return a proof for a PARENT tx that
-            // just got mined; that's signalled by merkle_path_bump being present.
-            // Different txid + no merkle path = genuine collision (e.g. CVE-2026-40069).
-            if let Some(expected_txid) = txid_for_cache {
-                if !br.txid.is_empty() && br.txid != expected_txid {
-                    if br.merkle_path_bump.is_some() {
-                        log::info!(
-                            "   ℹ️  {} txid differs (BEEF ancestry): {} vs {} — merklePath present, proceeding",
-                            br.provider,
-                            &expected_txid[..expected_txid.len().min(16)],
-                            &br.txid[..br.txid.len().min(16)]
-                        );
-                    } else {
-                        let msg = format!(
-                            "TX collision: {} returned txid {} instead of our {} (status: {})",
-                            br.provider,
-                            &br.txid[..br.txid.len().min(16)],
-                            &expected_txid[..expected_txid.len().min(16)],
-                            br.tx_status,
-                        );
-                        log::error!("   ❌ {}", msg);
-                        return Err(msg);
-                    }
-                }
-            }
-
-            // Cache merkle proof under the PROVIDER'S returned txid (NOT our
-            // submitted txid). When ARC returns a BEEF-ancestry merkle path it
-            // refers to a parent tx that just got mined — storing the parent's
-            // proof under our txid causes "Invalid BUMPs" on next use.
-            // Mirrors handlers.rs (pre-1.6d.D) :8263-8274.
-            if let (Some(ref merkle_path), Some(db)) = (&br.merkle_path_bump, db_for_cache) {
-                if !merkle_path.is_empty() && !br.txid.is_empty() {
-                    log::info!(
-                        "   📋 {} returned merklePath ({} hex chars) for txid={}",
-                        br.provider,
-                        merkle_path.len(),
-                        &br.txid[..br.txid.len().min(16)]
-                    );
-                    cache_arc_merkle_proof(db, &br.txid, merkle_path);
-                }
-            }
-
-            // Update broadcast_status="confirmed" on immediately-MINED. Mirrors
-            // handlers.rs (pre-1.6d.D) :8277-8287.
-            if let (Some(db), Some(cache_txid)) = (db_for_cache, txid_for_cache) {
-                if br.tx_status == "MINED" {
-                    if let Some(height) = br.block_height {
-                        log::info!("   📦 {} reports MINED at height {}", br.provider, height);
-                        if let Ok(db_guard) = db.lock() {
-                            let tx_repo = crate::database::TransactionRepository::new(
-                                db_guard.connection(),
-                            );
-                            let _ = tx_repo.update_broadcast_status(cache_txid, "confirmed");
-                        }
-                    }
-                }
-            }
-
-            Ok(format!(
-                "{} accepted: {} ({})",
-                br.provider, br.txid, br.tx_status
-            ))
+            accept_broadcast_result(br, db_for_cache, txid_for_cache, |txid| async move {
+                broadcast_lookup_verdict(services.tx_status_unanimous(&txid).await)
+            })
+            .await
         }
         Err(err) => {
             let err_str = err.to_string();
@@ -9809,6 +9809,123 @@ pub(crate) async fn broadcast_transaction(
             Err(extract_core_error(&err_str))
         }
     }
+}
+
+/// beta.6 P3 (`P3-A3`, TSA-192/-255). What a provider's broadcast acknowledgement is
+/// allowed to mean.
+///
+/// ⛔ An acknowledgement is **bound** to our transaction only if it names our txid.
+/// Nothing is cached and our row is never marked `confirmed` from an unbound one.
+/// Previously a different txid with a merkle path (the "BEEF ancestry" allowance)
+/// proceeded, cached that proof under the provider's txid and, on `MINED`, marked
+/// **our** transaction confirmed.
+///
+/// - **Empty txid** (WoC/mAPI "already known"): sent, unproven — see the branch.
+/// - **A different txid**: **our** txid is looked up (`verify`):
+///   - known ⇒ success;
+///   - every provider says unknown, or it is rejected ⇒ error (the old collision
+///     rule, now also when a merkle path is attached);
+///   - the lookup itself fails ⇒ success, unverified. ⛔ Not an error: callers release
+///     the inputs on error, which for a transaction that is in fact in mempool is
+///     working rule 7 trip-wire 1. As sent, the row is `unproven` and
+///     `TaskCheckForProofs` settles it (all-oracles 404 for 5 min ⇒ failed).
+///
+/// `verify` is injected so T1 can answer for the network; production is
+/// `broadcast_lookup_verdict(tx_status_unanimous(..))`.
+async fn accept_broadcast_result<F, Fut>(
+    br: crate::services::BroadcastResult,
+    db_for_cache: Option<&std::sync::Arc<std::sync::Mutex<crate::database::WalletDatabase>>>,
+    txid_for_cache: Option<&str>,
+    verify: F,
+) -> Result<String, String>
+where
+    F: FnOnce(String) -> Fut,
+    Fut: std::future::Future<Output = Result<bool, String>>,
+{
+    log::info!(
+        "   🎉 {} accepted: txid={}, status={}",
+        br.provider,
+        &br.txid[..br.txid.len().min(32)],
+        br.tx_status
+    );
+
+    if let Some(expected_txid) = txid_for_cache {
+        if br.txid.is_empty() {
+            // WoC/mAPI "already known": the reply to OUR bytes, with no txid. Not bound,
+            // so nothing is cached or confirmed from it; but it is not refuted either, and
+            // erroring on an indexer's lag would release the inputs of a transaction that
+            // is in mempool. Sent, unproven: `TaskCheckForProofs` settles it (all-oracles
+            // 404 for 5 min ⇒ failed).
+            log::info!("   ℹ️  {} acknowledged without a txid ({}) — treating ours as sent, unproven",
+                       br.provider, br.tx_status);
+            return Ok(format!("{} acknowledged ({}) without a txid; our {} unproven",
+                              br.provider, br.tx_status, expected_txid));
+        }
+        if br.txid != expected_txid {
+            log::warn!(
+                "   ⚠️  {} acknowledged txid '{}', not ours ({}) — verifying ours on the network",
+                br.provider, &br.txid[..br.txid.len().min(16)], &expected_txid[..expected_txid.len().min(16)]
+            );
+            return match verify(expected_txid.to_string()).await {
+                Ok(true) => Ok(format!(
+                    "{} acknowledged '{}' ({}); our {} verified on the network",
+                    br.provider, br.txid, br.tx_status, expected_txid
+                )),
+                Ok(false) => {
+                    let msg = format!(
+                        "TX collision: {} acknowledged txid '{}' instead of our {} (status: {}), and ours is not on the network",
+                        br.provider, &br.txid[..br.txid.len().min(16)], &expected_txid[..expected_txid.len().min(16)], br.tx_status,
+                    );
+                    log::error!("   ❌ {}", msg);
+                    Err(msg)
+                }
+                Err(e) => {
+                    log::warn!(
+                        "   ⚠️  {} acknowledged txid '{}' instead of our {}; ours could not be verified ({}) — treating as sent, unproven",
+                        br.provider, &br.txid[..br.txid.len().min(16)], &expected_txid[..expected_txid.len().min(16)], e,
+                    );
+                    Ok(format!(
+                        "{} acknowledged '{}' ({}); our {} unverified: {}",
+                        br.provider, br.txid, br.tx_status, expected_txid, e
+                    ))
+                }
+            };
+        }
+    }
+
+    // Bound (or no expected txid to bind to): cache the provider's merkle proof under
+    // the txid it names, and record an immediate MINED.
+    if let (Some(ref merkle_path), Some(db)) = (&br.merkle_path_bump, db_for_cache) {
+        if !merkle_path.is_empty() && !br.txid.is_empty() {
+            log::info!(
+                "   📋 {} returned merklePath ({} hex chars) for txid={}",
+                br.provider,
+                merkle_path.len(),
+                &br.txid[..br.txid.len().min(16)]
+            );
+            cache_arc_merkle_proof(db, &br.txid, merkle_path);
+        }
+    }
+
+    // Update broadcast_status="confirmed" on immediately-MINED.
+    if let (Some(db), Some(cache_txid)) = (db_for_cache, txid_for_cache) {
+        if br.tx_status == "MINED" {
+            if let Some(height) = br.block_height {
+                log::info!("   📦 {} reports MINED at height {}", br.provider, height);
+                if let Ok(db_guard) = db.lock() {
+                    let tx_repo = crate::database::TransactionRepository::new(
+                        db_guard.connection(),
+                    );
+                    let _ = tx_repo.update_broadcast_status(cache_txid, "confirmed");
+                }
+            }
+        }
+    }
+
+    Ok(format!(
+        "{} accepted: {} ({})",
+        br.provider, br.txid, br.tx_status
+    ))
 }
 
 // Helper function to extract a clean, user-friendly error message from broadcast errors
@@ -21759,7 +21876,7 @@ mod abort_action_tests {
     use super::*;
     use crate::services::{IndexerError, TxState, TxStatus};
 
-    fn app_state() -> web::Data<AppState> {
+    pub(super) fn app_state() -> web::Data<AppState> {
         let path = std::env::temp_dir().join(format!("hodos_p2_abort_{}.db", uuid::Uuid::new_v4()));
         let db = crate::database::WalletDatabase::new(path).unwrap();
         db.connection().execute(
@@ -21791,13 +21908,13 @@ mod abort_action_tests {
 
     /// Where the input's reservation currently sits.
     #[derive(Clone, Copy)]
-    enum Reserved { Placeholder, Txid }
+    pub(super) enum Reserved { Placeholder, Txid }
 
-    struct Seeded { reference: String, txid: String, input_txid: String }
+    pub(super) struct Seeded { pub(super) reference: String, pub(super) txid: String, pub(super) input_txid: String }
 
     /// One action row with `status`, one created (change) output and one reserved
     /// wallet input, plus the in-memory pending entry `sign_action` reads.
-    fn seed(state: &AppState, status: &str, outgoing: bool, reserved: Reserved) -> Seeded {
+    pub(super) fn seed(state: &AppState, status: &str, outgoing: bool, reserved: Reserved) -> Seeded {
         let reference = uuid::Uuid::new_v4().to_string();
         let txid = hex::encode(rand::random::<[u8; 32]>());
         let input_txid = hex::encode(rand::random::<[u8; 32]>());
@@ -21846,7 +21963,7 @@ mod abort_action_tests {
     }
 
     /// Every column of every `transactions` and `outputs` row, for "nothing changed".
-    fn snapshot(state: &AppState) -> Vec<String> {
+    pub(super) fn snapshot(state: &AppState) -> Vec<String> {
         let db = state.database.lock().unwrap();
         let c = db.connection();
         let mut all = Vec::new();
@@ -21871,7 +21988,7 @@ mod abort_action_tests {
         PENDING_TRANSACTIONS.lock().unwrap().contains_key(reference)
     }
 
-    async fn body(resp: HttpResponse) -> (u16, serde_json::Value) {
+    pub(super) async fn body(resp: HttpResponse) -> (u16, serde_json::Value) {
         let status = resp.status().as_u16();
         let bytes = actix_web::body::to_bytes(resp.into_body()).await.unwrap_or_default();
         (status, serde_json::from_slice(&bytes).unwrap_or(serde_json::Value::Null))
@@ -22174,5 +22291,145 @@ mod abort_action_tests {
                   IndexerError::InvalidResponse { provider: "p", reason: String::new() }] {
             assert!(matches!(abort_chain_verdict(Err(e)), AbortChainVerdict::Inconclusive(_)));
         }
+    }
+}
+
+// ============================================================================
+// beta.6 P3 — amounts are real numbers, and a broadcast is ours before we believe
+// it. Contract: development-docs/0.4.0-beta.6/phase-P3-amounts-cap-broadcast/PHASE_CONTRACT.md
+// ============================================================================
+#[cfg(test)]
+mod amounts_broadcast_tests {
+    use super::*;
+    use super::abort_action_tests::{app_state, body, seed, snapshot, Reserved};
+    use crate::services::BroadcastResult;
+
+    fn outputs(sats: &[i64]) -> Vec<CreateActionOutput> {
+        let v: Vec<serde_json::Value> = sats.iter()
+            .map(|s| serde_json::json!({ "satoshis": s, "lockingScript": "6a" })).collect();
+        serde_json::from_value(serde_json::Value::Array(v)).unwrap()
+    }
+
+    #[test]
+    fn p3_a1_amounts_must_be_real_money() {
+        assert_eq!(validate_output_amounts(&outputs(&[0, 1, 546])), Ok(547));
+        assert_eq!(validate_output_amounts(&outputs(&[MAX_SATOSHIS])), Ok(MAX_SATOSHIS));
+        for (label, sats) in [
+            ("negative", vec![1_000_000, -999_998]),
+            ("i64::MIN", vec![i64::MIN]),
+            ("above max", vec![MAX_SATOSHIS + 1]),
+            ("i64::MAX", vec![i64::MAX]),
+            ("sum above max", vec![MAX_SATOSHIS, 1]),
+            ("sum overflows i64", vec![MAX_SATOSHIS, MAX_SATOSHIS, MAX_SATOSHIS, MAX_SATOSHIS, MAX_SATOSHIS]),
+        ] {
+            assert!(validate_output_amounts(&outputs(&sats)).is_err(), "{} accepted: {:?}", label, sats);
+        }
+        // An output without an amount (sendMax) is skipped, as before.
+        let none: Vec<CreateActionOutput> = serde_json::from_value(serde_json::json!([{ "lockingScript": "6a" }])).unwrap();
+        assert_eq!(validate_output_amounts(&none), Ok(0));
+    }
+
+    fn create_req(sats: &[i64]) -> CreateActionRequest {
+        let outs: Vec<serde_json::Value> = sats.iter()
+            .map(|s| serde_json::json!({ "satoshis": s, "lockingScript": "6a", "outputDescription": "t" })).collect();
+        serde_json::from_value(serde_json::json!({ "description": "p3 test", "outputs": outs })).unwrap()
+    }
+
+    /// `P3-A1`: the real builder refuses before any coin is selected or reserved.
+    /// Control: a valid amount gets past the check (and then fails for want of coins).
+    #[tokio::test]
+    async fn p3_a1_create_action_internal_refuses_before_selecting() {
+        let state = app_state();
+        let _other = seed(&state, "unsigned", true, Reserved::Txid); // rows that must not move
+        for sats in [vec![1_000_000, -999_998], vec![MAX_SATOSHIS, 1], vec![i64::MIN]] {
+            let before = snapshot(&state);
+            let (code, json) = body(create_action_internal(state.clone(), create_req(&sats)).await).await;
+            assert_eq!((code, json["code"].as_str()), (400, Some("ERR_INVALID_OUTPUT_AMOUNT")), "{:?}: {}", sats, json);
+            assert_eq!(snapshot(&state), before, "{:?}: refused createAction changed the database", sats);
+        }
+        let (_, json) = body(create_action_internal(state.clone(), create_req(&[1000])).await).await;
+        assert_ne!(json["code"].as_str(), Some("ERR_INVALID_OUTPUT_AMOUNT"), "control: a valid amount was refused: {}", json);
+    }
+
+    /// A syntactically valid BUMP (height 800000, one level, our leaf + a sibling), so the
+    /// bound control really caches a proof and the unbound "nothing cached" can fail.
+    fn bump_for(txid: &str) -> String {
+        let mut le = hex::decode(txid).unwrap();
+        le.reverse();
+        format!("fe00350c00" /* height */ ) + "01" + "02" + "0002" + &hex::encode(le) + "0100" + &"11".repeat(32)
+    }
+
+    fn ack(txid: &str, status: &str, merkle: Option<String>) -> BroadcastResult {
+        BroadcastResult { provider: "TEST", txid: txid.to_string(), tx_status: status.to_string(),
+                          merkle_path_bump: merkle, block_height: Some(800_000) }
+    }
+
+    fn proven(state: &AppState, txid: &str) -> i64 {
+        state.database.lock().unwrap().connection()
+            .query_row("SELECT COUNT(*) FROM proven_txs WHERE txid = ?1", [txid], |r| r.get(0)).unwrap()
+    }
+
+    fn status_of(state: &AppState, txid: &str) -> String {
+        state.database.lock().unwrap().connection()
+            .query_row("SELECT status FROM transactions WHERE txid = ?1", [txid], |r| r.get(0)).unwrap()
+    }
+
+    async fn accept(state: &AppState, br: BroadcastResult, ours: &str, verdict: Result<bool, String>)
+        -> (Result<String, String>, usize) {
+        let calls = std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(0));
+        let seen = calls.clone();
+        let expected = ours.to_string();
+        let r = accept_broadcast_result(br, Some(&state.database), Some(ours), move |asked| async move {
+            seen.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+            assert_eq!(asked, expected, "verify was asked about a txid that is not ours");
+            verdict
+        }).await;
+        (r, calls.load(std::sync::atomic::Ordering::SeqCst))
+    }
+
+    /// `P3-A3`: an acknowledgement for a different or empty txid is not ours.
+    #[tokio::test]
+    async fn p3_a3_unbound_acknowledgement_is_verified_and_never_confirms_ours() {
+        let state = app_state();
+        // Control: bound + MINED + proof ⇒ proof cached, ours confirmed, no verification.
+        let s = seed(&state, "sending", true, Reserved::Txid);
+        let (r, calls) = accept(&state, ack(&s.txid, "MINED", Some(bump_for(&s.txid))), &s.txid, Ok(false)).await;
+        assert!(r.is_ok(), "bound: {:?}", r);
+        assert_eq!((calls, proven(&state, &s.txid), status_of(&state, &s.txid).as_str()), (0, 1, "completed"),
+                   "control: (verify calls, proofs cached, status) for a bound MINED ack");
+
+        // Different txid + MINED + proof ("BEEF ancestry"): never confirms ours, caches nothing.
+        let other = hex::encode(rand::random::<[u8; 32]>());
+        for (label, verdict, want_ok) in [("verified", Ok(true), true), ("not on network", Ok(false), false),
+                                          ("verify inconclusive", Err("down".to_string()), true)] {
+            let s = seed(&state, "sending", true, Reserved::Txid);
+            let (r, calls) = accept(&state, ack(&other, "MINED", Some(bump_for(&other))), &s.txid, verdict).await;
+            assert_eq!(r.is_ok(), want_ok, "different txid, {}: {:?}", label, r);
+            assert_eq!(calls, 1, "different txid, {}: our txid must be verified once", label);
+            assert_eq!((proven(&state, &other), status_of(&state, &s.txid).as_str()), (0, "sending"),
+                       "different txid, {}: (provider's proof cached, our status)", label);
+        }
+        // Empty txid (WoC "already known"): sent, unproven — never an error (that would
+        // release a mempool tx's inputs on index lag), never confirmed or cached.
+        let s = seed(&state, "sending", true, Reserved::Txid);
+        let (r, calls) = accept(&state, ack("", "MINED", Some(bump_for(&s.txid))), &s.txid, Ok(false)).await;
+        assert!(r.is_ok(), "empty txid refused: {:?}", r);
+        assert_eq!((calls, proven(&state, ""), proven(&state, &s.txid), status_of(&state, &s.txid).as_str()),
+                   (0, 0, 0, "sending"), "empty txid: (verify calls, proofs cached x2, our status)");
+    }
+
+    /// `P3-A3`: the production lookup decides "absent" by the error VARIANT. The
+    /// unanimous call's "not every provider answered" is inconclusive, not absent.
+    #[test]
+    fn p3_a3_lookup_absent_only_on_the_not_found_variant() {
+        use crate::services::{IndexerError, TxState, TxStatus};
+        assert_eq!(broadcast_lookup_verdict(Err(IndexerError::NotFound)), Ok(false));
+        let partial = IndexerError::InvalidResponse { provider: "ProviderCollection",
+            reason: "not found by WoC, but ARC: transport error".into() };
+        assert!(broadcast_lookup_verdict(Err(partial)).is_err(), "an error mentioning 'not found' read as absent");
+        assert!(broadcast_lookup_verdict(Err(IndexerError::Transport("x".into()))).is_err());
+        let seen = TxStatus { txid: String::new(), state: TxState::InMempool, block_height: None, block_hash: None,
+                              merkle_path_bump: None, raw_provider_status: None };
+        assert_eq!(broadcast_lookup_verdict(Ok(seen)), Ok(true));
     }
 }

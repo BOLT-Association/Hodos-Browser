@@ -25,9 +25,36 @@
 namespace hodos {
 
 // Sentinel: this body moves funds but the amount is NOT derivable from it.
-// Today the only such shape is {sendMax:true}, where the amount is the entire
-// spendable balance and only the Rust wallet knows it.
+// {sendMax:true}, where the amount is the entire spendable balance and only the
+// Rust wallet knows it; and (beta.6 P3) any amount that is not a real amount of
+// money — see ReadSatoshis.
 constexpr int64_t kAmountNotDerivable = -1;
+
+// The most satoshis that can exist: 21,000,000 BSV. Mirrors rust-wallet
+// handlers.rs :: MAX_SATOSHIS.
+constexpr int64_t kMaxSatoshis = 2100000000000000LL;
+
+// beta.6 P3 (`P3-A2`, TSA-141). One amount, as the wallet will read it: an integer
+// in [0, kMaxSatoshis]. A NUMBER that is anything else — negative, fractional, above
+// the maximum, or an unsigned value that would wrap in int64 — is not an amount, and
+// the caller must fail closed. (Non-number fields keep their old handling: ignored,
+// as `MalformedAndEmptyBodiesAreZeroNotCrash` pins; the wallet refuses them itself.) ⛔ A negative output used to be summed as-is, so
+// outputs [1000000, -999998] priced as 2 sats and passed every cap.
+inline bool ReadSatoshis(const nlohmann::json& v, int64_t& out) {
+    if (v.is_number_unsigned()) {
+        const uint64_t u = v.get<uint64_t>();
+        if (u > static_cast<uint64_t>(kMaxSatoshis)) return false;
+        out = static_cast<int64_t>(u);
+        return true;
+    }
+    if (v.is_number_integer()) {
+        const int64_t i = v.get<int64_t>();
+        if (i < 0 || i > kMaxSatoshis) return false;
+        out = i;
+        return true;
+    }
+    return false;
+}
 
 inline bool IsPaymentEndpoint(const std::string& endpoint) {
     // ⛔ NORMALIZE FIRST — never match the raw target. `/%70rocessAction` routes
@@ -130,8 +157,12 @@ inline int64_t ExtractOutputSatoshis(const std::string& body) {
             && !json["outputs"].empty()) {
             int64_t total = 0;
             for (const auto& output : json["outputs"]) {
-                if (output.contains("satoshis") && output["satoshis"].is_number()) {
-                    total += output["satoshis"].get<int64_t>();
+                if (output.is_object() && output.contains("satoshis")
+                    && output["satoshis"].is_number()) {
+                    int64_t sats = 0;
+                    if (!ReadSatoshis(output["satoshis"], sats)) return kAmountNotDerivable;
+                    total += sats;  // both terms <= kMaxSatoshis: cannot overflow
+                    if (total > kMaxSatoshis) return kAmountNotDerivable;
                 }
             }
             amount = total;
@@ -140,13 +171,13 @@ inline int64_t ExtractOutputSatoshis(const std::string& body) {
 
         // /transaction/send — {toAddress, amount}.
         if (json.contains("amount") && json["amount"].is_number()) {
-            amount = json["amount"].get<int64_t>();
+            if (!ReadSatoshis(json["amount"], amount)) return kAmountNotDerivable;
             ++shapes;
         }
 
         // PeerPay + Paymail share the {..., amount_satoshis} shape.
         if (json.contains("amount_satoshis") && json["amount_satoshis"].is_number()) {
-            amount = json["amount_satoshis"].get<int64_t>();
+            if (!ReadSatoshis(json["amount_satoshis"], amount)) return kAmountNotDerivable;
             ++shapes;
         }
 
@@ -157,7 +188,7 @@ inline int64_t ExtractOutputSatoshis(const std::string& body) {
         // two shapes and falls to the ambiguity rule below, so the decoy family
         // that motivated that rule cannot be re-opened through this branch.
         if (json.contains("satoshis") && json["satoshis"].is_number()) {
-            amount = json["satoshis"].get<int64_t>();
+            if (!ReadSatoshis(json["satoshis"], amount)) return kAmountNotDerivable;
             ++shapes;
         }
 

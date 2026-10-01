@@ -359,4 +359,54 @@ TEST(RequestPathForMatching, QuerySchemeIsCutBeforeSchemeDetection) {
     EXPECT_EQ(hodos::RequestPathForMatching("https://127.0.0.1:5137"), "");
 }
 
+// ---------------------------------------------------------------------------
+// beta.6 P3 (`P3-A2`, TSA-141) — an amount that is not real money is not priced.
+// The fixture sums to 2 sats (not <= 0), so the old `satoshis > 0` floor cannot be
+// what catches it: the old sum priced it at 2 sats and passed every cap.
+// ---------------------------------------------------------------------------
+
+TEST(PaymentCostP3, NegativeOutputCannotShrinkThePrice) {
+    const auto c = hodos::ComputePaymentCost(
+        "/createAction", R"({"outputs":[{"satoshis":1000000},{"satoshis":-999998}]})", kPrice);
+    EXPECT_FALSE(c.priceAvailable) << "priced " << c.satoshis << " sats";
+    EXPECT_EQ(hodos::ExtractOutputSatoshis(
+                  R"({"outputs":[{"satoshis":1000000},{"satoshis":-999998}]})"),
+              hodos::kAmountNotDerivable);
+}
+
+TEST(PaymentCostP3, ImpossibleOutputAmountsAreNotDerivable) {
+    for (const char* body : {
+             R"({"outputs":[{"satoshis":1.9}]})",                              // fractional
+             R"({"outputs":[{"satoshis":2100000000000001}]})",                 // above max
+             R"({"outputs":[{"satoshis":2100000000000000},{"satoshis":1}]})",  // sum above max
+             R"({"outputs":[{"satoshis":18446744073709551614}]})",             // unsigned; wraps to -2
+             R"({"outputs":[{"satoshis":-9223372036854775808}]})",             // INT64_MIN
+             R"({"outputs":[{"satoshis":1e300}]})",                            // huge float
+         }) {
+        EXPECT_EQ(hodos::ExtractOutputSatoshis(body), hodos::kAmountNotDerivable) << body;
+    }
+}
+
+TEST(PaymentCostP3, NegativeSingleAmountShapesAreNotDerivable) {
+    for (const char* body : {R"({"toAddress":"1abc","amount":-5})",
+                             R"({"recipient":"x","amount_satoshis":-5})",
+                             R"({"server_pubkey_hex":"02","satoshis":-5,"original_url":"u"})",
+                             R"({"toAddress":"1abc","amount":2100000000000001})"}) {
+        EXPECT_EQ(hodos::ExtractOutputSatoshis(body), hodos::kAmountNotDerivable) << body;
+    }
+}
+
+// R-GOLD: ordinary payments still price exactly as before.
+TEST(PaymentCostP3, OrdinaryAmountsStillPrice) {
+    EXPECT_EQ(hodos::ExtractOutputSatoshis(R"({"outputs":[{"satoshis":1000},{"satoshis":2000}]})"), 3000);
+    EXPECT_EQ(hodos::ExtractOutputSatoshis(R"({"outputs":[{"satoshis":0,"lockingScript":"6a"},{"satoshis":546}]})"), 546);
+    EXPECT_EQ(hodos::ExtractOutputSatoshis(R"({"outputs":[{"satoshis":2100000000000000}]})"), 2100000000000000LL);
+    EXPECT_EQ(hodos::ExtractOutputSatoshis(R"({"toAddress":"1abc","amount":5000})"), 5000);
+    EXPECT_EQ(hodos::ExtractOutputSatoshis(R"({"recipient":"x","amount_satoshis":7000})"), 7000);
+    EXPECT_EQ(hodos::ExtractOutputSatoshis(R"({"server_pubkey_hex":"02","satoshis":10,"original_url":"u"})"), 10);
+    const auto c = hodos::ComputePaymentCost("/createAction", R"({"outputs":[{"satoshis":100000}]})", kPrice);
+    EXPECT_TRUE(c.priceAvailable);
+    EXPECT_EQ(c.satoshis, 100000);
+}
+
 }  // namespace

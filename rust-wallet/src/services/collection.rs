@@ -90,7 +90,7 @@ impl<P: IndexerProvider + ?Sized> ProviderCollection<P> {
         match self.call_tracking(op, soft_timeout, f).await {
             (Err(IndexerError::NotFound), Some(failure)) => Err(IndexerError::InvalidResponse {
                 provider: "ProviderCollection",
-                reason: format!("not found by some providers, but not every provider answered: {}", failure),
+                reason: format!("not every provider answered: {}", failure),
             }),
             (result, _) => result,
         }
