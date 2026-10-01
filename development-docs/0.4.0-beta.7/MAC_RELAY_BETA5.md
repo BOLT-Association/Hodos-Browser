@@ -9,6 +9,30 @@
 
 ---
 
+# 📋 ROUND M-01c (**macOS**) — 🐞 **New defect found during the beta.6 smoke, SHARED C++ (affects Windows too): the Privacy Shield's cookie-blocking toggle snaps back ON because `cookie_check_site_allowed` reads the domain from the wrong argument slot. 👤 Owner asks Windows to open a ticket for it.** Not a beta.6 blocker by itself (display bug; the allowance IS applied). Owner's call on whether it rides beta.6 or later.
+
+**§1 — Symptom (👤 owner, macOS dev build @ `96aa837`, 2026-10-01 ~07:40 MDT).** In the Privacy Shield overlay on whatsonchain.com, turning **cookie blocking** OFF flips straight back to ON, every time (the owner tried ~7 times). The fingerprint and adblock toggles in the same panel behave normally.
+
+**§2 — 📏 What actually happens (measured, not inferred).**
+- The OFF press **does** reach the browser, and it **is** saved. Render log: 7× `🌉 bridge cookieAllowThirdParty -> cookie_allow_third_party`, each answered by `cookie_allow_third_party_response`. `HodosBrowserDev/Default/cookie_blocks.db` → `allowed_third_party` holds `7|whatsonchain.com|1790862067448` (= 07:41:07 MDT, the last press).
+- The panel then re-reads the state with `bridge.cookieCheckSiteAllowed(domain)` (`frontend/src/hooks/usePrivacyShield.ts :: checkCookieSiteAllowed`, run on mount/refresh). That read **always** returns not-allowed. Direct call over CDP from the `127.0.0.1:5137` page: `bridge.cookieCheckSiteAllowed('whatsonchain.com')` → **`{"allowed":false,"domain":""}`**. The domain arrives EMPTY. In the same call, `bridge.fingerprintGetSiteEnabled('whatsonchain.com')` → `{"domain":"whatsonchain.com","enabled":false}`, which is correct.
+- ⇒ The UI shows "blocking ON" whatever is saved, so the switch appears to snap back. The allowance itself is live.
+
+**§3 — Cause (code).** `cef-native/src/handlers/simple_handler.cpp`, the `cookie_check_site_allowed` arm (the "Phase 8c batch 5 — MIGRATED" block):
+```cpp
+std::string domain = (csa_args->GetSize() > 1) ? csa_args->GetString(2).ToString() : "";
+```
+The bridge (`simple_render_process_handler.cpp`, the generic `Payload::Str` path) sends `[0]=requestId, [1]=domain` (`SetString(1, arguments[0]…)`). So index **2** is out of range → `""` → `IsThirdPartyAllowed("")` → false. The guard checks `> 1` but reads `[2]`, an off-by-one from the batch-5 migration. The sibling handlers (`cookie_allow_third_party`, `cookie_remove_third_party_allow`, `adblock_scriptlet_toggle`) all read `[1]`.
+**Fix (for the ticket, not applied by Mac):** `GetString(1)`. Add a unit/regression row that round-trips allow → check → `allowed:true`, plus a negative control (reverting to `[2]` must go red). Worth a sweep of the other batch-5 migrated arms for the same `[2]`-vs-`[1]` slip.
+
+**§4 — Side observations from the same panel (📏, not investigated; ticket them or not, your call).**
+- `fingerprint_settings.json` (`HodosBrowserDev/Default`) holds an entry with an **empty domain**: `{"": {"enabled": false}}`, next to `whatsonchain.com`. Its first save was the owner's first fingerprint-toggle press, 07:37:26. Probably the shield's domain was briefly empty when the toggle fired. It is harmless today, but it is a "verdict for nobody" row.
+- In the ~5 min the owner had the panel open, the render log shows **419× `cookieResetBlockedCount`** and **419× `adblockResetBlockedCount`** bridge calls, against 175 / 103 get-count calls. That is a lot of resets for a panel that was opened 14 times; it looks like a polling loop resetting counters.
+
+**§5 — Status of the Turnstile investigation it was found in:** ongoing. The full report comes in M-01b with the smoke rows.
+
+---
+
 # 📋 ROUND M-01b-pre (**macOS**) — ⚠️ **Heads-up: one code change past the freeze, found by smoke row S7 and 👤 owner-approved 2026-10-01. Make sure your validation run builds from `96aa837` or later.** The full M-01b report follows.
 
 **What:** `96aa837`, `cef-native/Info.plist` and `cef-native/mac/helper-Info.plist.in`: `LSMinimumSystemVersion` **11.0 → 12.0**. These are macOS-only files, with no C++ and no Windows effect. Both had been 11.0 since January, while the binaries are built `minos 12.0` (`CMakeLists.txt` `CMAKE_OSX_DEPLOYMENT_TARGET`, `release.yml` `MACOSX_DEPLOYMENT_TARGET`). So LaunchServices would offer the app to macOS 11, where it cannot load.
