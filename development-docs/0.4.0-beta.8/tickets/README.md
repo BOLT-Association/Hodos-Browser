@@ -21,3 +21,4 @@ controls). ⛔ A ticket is not work until beta.8 planning assigns it to a track.
 | `TICKET_messagebox_recipient_fees_unmeasured.md` | ⬜ UNASSIGNED | — (beta.6 triage (TSA-047); 🔬 research, owner: not urgent) | 2026-09-30 |
 | `TICKET_commission_rows_deleted_when_an_action_is_signed.md` | ⬜ UNASSIGNED | — (beta.6 P5 review; measured 3 rows / 636 outgoing; accounting loss, not poisoning) | 2026-09-30 |
 | `TICKET_live_reservation_placeholders_fails_open_on_poisoned_lock.md` | ⬜ UNASSIGNED | — (beta.6 P5 review; code reading) | 2026-09-30 |
+| `TICKET_privacy_shield_cookie_toggle_snaps_back.md` | ⬜ UNASSIGNED | — (beta.6 Mac smoke M-01c; shared C++ off-by-one; display only, allowance applied) | 2026-10-01 |

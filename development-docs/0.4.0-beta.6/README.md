@@ -11,7 +11,8 @@
 5. **Rebuild the app** on the **same verified engine asset** (`cef-binaries-*-150.0.48-g7d50c1c`, see the engine plan). Validation run, then the full step-5 checks, tag **`v0.4.0-beta.6`**, draft, promote.
    - 🧊 **Code frozen at `4fec006`** (relay W-01b), except smoke-found defects: `96aa837` macOS `LSMinimumSystemVersion` 11.0 → 12.0 (Mac S7, 👤 owner-approved).
    - ✅ **Windows smoke, 2026-10-01** (dev build of `1c9fa91`, shell rebuilt 06:53 with the P3 header, dev wallet = final P5 binary): **S1** engine — deployed `libcef.dll` md5 `2137cba8…` = the beta.5-verified engine, `CEF_VERSION …+g7d50c1c+chromium-150.0.7871.255` · **S2** MessageBox — `handshake OK, reply signature verified` 06:53:42, `listMessages` 200, no `ERR_AUTH_MALFORMED` · **S3** SDK validator 25/2 (the 2 = deferred B4) on the same wallet binary · **S4–S6** 👤 owner on the dev browser: *"I went through a few tests on the dev browser. Everything looks good to me."* (per-row detail not recorded). DPI cells not re-run: no layout change, engine identical to beta.5's verified one.
-   - ⏳ macOS smoke: relay M-01b.
+   - ✅ **macOS smoke, 2026-10-01** (relay M-01b): S1–S7 pass — live `chrome://version` V8 `15.0.245.40`; handshake OK; SDK validator 23/2 (−2 environmental: one UTXO, explained); basket; `R-GOLD` gold pill ×2 on a real zanaadu upvote; Send name search 200s; minos 12.0. Two more macOS-only smoke fixes, 👤 owner-approved: `96aa837` (plist floor) and `8415c31` (⌘V paste in the wallet overlay). ⇒ **release builds from `8415c31` or later.**
+   - 🐞 M-01c Privacy Shield cookie toggle (shared C++ off-by-one, display only) → `../0.4.0-beta.8/tickets/TICKET_privacy_shield_cookie_toggle_snaps_back.md`, not in beta.6.
 
 ## ✅ Kickoff, 2026-09-30
 
