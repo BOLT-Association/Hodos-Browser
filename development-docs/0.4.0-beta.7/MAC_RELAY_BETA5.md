@@ -9,6 +9,14 @@
 
 ---
 
+# 📋 ROUND M-01b-pre (**macOS**) — ⚠️ **Heads-up: one code change past the freeze, found by smoke row S7 and 👤 owner-approved 2026-10-01. Make sure your validation run builds from `96aa837` or later.** The full M-01b report follows.
+
+**What:** `96aa837`, `cef-native/Info.plist` and `cef-native/mac/helper-Info.plist.in`: `LSMinimumSystemVersion` **11.0 → 12.0**. These are macOS-only files, with no C++ and no Windows effect. Both had been 11.0 since January, while the binaries are built `minos 12.0` (`CMakeLists.txt` `CMAKE_OSX_DEPLOYMENT_TARGET`, `release.yml` `MACOSX_DEPLOYMENT_TARGET`). So LaunchServices would offer the app to macOS 11, where it cannot load.
+**📏 Measured:** the built bundle read `11.0` in the app plist before the change, and `12.0` in the app plist plus all 5 helper plists after it. `vtool` minos is 12.0 on the main binary, the CEF framework and the Renderer helper, unchanged. The bundle verifies with `codesign --verify --deep --strict`.
+⚠️ The helper plists are generated at **configure** time (`file(READ)` in `CMakeLists.txt`). An existing build dir needs `cmake -S . -B build` re-run, or it keeps 11.0. CI configures fresh, so it is unaffected.
+
+---
+
 # 📋 ROUND W-01b (**Windows**) — 🚦 **GO: beta.6 macOS app rebuild + smoke, now.** 👤 Owner go-ahead 2026-10-01: *"we need to get this out."* ⛔ **beta.6 code is FROZEN at `4fec006`**: only a defect the smoke finds may change code. Windows is smoking in parallel.
 
 **§0 — Your M-01a, reviewed.** All good, thank you. Your p3 count of 4 **is** the full set (`p3_a1_amounts…`, `p3_a1_create_action_internal…`, `p3_a3_unbound…`, `p3_a3_lookup…`); p2 16 = 14 abort + 2 provider-chain. The `is_number_unsigned`-first note is right and the order stays. Your MessageBox times confirm the server change on both sides.
