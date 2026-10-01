@@ -6113,7 +6113,10 @@ pub(crate) async fn create_action_internal(
     };
 
     // Generate reference ID
-    let reference = format!("action-{}", uuid::Uuid::new_v4());
+    // beta.6 P5: BRC-100 references are base64 (the SDK validates
+    // `signableTransaction.reference` as base64; `action-<uuid>` is not). 12 random
+    // bytes, as wallet-toolbox mints them.
+    let reference = general_purpose::STANDARD.encode(rand::random::<[u8; 12]>());
 
     // Build user input infos for signing
     let user_input_infos: Vec<UserInputInfo> = user_inputs.iter().map(|ui| UserInputInfo {
@@ -6129,6 +6132,41 @@ pub(crate) async fn create_action_internal(
     // This is needed for two-phase signing: when the SDK calls signAction directly
     // for phase 2, sign_action needs to know whether to broadcast.
     let no_send = req.options.as_ref().and_then(|o| o.no_send).unwrap_or(false);
+
+    // beta.6 P5 (B3): `signAndProcess:false` returns a signable transaction. Its BEEF is
+    // built HERE, before the reservation is committed, so a failure (an unfetchable
+    // ancestor, a slow indexer) is released by the guard instead of stranding inputs
+    // behind a 500 that carries no reference to abort (adversarial review).
+    let deferred_beef: Option<Vec<u8>> = if req.options.as_ref().and_then(|o| o.sign_and_process) == Some(false) {
+        if req.options.as_ref().and_then(|o| o.send_with.as_ref()).map_or(false, |v| !v.is_empty()) {
+            // `signAction` does not read sendWith, so it would be silently dropped.
+            return HttpResponse::BadRequest().json(serde_json::json!({
+                "error": "sendWith cannot be combined with signAndProcess:false",
+                "code": "ERR_INVALID_PARAMETER"
+            }));
+        }
+        let built = tokio::time::timeout(
+            std::time::Duration::from_secs(30),
+            build_signable_beef(&state, &tx, &txid, parsed_input_beef.as_ref(), &selected_utxos),
+        ).await;
+        match built {
+            Ok(Ok(b)) => Some(b),
+            Ok(Err(e)) => {
+                log::error!("   ❌ signableTransaction: {}", e);
+                return HttpResponse::InternalServerError().json(serde_json::json!({
+                    "error": format!("Could not build the signable transaction: {}", e)
+                }));
+            }
+            Err(_) => {
+                log::error!("   ❌ signableTransaction: ancestry timed out (30s)");
+                return HttpResponse::InternalServerError().json(serde_json::json!({
+                    "error": "Could not build the signable transaction: ancestry lookup timed out"
+                }));
+            }
+        }
+    } else {
+        None
+    };
 
     // Store transaction in memory with UTXO metadata for signing.
     //
@@ -6551,11 +6589,33 @@ pub(crate) async fn create_action_internal(
             }
         }
     } else {
-        log::info!("   ℹ️  Skipping signing (signAndProcess=false)");
-        // Convert unsigned transaction hex to byte array for BRC-100 spec compliance (AtomicBEEF = Byte[])
-        let tx_bytes = tx.to_hex().ok()
-            .and_then(|h| hex::decode(h).ok());
-        (txid, tx_bytes)
+        // beta.6 P5 (B3). `signAndProcess:false` asks for deferred signing: BRC-100 returns
+        // `signableTransaction { tx: AtomicBEEF, reference }` and signs at `signAction`.
+        // ⛔ This used to return `txid` + the bare unsigned raw tx, which the SDK rejects
+        // ("expected a complete, exactly framed BEEF") and which hid the reference the
+        // dApp needs for `signAction`. The pending entry and the `unsigned` row already
+        // exist, so `signAction(reference)` signs it as in the two-phase path.
+        log::info!("   ℹ️  signAndProcess=false — returning signableTransaction (reference {})", reference);
+        // The reservation moves from its placeholder to the txid, as the pre-change flow
+        // did (the "txid didn't change" arm below): `TaskFailAbandoned` releases an
+        // abandoned `unsigned` action by txid, and `sign_action`'s `update_txid` re-keys
+        // txid-held inputs to the signed txid.
+        if let Some(ref placeholder) = reservation_placeholder {
+            let db = state.database.lock().unwrap();
+            let output_repo = crate::database::OutputRepository::new(db.connection());
+            if let Err(e) = output_repo.update_spending_description_batch(placeholder, &txid) {
+                drop(db);
+                return resolution_failed_response(&state, placeholder, &txid, &e.to_string());
+            }
+        }
+        let Some(atomic) = deferred_beef else {
+            return HttpResponse::InternalServerError().json(serde_json::json!({
+                "error": "signable transaction was not built"
+            }));
+        };
+        return HttpResponse::Ok().json(serde_json::json!({
+            "signableTransaction": { "tx": atomic, "reference": reference }
+        }));
     };
 
     // ═══════════════════════════════════════════════════════════════
@@ -13768,6 +13828,158 @@ pub async fn update_confirmations_endpoint(state: web::Data<AppState>, _body: we
     }
 }
 
+/// beta.6 P5 (B3). The AtomicBEEF of a not-yet-signed action: the dApp's `inputBEEF`,
+/// then our inputs' ancestry (`build_beef_for_txid`), then the unsigned transaction as
+/// the subject, in BRC-62 topological order.
+async fn build_signable_beef(
+    state: &AppState,
+    tx: &Transaction,
+    txid: &str,
+    input_beef: Option<&crate::beef::Beef>,
+    wallet_inputs: &[UTXO],
+) -> Result<Vec<u8>, String> {
+    let unsigned = tx.to_hex().ok().and_then(|h| hex::decode(h).ok())
+        .ok_or("failed to serialize the unsigned transaction")?;
+    let mut beef = crate::beef::Beef::new();
+    if let Some(ib) = input_beef {
+        beef.bumps.extend(ib.bumps.iter().cloned());
+        for (i, tx_bytes) in ib.transactions.iter().enumerate() {
+            let idx = beef.add_parent_transaction(tx_bytes.clone());
+            if let Some(Some(b)) = ib.tx_to_bump.get(i) {
+                beef.tx_to_bump[idx] = Some(*b);
+            }
+        }
+    }
+    let mut parents: Vec<String> = wallet_inputs.iter().map(|u| u.txid.clone()).collect();
+    parents.sort();
+    parents.dedup();
+    for parent in &parents {
+        crate::beef_helpers::build_beef_for_txid(parent, &mut beef, &state.database, &state.services).await
+            .map_err(|e| format!("ancestry for {} unavailable: {}", parent, e))?;
+    }
+    beef.set_main_transaction(unsigned);
+    beef.sort_topologically();
+    beef.to_atomic_beef_hex(txid).ok().and_then(|h| hex::decode(h).ok())
+        .ok_or_else(|| "failed to encode the signable transaction".to_string())
+}
+
+/// A description as BRC-100 allows it: "" or 5..=2000 UTF-8 bytes (the SDK counts bytes). Ours can be absent
+/// or shorter (internal sends); those become "" rather than an invented text.
+fn brc100_description(d: Option<&str>) -> String {
+    match d {
+        Some(s) if (5..=2000).contains(&s.len()) => s.to_string(),
+        _ => String::new(),
+    }
+}
+
+/// beta.6 P5 (B1). One `listActions` entry in BRC-100's shape.
+///
+/// ⛔ Before: `status` went through `TransactionStatus::to_action_status`, a lossy legacy
+/// mapping (`completed`→`confirmed`, `unproven`→`unconfirmed`, `nosend`→`aborted`, …) that
+/// the SDK's result validator rejects, so every upgraded dApp's `listActions` threw.
+/// The `status` column already holds BRC-100's eight words; it is returned as stored.
+/// Inputs and outputs were our storage rows (`{txid,vout,satoshis,script}`); they are now
+/// BRC-100 `sourceOutpoint`/`outputIndex` shapes, filled from stored facts only:
+/// unlocking scripts and sequence numbers from the stored raw transaction, the spent
+/// output's locking script / our output's spendability, basket and tags from `outputs`.
+/// Our own keys (`referenceNumber`, `timestamp`, `confirmations`, `blockHeight`) stay;
+/// the validator tolerates extra keys.
+fn brc100_action_json(
+    conn: &rusqlite::Connection,
+    action: &crate::action_storage::StoredAction,
+    include_labels: bool,
+    include_inputs: bool,
+    include_outputs: bool,
+) -> rusqlite::Result<serde_json::Value> {
+    use rusqlite::OptionalExtension;
+    let status: String = conn.query_row(
+        "SELECT status FROM transactions WHERE txid = ?1", [&action.txid], |r| r.get(0))?;
+    let mut obj = serde_json::json!({
+        "txid": action.txid,
+        "referenceNumber": action.reference_number,
+        "status": status,
+        "isOutgoing": action.is_outgoing,
+        "satoshis": action.satoshis,
+        "timestamp": action.timestamp,
+        "confirmations": action.confirmations,
+        "description": brc100_description(action.description.as_deref()),
+        "version": action.version,
+        "lockTime": action.lock_time,
+    });
+    if let Some(block_height) = action.block_height {
+        obj["blockHeight"] = serde_json::json!(block_height);
+    }
+    if include_labels {
+        obj["labels"] = serde_json::json!(&action.labels);
+    }
+    if include_inputs {
+        // Unlocking script + sequence per outpoint, from the transaction as stored.
+        let parsed = hex::decode(&action.raw_tx).ok()
+            .and_then(|b| crate::beef::ParsedTransaction::from_bytes(&b).ok());
+        let mut inputs = Vec::with_capacity(action.inputs.len());
+        for input in &action.inputs {
+            let in_tx = parsed.as_ref().and_then(|p| p.inputs.iter()
+                .find(|i| i.prev_txid == input.txid && i.prev_vout == input.vout));
+            let source_script: Option<Vec<u8>> = conn.query_row(
+                "SELECT locking_script FROM outputs WHERE txid = ?1 AND vout = ?2",
+                rusqlite::params![input.txid, input.vout], |r| r.get(0)).optional()?.flatten();
+            let mut i = serde_json::json!({
+                "sourceOutpoint": format!("{}.{}", input.txid, input.vout),
+                "sourceSatoshis": input.satoshis.max(0),
+                "inputDescription": "",
+                // Every input the wallet builds is final unless a lockTime asked otherwise;
+                // the stored raw tx says which, and is only missing for legacy rows.
+                "sequenceNumber": in_tx.map(|i| i.sequence).unwrap_or(0xFFFF_FFFF),
+            });
+            if let Some(script) = source_script.filter(|s| !s.is_empty()) {
+                i["sourceLockingScript"] = serde_json::json!(hex::encode(script));
+            }
+            if let Some(unlocking) = in_tx.map(|i| &i.script).filter(|s| !s.is_empty()) {
+                i["unlockingScript"] = serde_json::json!(hex::encode(unlocking));
+            }
+            inputs.push(i);
+        }
+        obj["inputs"] = serde_json::Value::Array(inputs);
+    }
+    if include_outputs {
+        let mut outputs = Vec::with_capacity(action.outputs.len());
+        for output in &action.outputs {
+            // Ours (change, basket outputs) have a row; a payment to someone else does not.
+            let ours: Option<(i64, bool, Option<String>, Option<String>, Option<String>)> = conn.query_row(
+                "SELECT o.outputId, o.spendable, b.name, o.custom_instructions, o.output_description
+                 FROM outputs o LEFT JOIN output_baskets b ON b.basketId = o.basket_id
+                 WHERE o.txid = ?1 AND o.vout = ?2",
+                rusqlite::params![action.txid, output.vout],
+                |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?, r.get(4)?)),
+            ).optional()?;
+            let tags: Vec<String> = match &ours {
+                Some((id, ..)) => conn.prepare(
+                    "SELECT t.tag FROM output_tag_map m JOIN output_tags t ON t.id = m.output_tag_id
+                     WHERE m.output_id = ?1 AND m.is_deleted = 0 AND t.is_deleted = 0 ORDER BY t.tag")?
+                    .query_map([id], |r| r.get(0))?.collect::<rusqlite::Result<_>>()?,
+                None => Vec::new(),
+            };
+            let mut o = serde_json::json!({
+                "outputIndex": output.vout,
+                "satoshis": output.satoshis.max(0),
+                "spendable": ours.as_ref().map(|o| o.1).unwrap_or(false),
+                "tags": tags,
+                "outputDescription": brc100_description(ours.as_ref().and_then(|o| o.4.as_deref())),
+                "basket": ours.as_ref().and_then(|o| o.2.clone()).unwrap_or_default(),
+            });
+            if let Some(script) = output.script.as_ref().filter(|s| !s.is_empty()) {
+                o["lockingScript"] = serde_json::json!(script);
+            }
+            if let Some(ci) = ours.as_ref().and_then(|o| o.3.clone()) {
+                o["customInstructions"] = serde_json::json!(ci);
+            }
+            outputs.push(o);
+        }
+        obj["outputs"] = serde_json::Value::Array(outputs);
+    }
+    Ok(obj)
+}
+
 pub async fn list_actions(
     state: web::Data<AppState>,
     req: web::Json<ListActionsRequest>,
@@ -13811,40 +14023,18 @@ pub async fn list_actions(
     let include_inputs = req.include_inputs.unwrap_or(true);
     let include_outputs = req.include_outputs.unwrap_or(true);
 
-    let actions_json: Vec<serde_json::Value> = actions.iter()
-        .map(|action| {
-            let mut obj = serde_json::json!({
-                "txid": action.txid,
-                "referenceNumber": action.reference_number,
-                "status": action.status.to_string(),
-                "isOutgoing": action.is_outgoing,
-                "satoshis": action.satoshis,
-                "timestamp": action.timestamp,
-                "confirmations": action.confirmations,
-                "description": action.description,
-                "version": action.version,
-                "lockTime": action.lock_time,
-            });
-
-            if let Some(block_height) = action.block_height {
-                obj["blockHeight"] = serde_json::json!(block_height);
+    let mut actions_json: Vec<serde_json::Value> = Vec::with_capacity(actions.len());
+    for action in &actions {
+        match brc100_action_json(db.connection(), action, include_labels, include_inputs, include_outputs) {
+            Ok(obj) => actions_json.push(obj),
+            Err(e) => {
+                log::error!("   Failed to build action {}: {}", action.txid, e);
+                return HttpResponse::InternalServerError().json(serde_json::json!({
+                    "error": format!("Failed to list actions: {}", e)
+                }));
             }
-
-            if include_labels {
-                obj["labels"] = serde_json::json!(&action.labels);
-            }
-
-            if include_inputs {
-                obj["inputs"] = serde_json::json!(&action.inputs);
-            }
-
-            if include_outputs {
-                obj["outputs"] = serde_json::json!(&action.outputs);
-            }
-
-            obj
-        })
-        .collect();
+        }
+    }
 
     HttpResponse::Ok().json(ListActionsResponse {
         total_actions: total,
@@ -22431,5 +22621,111 @@ mod amounts_broadcast_tests {
         let seen = TxStatus { txid: String::new(), state: TxState::InMempool, block_height: None, block_hash: None,
                               merkle_path_bump: None, raw_provider_status: None };
         assert_eq!(broadcast_lookup_verdict(Ok(seen)), Ok(true));
+    }
+}
+
+// ============================================================================
+// beta.6 P5 — listActions in BRC-100's shape, listCertificates' total name.
+// Contract: development-docs/0.4.0-beta.6/phase-P5-g2-fixes/PHASE_CONTRACT.md
+// The SDK-validator evidence is live (g2-validator/); these pin the shape in T1.
+// ============================================================================
+#[cfg(test)]
+mod brc100_shape_tests {
+    use super::*;
+    use super::abort_action_tests::{app_state, seed, Reserved};
+
+    /// One action as `list_actions` would build it: a stored raw tx whose single input
+    /// carries sequence 0xFFFFFFFE and a 2-byte unlocking script, a recorded input row,
+    /// and two recorded outputs — vout 0 ours (seeded change, tagged, in a basket), vout 1
+    /// someone else's.
+    fn action_json(status: &str, description: Option<&str>) -> serde_json::Value {
+        let state = app_state();
+        let s = seed(&state, status, true, Reserved::Txid);
+        let db = state.database.lock().unwrap();
+        let c = db.connection();
+        let mut tx = Transaction::new();
+        let mut input = TxInput::new(OutPoint::new(s.input_txid.clone(), 0));
+        input.set_script(vec![0x51, 0x51]);
+        input.sequence = 0xFFFF_FFFE;
+        tx.add_input(input);
+        tx.add_output(TxOutput::new(900, vec![0x6a]));
+        let tid: i64 = c.query_row("SELECT id FROM transactions WHERE txid = ?1", [&s.txid], |r| r.get(0)).unwrap();
+        c.execute("UPDATE transactions SET raw_tx = ?1, description = ?2 WHERE id = ?3",
+                  rusqlite::params![tx.to_hex().unwrap(), description, tid]).unwrap();
+        c.execute("INSERT INTO transaction_inputs (transaction_id, txid, vout, satoshis, script) VALUES (?1, ?2, 0, 1000, '')",
+                  rusqlite::params![tid, s.input_txid]).unwrap();
+        c.execute("INSERT INTO transaction_outputs (transaction_id, vout, satoshis, script) VALUES (?1, 0, 900, '6a'), (?1, 1, 50, '6a')",
+                  [tid]).unwrap();
+        c.execute("UPDATE outputs SET locking_script = X'76a914', output_description = 'change back to us' WHERE txid = ?1",
+                  [&s.input_txid]).unwrap();
+        c.execute("INSERT INTO output_baskets (user_id, name, created_at, updated_at) VALUES (1, 'probe basket', 0, 0)", []).unwrap();
+        let basket = c.last_insert_rowid();
+        c.execute("UPDATE outputs SET basket_id = ?1, custom_instructions = 'ci' WHERE txid = ?2 AND vout = 0",
+                  rusqlite::params![basket, s.txid]).unwrap();
+        let out_id: i64 = c.query_row("SELECT outputId FROM outputs WHERE txid = ?1", [&s.txid], |r| r.get(0)).unwrap();
+        c.execute("INSERT INTO output_tags (user_id, tag, created_at, updated_at) VALUES (1, 'probe-tag', 0, 0)", []).unwrap();
+        let tag = c.last_insert_rowid();
+        c.execute("INSERT INTO output_tag_map (output_id, output_tag_id, created_at, updated_at) VALUES (?1, ?2, 0, 0)",
+                  rusqlite::params![out_id, tag]).unwrap();
+        let action = crate::database::TransactionRepository::new(c).get_by_txid(&s.txid).unwrap().unwrap();
+        brc100_action_json(c, &action, true, true, true).unwrap()
+    }
+
+    #[test]
+    fn p5_b1_status_is_the_brc100_word_as_stored() {
+        for status in ["completed", "unprocessed", "sending", "unproven", "unsigned", "nosend", "nonfinal", "failed"] {
+            assert_eq!(action_json(status, None)["status"], status, "status {} returned as", status);
+        }
+    }
+
+    #[test]
+    fn p5_b1_inputs_and_outputs_have_the_brc100_shape() {
+        let a = action_json("unproven", Some("a valid description"));
+        assert_eq!(a["description"], "a valid description");
+        let i = &a["inputs"][0];
+        assert!(i["sourceOutpoint"].as_str().unwrap().ends_with(".0"), "{}", i);
+        assert_eq!((i["sourceSatoshis"].as_i64(), i["sequenceNumber"].as_u64()), (Some(1000), Some(0xFFFF_FFFE)),
+                   "sequence from the stored raw tx: {}", i);
+        assert_eq!((i["unlockingScript"].as_str(), i["sourceLockingScript"].as_str(), i["inputDescription"].as_str()),
+                   (Some("5151"), Some("76a914"), Some("")), "{}", i);
+        let ours = &a["outputs"][0];
+        assert_eq!((ours["outputIndex"].as_u64(), ours["spendable"].as_bool(), ours["basket"].as_str(),
+                    ours["customInstructions"].as_str(), ours["lockingScript"].as_str()),
+                   (Some(0), Some(true), Some("probe basket"), Some("ci"), Some("6a")), "{}", ours);
+        assert_eq!(ours["tags"], serde_json::json!(["probe-tag"]));
+        let theirs = &a["outputs"][1];
+        assert_eq!((theirs["spendable"].as_bool(), theirs["basket"].as_str(), theirs["outputDescription"].as_str()),
+                   (Some(false), Some(""), Some("")), "{}", theirs);
+        assert_eq!(theirs["tags"], serde_json::json!([]));
+    }
+
+    #[test]
+    fn p5_b1_descriptions_brc100_cannot_carry_become_empty() {
+        assert_eq!(action_json("unproven", None)["description"], "");
+        assert_eq!(action_json("unproven", Some("fee"))["description"], "", "a 3-char description is not valid BRC-100");
+    }
+
+    /// `P5-B3` (review HIGH-1): an abandoned deferred action is released only if its
+    /// reservation is held under the TXID — `TaskFailAbandoned` restores by txid. This is
+    /// why the deferred branch renames placeholder → txid. Real `task_fail_abandoned::run`.
+    #[tokio::test]
+    async fn p5_b3_abandoned_unsigned_action_is_released_only_when_held_by_txid() {
+        let state = app_state();
+        let by_txid = seed(&state, "unsigned", true, Reserved::Txid);
+        let by_placeholder = seed(&state, "unsigned", true, Reserved::Placeholder);
+        crate::monitor::task_fail_abandoned::run(&state).await.unwrap();
+        let held = |s: &abort_action_tests::Seeded| -> i64 {
+            state.database.lock().unwrap().connection().query_row(
+                "SELECT spendable FROM outputs WHERE txid = ?1", [&s.input_txid], |r| r.get(0)).unwrap()
+        };
+        assert_eq!(held(&by_txid), 1, "input held under the txid was not released");
+        assert_eq!(held(&by_placeholder), 0, "control: a placeholder-held input is NOT released by this task");
+    }
+
+    #[test]
+    fn p5_b2_list_certificates_total_is_named_total_certificates() {
+        let v = serde_json::to_value(crate::handlers::certificate_handlers::ListCertificatesResponse {
+            total_certificates: 3, certificates: vec![] }).unwrap();
+        assert_eq!(v["totalCertificates"], 3, "{}", v);
     }
 }

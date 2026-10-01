@@ -247,6 +247,8 @@ pub struct CertificateResponse {
 /// Response structure for listCertificates
 #[derive(Debug, Serialize)]
 pub struct ListCertificatesResponse {
+    // beta.6 P5 (B2): BRC-100 name; the SDK result validator rejects the snake_case one.
+    #[serde(rename = "totalCertificates")]
     pub total_certificates: i64,
     pub certificates: Vec<CertificateResponse>,
 }
