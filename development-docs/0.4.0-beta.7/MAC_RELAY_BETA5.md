@@ -9,6 +9,53 @@
 
 ---
 
+# 📋 ROUND M-01a (**macOS**) — ✅ **Answers W-30a §4, W-30b, W-30c, W-01a. On `0.4.0` @ `065a2a00`: `cargo test --workspace` 0 failed (P1–P5 all green); `hodos_tests` 342 passed / 0 failed / 1 skipped (by design); `PaymentCostP3.*` 4/4; nlohmann on macOS classifies `1e300` and `18446744073709551614` the way P3 relies on. First macOS `ERR_AUTH_MALFORMED`: 2026-09-23 01:50:09 MDT.** No owner time used.
+
+**Host (📏 2026-10-01):** macOS 26.6 (arm64) · rustc/cargo 1.94.1 · Apple clang 21.0.0 · cmake 4.3.1 · nlohmann_json **3.12.0** (Homebrew, `/opt/homebrew/share/cmake/nlohmann_json`). The tree was clean at `065a2a00` (fast-forward pull, no conflicts). ⚠️ The relay is now at `0.4.0-beta.7/MAC_RELAY_BETA5.md`; the rename came through cleanly.
+
+## §1 — Wallet tests (W-30b §2.1, W-30c §2.2, W-01a §2) — 📏
+`cd rust-wallet && cargo test --workspace`, **exit 0, 0 failed in every binary**:
+- `hodos_wallet` lib **482 passed** / 2 ignored · bin **633 passed** / 3 ignored · integration files (`beef_crypto_cert`, `diagnostic`, `sdk_interop` 9, `sighash_transaction`, `tier3`…`tier12`) all ok · `hodos_permission_engine` 47 + `decision_matrix` 33 · doc-tests 4.
+- New tests counted by name prefix in the bin run (`::pN_` … ok): **p1 13 · p2 16 · p3 4 · p4 4 (+1 ignored = `p4_a5`, network) · p5 5. 0 FAILED.** p1 = 13 matches W-30b's count. My p3 count only covers names starting `p3_`, so it may not include every P3 test; cross-check it against your list.
+- ✅ **macOS does NOT block the loopback listener.** `p1_a2_wire_nonce_lengths` and `p1_a4_production_handshake_refuses_forged_reply` (TCP on `127.0.0.1:0`) passed.
+- Optional (network): `cargo test --bin hodos-wallet -- --ignored p4_a5` → **`p4_a5_live_overlay_certificates_still_resolve ... ok`**, 1 passed, 2.28 s. Real overlay certificates still resolve from macOS.
+- The three ignored tests besides `p4_a5` are the existing `test_decode_typescript_scripts` and `test_fetch_utxos_nonexistent_address`, unchanged.
+
+## §2 — `hodos_tests` (W-30c §2.3) — 📏
+Rebuilt in the existing Mac test tree `cef-native/build-tests` (`-DHODOS_BUILD_TESTS=ON`, Release; binary `build-tests/bin/hodos_tests`, dated 2026-10-01 06:38, ad-hoc signed by the build). Run: **343 tests / 72 suites, 342 passed, 0 failed, 1 skipped**, exit 0.
+- **`PaymentCostP3.*` 4/4 OK**: `ImpossibleOutputAmountsAreNotDerivable`, `NegativeOutputCannotShrinkThePrice`, `NegativeSingleAmountShapesAreNotDerivable`, `OrdinaryAmountsStillPrice`.
+- Existing `ComputePaymentCost.*` 9/9 OK (unchanged).
+- The skip is `UpdateStagerRig.StagesFromLocalFeed` ("rig env not set (run scripts/test-update-feed.ps1)"). It is the same Windows-rig skip as before, not new.
+- Link output only adds the usual Homebrew `libcrypto.a … built for newer macOS (26.0) than being linked (12.0)` warnings. These are pre-existing and test-binary only.
+
+## §3 — nlohmann edge cases on macOS (W-30c §2.3 question) — 📏
+A standalone probe, built against the same header the tests link (`/opt/homebrew/include`, nlohmann **3.12.0**), parsed each value with `json::parse`:
+
+| input | `is_number_unsigned` | `is_number_integer` | `is_number_float` | branch in `ReadSatoshis` |
+|---|---|---|---|---|
+| `1e300` | 0 | 0 | **1** | none ⇒ `false` (not derivable) ✅ |
+| `18446744073709551614` | **1** | 1 | 0 | unsigned, `> kMaxSatoshis` ⇒ `false` ✅ (no wrap to −2) |
+| `-9223372036854775808` | 0 | **1** | 0 | integer, `< 0` ⇒ `false` ✅ |
+| `2100000000000001` | **1** | 1 | 0 | unsigned, `> kMaxSatoshis` ⇒ `false` ✅ |
+| `1.9` | 0 | 0 | **1** | none ⇒ `false` ✅ |
+| `18446744073709551616` (UINT64_MAX+1, extra) | 0 | 0 | **1** | none ⇒ `false` ✅ |
+
+Note for the header: nlohmann reports `is_number_integer()` = **true for unsigned values too**. `ReadSatoshis` is correct only because it checks `is_number_unsigned()` **first**, so keep that order. This is the same library on both platforms, but the measurement above is macOS (do NOT inherit this).
+
+## §4 — First `ERR_AUTH_MALFORMED` on macOS (W-30a §4) — 📏 do NOT inherit Windows' time
+Grepped every retained wallet log (`~/Library/Application Support/<profile>/logs/wallet_r*.log`):
+- **Installed app** (`HodosBrowser`, logs retained back to **2026-08-13**, so this first time is real): first hit **2026-09-23 01:50:09.799 MDT**, `task_check_peerpay.rs:112`, `Handshake failed: server returned 400 (expected 200): {"status":"error","code":"ERR_AUTH_MALFORMED",...}`. Just before it: **`503` at 01:48:03 and 01:49:04 MDT**, then 400 from 01:50:09 on, every ~60 s. The 503 → 400 handover fits a server redeploy at ~01:49. That is an inference; the measured fact is the timestamps. Last hit 2026-09-29 08:55:51 (5,841 + 1,470 lines in the two newest files).
+- **Dev profile** (`HodosBrowserDev`): first hit 2026-09-23 08:22:59 MDT, but its oldest retained line is 08:22:06 the same morning. ⇒ **that time comes only from what the logs kept, not from when the break started; do not use it.** Last hit 2026-09-30 06:11:38.
+- Both macOS times are ~1 min after Windows' 01:49 MDT and consistent with it.
+
+## §5 — Not done, and why
+- **W-30b §2.2 (optional live "handshake OK, reply signature verified").** Not run. It needs a dev wallet built from the new code running live. From past experience, starting the dev wallet can bring up the Keychain dialog (owner time), and it must not collide with the owner's running wallet on 31301. It folds naturally into the **macOS app rebuild + smoke you're queueing before promote**. I'll measure it there and grep for `handshake OK` within 60 s of start.
+
+## §6 — Next on macOS
+Waiting for your round that queues the beta.6 macOS app rebuild + smoke on `cef-binaries-macos-150.0.48-g7d50c1c` (the engine already staged in this checkout's `cef-binaries/`, verified in M-30b). Nothing else is open from W-30a…W-01a.
+
+---
+
 # 📋 ROUND W-01a (**Windows**) — ✅ **beta.6 P4 (recipient-name spoofing) and P5 (SDK-validator fixes) landed. Shared Rust only, no C++.** 🍎 Nothing to rebuild in the shell; please run the wallet tests.
 
 **§1 — What landed (`origin/0.4.0`).** P4 `7cbfd10` + `0b4cd58`: `rust-wallet/src/identity_resolver.rs` (a name is shown only from a certificate a trusted certifier signed, about that key) + `rust-wallet/tests/fixtures/identity_cert_vectors.json` (made by `@bsv/sdk` 2.8.11). P5 `52ef75c` + `d0b5b5e`: `rust-wallet/src/handlers.rs` (`listActions` BRC-100 shape, `signAndProcess:false` ⇒ `signableTransaction`, base64 references), `rust-wallet/src/handlers/certificate_handlers.rs` (`totalCertificates`).
