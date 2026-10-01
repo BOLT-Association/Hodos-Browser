@@ -106,6 +106,7 @@ existing links use it. Describe the **symptom or the defect**, not the fix:
 | `TICKET_headerless_loopback_requests_are_trusted_as_wallet_ui.md` | 📌 **ASSIGNED 2026-09-30** | **B5-T5 Identity & privacy, phase P2** — moved from beta.8 intake (👤 owner 2026-09-30): per-launch secret (`W9`, `P2-A14`) + `IsInternalOrigin` first-party-only (answers `P2-A9`); TSA-322 | 2026-09-30 |
 | `TICKET_modal_info_tooltip_overflows_modal.md` | 📌 **ASSIGNED 2026-09-27** | **B5-T6 Browser shell** — (moved from beta.3; low) | beta.3 |
 | `TICKET_signaction_response_not_brc100_shape.md` | 📌 **ASSIGNED 2026-09-27** | **B5-T1 Money path** — (moved from beta.3; ⚠️ **money**: a fatal broadcast failure returns success) | beta.3 |
+| `TICKET_weak_arc_statuses_count_as_on_the_network.md` | 📌 **ASSIGNED 2026-09-30** | **B5-T1 Money path** — deferred from beta.6 P3 (TSA-250) by the owner: one ARC "on the network" line for broadcast, money-in and both monitor tasks | 2026-09-30 |
 | `TICKET_synced_outputs_store_a_fabricated_locking_script.md` | 📌 **ASSIGNED 2026-09-27** | **B5-T1 Money path** — (moved from beta.3; ⭐ would fool the Track 1 classifier) | beta.3 |
 | `TICKET_transaction_row_can_sit_at_created_while_its_coin_is_on_chain.md` | 📌 **ASSIGNED 2026-09-27** | **B5-T1 Money path** — (moved from beta.3; reasoned, not measured) | beta.3 |
 | `TICKET_wallet_bridge_plumbing_is_advertised_to_every_site.md` | 📌 **ASSIGNED 2026-09-27** | **B5-T5 Identity & privacy** — (moved from beta.3; fingerprint surface; medium) | beta.3 |

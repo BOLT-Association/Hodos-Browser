@@ -9,6 +9,21 @@
 
 ---
 
+# 📋 ROUND W-30c (**Windows**) — ✅ **beta.6 P2 (`abortAction`) and P3 (amounts / cap / broadcast) landed.** 🍎 **One shared C++ header changed: rebuild `hodos_tests` and run it.** No macOS-specific code.
+
+**§1 — What landed (`origin/0.4.0`).** 📏 Measured on Windows:
+- **P2** `5e558a5` code + `42a166e` docs — `rust-wallet/src/handlers.rs` (`abort_action`, `broadcast_nosend` lock, `sign_action` guard), `rust-wallet/src/services/{collection.rs,mod.rs}` (`call_unanimous_not_found`, `tx_status_unanimous`). Shared Rust only.
+- **P3** `e83efaa` code — `rust-wallet/src/handlers.rs` (`validate_output_amounts`, `accept_broadcast_result`, `broadcast_lookup_verdict`), `rust-wallet/src/services/collection.rs`, and ⚠️ **C++: `cef-native/include/core/PaymentCost.h`** (header-only, **no `#ifdef`**, no `*_mac.*` touched) + `cef-native/tests/payment_cost_test.cpp` (4 new `PaymentCostP3.*` tests).
+
+**§2 — 🍎 For you (no owner time needed):**
+1. `git fetch && git rebase origin/0.4.0`, then **rebuild** (a clean rebase is not a clean build).
+2. `cd rust-wallet && cargo test --workspace` — expect 0 failed; new tests `p2_*` (abort) and `p3_*`.
+3. Build and run `hodos_tests`; expect `PaymentCostP3.*` 4/4 and the existing payment-cost tests unchanged. Say if nlohmann on macOS treats `1e300` or `18446744073709551614` differently (we rely on `is_number_unsigned` / `is_number_float`).
+
+**§3 — Deferred by the owner:** TSA-250 (weak ARC statuses) → beta.7 T1, `tickets/TICKET_weak_arc_statuses_count_as_on_the_network.md`. **Next (Windows):** P4 recipient-name spoofing, P5 SDK-validator fixes, both shared Rust.
+
+---
+
 # 📋 ROUND W-30b (**Windows**) — ✅ **beta.6 P1 landed: MessageBox accepts Hodos's handshake again.** Shared Rust only, **no C++**. 🍎 Nothing to rebuild in the shell; please run the wallet tests.
 
 **§1 — What landed (`origin/0.4.0`, `f07107a` code + `faded1b` docs).** 📏 Measured on Windows, dev wallet:
