@@ -31,6 +31,7 @@ pub mod task_replay_overlay;
 pub mod task_consolidate_dust;
 pub mod task_verify_double_spend;
 pub mod task_sync_headers;
+pub mod task_push;
 pub mod task_recheck_proofs;
 pub mod task_retry_peerpay_outbox;
 pub mod task_refresh_ship_cache;
@@ -122,6 +123,7 @@ impl Monitor {
             warn!("Monitor::start() called but Monitor is already running — skipping");
             return None;
         }
+        task_push::start(state.clone());
         let monitor = Self::new(state);
         Some(tokio::spawn(async move {
             monitor.run().await;

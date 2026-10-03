@@ -13584,6 +13584,28 @@ pub async fn internalize_action(
         }
     }
 
+    // spv + push: the subject tx is on the network but unproven, and Arcade only pushes events for
+    // txs submitted under a callback token. Re-submit it (Extended Format, idempotent) to subscribe
+    // this wallet's token. Best-effort and off the request path: the proof task polls regardless.
+    if crate::chain_mode::push_enabled() {
+        if let Some(ref beef) = parsed_beef {
+            if !beef.tx_has_proof(&txid) {
+                if let (Ok(ef), Some(provider)) = (
+                    beef.to_ef_hex(),
+                    crate::services::providers::ArcadeProvider::from_env(state.services.client.clone()),
+                ) {
+                    let short = txid[..txid.len().min(16)].to_string();
+                    tokio::spawn(async move {
+                        match provider.register_for_push(&ef).await {
+                            Ok(code) => log::info!("📡 Arcade push: subscribed token for {} ({})", short, code),
+                            Err(e) => log::warn!("📡 Arcade push: could not subscribe {}: {} (polling covers it)", short, e),
+                        }
+                    });
+                }
+            }
+        }
+    }
+
     // spv mode: a BRC-42 output whose own transaction came with a BUMP has just been
     // verified against the wallet's header chain (`verify_beef_bumps`, above), so that
     // proof IS the confirmation. Mark it confirmed now. `store_derived_utxo` inserts

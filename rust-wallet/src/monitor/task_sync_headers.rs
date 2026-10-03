@@ -16,7 +16,11 @@ use crate::header_sync::{self, ChaintracksSource};
 use crate::services::providers::ChaintracksProvider;
 use crate::AppState;
 
+/// One header sync at a time: the monitor's tick and the push driver both call `run`.
+static RUN_LOCK: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
+
 pub async fn run(state: &web::Data<AppState>) -> Result<(), String> {
+    let _one_at_a_time = RUN_LOCK.lock().await;
     let Some(svc) = header_sync::global() else {
         return Ok(());
     };
