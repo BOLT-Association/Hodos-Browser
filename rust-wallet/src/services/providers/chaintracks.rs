@@ -39,6 +39,35 @@ impl ChaintracksProvider {
     pub fn from_env(client: reqwest::Client) -> Option<Self> {
         configured_base_url().map(|base| Self::new(client, base))
     }
+
+    /// The server's own claimed tip height (`GET /height`). A hint for how far to
+    /// sync; the wallet's header chain never trusts it for chain selection.
+    pub async fn tip_height(&self) -> Result<u32, IndexerError> {
+        let resp = self
+            .client
+            .get(format!("{}/height", self.base))
+            .send()
+            .await
+            .map_err(|e| IndexerError::Transport(e.to_string()))?;
+        if !resp.status().is_success() {
+            return Err(IndexerError::ProviderStatus {
+                provider: NAME,
+                status: resp.status().as_u16(),
+                body: resp.text().await.unwrap_or_default(),
+            });
+        }
+        let v: Value = resp
+            .json()
+            .await
+            .map_err(|e| IndexerError::Transport(e.to_string()))?;
+        v.get("height")
+            .and_then(|h| h.as_u64())
+            .and_then(|h| u32::try_from(h).ok())
+            .ok_or(IndexerError::InvalidResponse {
+                provider: NAME,
+                reason: "missing 'height'".into(),
+            })
+    }
 }
 
 #[async_trait]

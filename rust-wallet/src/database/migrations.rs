@@ -1386,3 +1386,28 @@ pub fn migrate_v24_to_v25(conn: &Connection) -> Result<()> {
     info!("   ✅ V25 migration applied (default_bundled_scope_grant)");
     Ok(())
 }
+
+/// V25 → V26 — WS4 verified header chain. Owner-approved 2026-10-03.
+///
+/// One additive table; nothing existing is altered. Holds raw 80-byte headers per
+/// network. Height, chainwork and the active chain are NOT stored: they are
+/// recomputed and every header re-validated on load (`HeaderChain::from_stored`),
+/// so this table is a cache of candidate headers, never an authority.
+///
+/// Idempotent: `CREATE TABLE IF NOT EXISTS`.
+pub fn migrate_v25_to_v26(conn: &Connection) -> Result<()> {
+    info!("   Creating header_chain table (V26)...");
+    conn.execute_batch(
+        "CREATE TABLE IF NOT EXISTS header_chain (
+            network TEXT NOT NULL,
+            block_hash TEXT NOT NULL,
+            height INTEGER NOT NULL,
+            header_hex TEXT NOT NULL,
+            created_at INTEGER NOT NULL,
+            PRIMARY KEY (network, block_hash)
+        );
+        CREATE INDEX IF NOT EXISTS idx_header_chain_height ON header_chain(network, height);",
+    )?;
+    info!("   ✅ V26 migration applied (header_chain)");
+    Ok(())
+}

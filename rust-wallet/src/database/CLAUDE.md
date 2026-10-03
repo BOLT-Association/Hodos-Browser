@@ -36,6 +36,7 @@ This module provides the complete data access layer for the HodosBrowser wallet.
 | `Address` | `addresses` | `wallet_id`, `index`, `address`, `public_key`, `used`, `balance`, `pending_utxo_check` | index: -1=master, -2=external, -3=backup, 0+=derived |
 | `Output` | `outputs` | `user_id`, `txid`, `vout`, `satoshis`, `spendable`, `change`, `spent_by`, `derivation_prefix/suffix`, `sender_identity_key`, `locking_script` (BLOB) | Primary UTXO tracking table. Note: the `confirmed` column (V14) is **not** a field on the struct — it is read/written by dedicated `OutputRepository` methods |
 | `ParentTransaction` | `parent_transactions` | `txid`, `raw_hex`, `utxo_id` | Raw tx cache for BEEF building |
+| `HeaderChainRepository` | `header_chain` (V26) | `network`, `block_hash`, `height`, `header_hex` | WS4 candidate headers per network; a cache, not an authority — `HeaderChain::from_stored` re-validates all on load |
 | `BlockHeader` | `block_headers` | `block_hash`, `height`, `header_hex` | Cached for TSC proof enhancement |
 | `ProvenTx` | `proven_txs` | `txid`, `height`, `merkle_path` (BLOB), `raw_tx` (BLOB) | Immutable in normal operation; `replace_proof`/`delete_by_txid` exist for repair paths |
 | `ProvenTxReq` | `proven_tx_reqs` | `txid`, `status`, `attempts`, `proven_tx_id` FK | Proof acquisition lifecycle |

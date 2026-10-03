@@ -30,6 +30,7 @@ pub mod task_backup;
 pub mod task_replay_overlay;
 pub mod task_consolidate_dust;
 pub mod task_verify_double_spend;
+pub mod task_sync_headers;
 pub mod task_retry_peerpay_outbox;
 pub mod task_refresh_ship_cache;
 pub mod task_sweep_reservations;
@@ -61,6 +62,7 @@ struct TaskSchedule {
     retry_peerpay_outbox: u64,
     refresh_ship_cache: u64,
     sweep_reservations: u64,
+    sync_headers: u64,
 }
 
 impl Default for TaskSchedule {
@@ -81,6 +83,7 @@ impl Default for TaskSchedule {
             retry_peerpay_outbox: 30, // 30 seconds — fast tick, actual retry governed by next_retry_at
             refresh_ship_cache: 300,  // 5 min — matches ship_cache::FRESH_TTL so cache never enters stale window
             sweep_reservations: 300,  // 5 min — each run only releases reservations older than MAX_AGE_SECS
+            sync_headers: 30,         // 30 seconds — no-op unless HODOS_CHAINTRACKS_URL is set
         }
     }
 }
@@ -188,6 +191,7 @@ impl Monitor {
         // stranded by a process kill; it replaced an unconditional, unverified blanket
         // restore that used to run inline in main().
         let mut last_sweep_reservations: u64 = 0;
+        let mut last_sync_headers: u64 = 0; // sync on first tick
 
         // Small initial delay to let the server finish starting up
         tokio::time::sleep(Duration::from_secs(5)).await;
@@ -360,6 +364,14 @@ impl Monitor {
                 if let Err(e) = task_consolidate_dust::run(&self.state).await {
                     warn!("   ⚠️ TaskConsolidateDust failed: {}", e);
                     self.log_event("TaskConsolidateDust:error", Some(&e));
+                }
+            }
+
+            // TaskSyncHeaders — verified header chain (WS4); no-op without HODOS_CHAINTRACKS_URL
+            if now - last_sync_headers >= self.schedule.sync_headers {
+                last_sync_headers = now;
+                if let Err(e) = task_sync_headers::run(&self.state).await {
+                    warn!("   ⚠️ TaskSyncHeaders failed: {}", e);
                 }
             }
 
