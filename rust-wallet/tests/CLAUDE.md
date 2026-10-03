@@ -2,6 +2,8 @@
 
 > 780+ integration tests validating cryptography, transaction handling, BEEF format, certificates, and storage against known-answer vectors (NIST, RFC, BIP, BRC specs). 55 `#[test]` functions accumulate ~686 `check!` assertions across 12 files.
 
+> `tests/migrate_copy.rs` (ignored): opens, and so migrates, the DB file named by `HODOS_MIGRATE_DB`. Run it on a COPY of a real wallet DB, then compare table row counts from outside; never point it at a live DB.
+
 ## Overview
 
 This directory contains 12 integration test files organized into tiers of increasing coverage specificity. Tests use a diagnostic pattern with atomic pass/fail counters and a `check!` macro for structured reporting. All tests run against the `hodos_wallet` crate's public API — no mocking, no test doubles. Test vectors come from authoritative sources: NIST SP 800-38D (AES-GCM), RFC 4231 (HMAC), TREZOR (BIP-39), bitcoin-sv/bitcoin-sv (sighash), and the BSV TypeScript SDK (BRC-42/43/52).

@@ -285,6 +285,14 @@ impl Beef {
         !self.bumps.is_empty()
     }
 
+    /// Does the transaction with this txid (display hex) carry its own BUMP in this BEEF?
+    pub fn tx_has_proof(&self, txid: &str) -> bool {
+        self.find_txid(txid)
+            .and_then(|i| self.tx_to_bump.get(i).copied().flatten())
+            .map(|b| b < self.bumps.len())
+            .unwrap_or(false)
+    }
+
     /// Create a new empty BEEF structure
     pub fn new() -> Self {
         Beef {
@@ -1329,6 +1337,18 @@ mod verify_bumps_tests {
             tx_to_bump: vec![Some(0)],
         };
         (beef, hex::encode(root))
+    }
+
+    #[test]
+    fn tx_has_proof_only_for_a_tx_that_carries_its_own_bump() {
+        let (mut b, _) = fixture();
+        let txid: String = dsha(&b.transactions[0]).iter().rev().map(|x| format!("{:02x}", x)).collect();
+        assert!(b.tx_has_proof(&txid));
+        assert!(!b.tx_has_proof(&"00".repeat(32)), "unknown txid");
+        b.tx_to_bump[0] = None;
+        assert!(!b.tx_has_proof(&txid), "no BUMP mapped to it");
+        b.tx_to_bump[0] = Some(7);
+        assert!(!b.tx_has_proof(&txid), "dangling BUMP index");
     }
 
     #[test]
