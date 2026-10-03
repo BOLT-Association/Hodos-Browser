@@ -791,7 +791,34 @@ enum OracleVerdict {
     Inconclusive(String),
 }
 
+/// Map Arcade's answer onto the oracle verdict (spv mode: Arcade is the only oracle).
+/// `NotFound` is authoritative because every tx the wallet broadcasts goes through
+/// Arcade; transport/other errors are no signal.
+fn verdict_from_arcade(r: Result<crate::services::TxStatus, crate::services::IndexerError>) -> OracleVerdict {
+    use crate::services::{IndexerError, TxState};
+    match r {
+        Ok(s) => match s.state {
+            TxState::Mined => OracleVerdict::Present { any_confirmed: true },
+            TxState::InMempool => OracleVerdict::Present { any_confirmed: false },
+            TxState::Rejected => OracleVerdict::AllNotFound,
+            TxState::DoubleSpendAttempted | TxState::Unknown => OracleVerdict::Inconclusive(format!(
+                "arcade: {:?} ({:?})",
+                s.state, s.raw_provider_status
+            )),
+        },
+        Err(IndexerError::NotFound) => OracleVerdict::AllNotFound,
+        Err(e) => OracleVerdict::Inconclusive(format!("arcade: {}", e)),
+    }
+}
+
 async fn oracle_quorum_check(client: &reqwest::Client, txid: &str) -> OracleVerdict {
+    if crate::chain_mode::is_spv() {
+        use crate::services::IndexerProvider;
+        return match crate::services::providers::ArcadeProvider::from_env(client.clone()) {
+            Some(p) => verdict_from_arcade(p.tx_status(txid).await),
+            None => OracleVerdict::Inconclusive("arcade not configured".to_string()),
+        };
+    }
     let (woc, jb, bt) = tokio::join!(
         query_woc_txid(client, txid),
         query_junglebus_txid(client, txid),
@@ -890,5 +917,37 @@ async fn query_bitails_txid(client: &reqwest::Client, txid: &str) -> OracleStatu
             }
         }
         Err(e) => OracleStatus::Error(format!("transport:{}", e)),
+    }
+}
+
+#[cfg(test)]
+mod spv_oracle_tests {
+    use super::*;
+    use crate::services::{IndexerError, TxState, TxStatus};
+
+    fn st(state: TxState) -> Result<TxStatus, IndexerError> {
+        Ok(TxStatus {
+            txid: "ab".into(),
+            state,
+            block_height: None,
+            block_hash: None,
+            merkle_path_bump: None,
+            raw_provider_status: None,
+        })
+    }
+
+    #[test]
+    fn arcade_answers_map_to_oracle_verdicts() {
+        assert!(matches!(verdict_from_arcade(st(TxState::Mined)), OracleVerdict::Present { any_confirmed: true }));
+        assert!(matches!(verdict_from_arcade(st(TxState::InMempool)), OracleVerdict::Present { any_confirmed: false }));
+        assert!(matches!(verdict_from_arcade(st(TxState::Rejected)), OracleVerdict::AllNotFound));
+        assert!(matches!(verdict_from_arcade(Err(IndexerError::NotFound)), OracleVerdict::AllNotFound));
+    }
+
+    #[test]
+    fn ambiguous_or_failed_arcade_answers_are_inconclusive_never_a_failure_verdict() {
+        assert!(matches!(verdict_from_arcade(st(TxState::DoubleSpendAttempted)), OracleVerdict::Inconclusive(_)));
+        assert!(matches!(verdict_from_arcade(st(TxState::Unknown)), OracleVerdict::Inconclusive(_)));
+        assert!(matches!(verdict_from_arcade(Err(IndexerError::Transport("down".into()))), OracleVerdict::Inconclusive(_)));
     }
 }
