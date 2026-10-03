@@ -1082,6 +1082,14 @@ impl WalletDatabase {
             info!("   ✅ Schema V25 applied");
         }
 
+        if current_version < 26 {
+            // WS4 (owner-approved 2026-10-03): verified header chain candidates.
+            info!("   Applying migration V26 (header_chain)...");
+            migrations::migrate_v25_to_v26(&self.conn)?;
+            self.conn.execute("INSERT INTO schema_version (version) VALUES (26)", [])?;
+            info!("   ✅ Schema V26 applied");
+        }
+
         // Startup repair: V12 migration may have recorded version but failed to add columns
         // (INSERT INTO schema_version succeeded but ALTER TABLE was skipped/failed).
         // Re-run the column checks unconditionally to patch any inconsistent DBs.

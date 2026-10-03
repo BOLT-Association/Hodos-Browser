@@ -464,13 +464,13 @@ impl HeaderChain {
 }
 
 #[cfg(test)]
-mod tests {
+pub(crate) mod tests {
     use super::*;
 
-    const NOW: u32 = 2_000_000_000;
+    pub(crate) const NOW: u32 = 2_000_000_000;
 
     /// Mine a header on top of `prev` (wire hash) at regtest difficulty.
-    fn mine(prev: [u8; 32], salt: u32, bits: u32) -> Header {
+    pub(crate) fn mine(prev: [u8; 32], salt: u32, bits: u32) -> Header {
         let target = compact_to_target(bits).unwrap();
         let mut h = Header { version: 1, prev_hash: prev, merkle_root: [salt as u8; 32], time: 1_700_000_000 + salt, bits, nonce: 0 };
         loop {
@@ -484,7 +484,7 @@ mod tests {
     }
 
     /// Test params whose genesis is a header we mine ourselves.
-    fn fixture() -> (HeaderChain, Header) {
+    pub(crate) fn fixture() -> (HeaderChain, Header) {
         let g = mine([0; 32], 0, 0x207f_ffff);
         let ghash: &'static str = Box::leak(g.hash_hex().into_boxed_str());
         let params = Params { name: "test", fixed_bits: 0x207f_ffff, genesis_hash: ghash };

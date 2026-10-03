@@ -165,11 +165,49 @@ fn fix_tsc_byte_order(txid: &str, tsc: &Value) -> Option<Value> {
 ///
 /// Returns Ok(true) if the proof's computed root matches the block's merkle root,
 /// Ok(false) if they don't match, or Err if the block header can't be fetched.
+/// Verify a TSC proof's merkle root against the verified header chain (WS4).
+///
+/// `Ok(true)` / `Ok(false)` are verdicts against the active chain. Anything that
+/// stops us reaching a verdict (no height in the proof, chain not initialised, no
+/// header at that height yet) is an `Err`, so callers never read it as "invalid".
+pub fn verify_tsc_proof_against_header_chain(txid: &str, tsc: &Value) -> CacheResult<bool> {
+    let svc = crate::header_sync::global()
+        .ok_or_else(|| CacheError::Api("header chain configured but not initialised".to_string()))?;
+    let height = match tsc["height"].as_u64() {
+        Some(h) if h > 0 => h as u32,
+        _ => {
+            return Err(CacheError::InvalidData(
+                "TSC proof has no height; cannot check it against the header chain".to_string(),
+            ))
+        }
+    };
+    let index = tsc["index"].as_u64().unwrap_or(0);
+    let nodes = match tsc["nodes"].as_array() {
+        Some(n) => n,
+        None => return Ok(false),
+    };
+    let root = match crate::beef::compute_merkle_root_from_tsc(txid, height, index, nodes) {
+        Ok(r) => r,
+        Err(e) => {
+            log::warn!("   Failed to compute merkle root for {}: {}", txid, e);
+            return Ok(false);
+        }
+    };
+    svc.check_merkle_root(height, &root).map_err(CacheError::Api)
+}
+
 pub async fn verify_tsc_proof_against_block(
     client: &Client,
     txid: &str,
     tsc: &Value,
 ) -> CacheResult<bool> {
+    // WS4: when a chaintracks source is configured, the root is checked against the
+    // wallet's own verified header chain and never against a third-party API. A
+    // configured-but-uninitialised chain is an ERROR, not a fall-through to WoC.
+    if crate::services::providers::chaintracks::configured_base_url().is_some() {
+        return verify_tsc_proof_against_header_chain(txid, tsc);
+    }
+
     let block_height = match tsc["height"].as_u64() {
         Some(h) if h > 0 => h as u32,
         _ => {
