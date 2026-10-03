@@ -6,6 +6,7 @@
 //! where both sides agree, then adds forward from there. A server that reorged shows
 //! up as `AddOutcome::Reorg`; one that lies fails `add_header` validation.
 
+use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 use std::sync::{Arc, Mutex, OnceLock};
 
 use async_trait::async_trait;
@@ -129,6 +130,33 @@ pub struct HeaderService {
 
 static SERVICE: OnceLock<Arc<HeaderService>> = OnceLock::new();
 
+/// Lowest height whose stored proofs need re-checking against the active chain
+/// (`u32::MAX` = nothing pending). Set after a reorg and once after the first
+/// successful sync; consumed by `monitor/task_recheck_proofs.rs`.
+static RECHECK_FROM: AtomicU32 = AtomicU32::new(u32::MAX);
+static STARTUP_RECHECK_REQUESTED: AtomicBool = AtomicBool::new(false);
+
+pub fn request_proof_recheck(from_height: u32) {
+    RECHECK_FROM.fetch_min(from_height, Ordering::SeqCst);
+}
+
+pub fn pending_proof_recheck() -> Option<u32> {
+    let v = RECHECK_FROM.load(Ordering::SeqCst);
+    (v != u32::MAX).then_some(v)
+}
+
+/// Clear the request only if no newer (lower) one arrived while we worked.
+pub fn clear_proof_recheck_if(seen: u32) {
+    let _ = RECHECK_FROM.compare_exchange(seen, u32::MAX, Ordering::SeqCst, Ordering::SeqCst);
+}
+
+/// Ask for one full re-check after the first successful sync of this process.
+pub fn request_startup_recheck_once() {
+    if !STARTUP_RECHECK_REQUESTED.swap(true, Ordering::SeqCst) {
+        request_proof_recheck(0);
+    }
+}
+
 pub fn init(chain: HeaderChain) -> Arc<HeaderService> {
     let svc = Arc::new(HeaderService { chain: Mutex::new(chain) });
     let _ = SERVICE.set(svc.clone());
@@ -159,6 +187,21 @@ impl HeaderService {
 mod tests {
     use super::*;
     use crate::header_chain::tests::{fixture, mine, NOW};
+
+    #[test]
+    fn recheck_request_keeps_the_lowest_height_and_clears_only_if_unchanged() {
+        // Process-wide state: use heights no other test uses, and restore at the end.
+        clear_proof_recheck_if(pending_proof_recheck().unwrap_or(u32::MAX));
+        request_proof_recheck(500);
+        request_proof_recheck(300);
+        request_proof_recheck(400);
+        assert_eq!(pending_proof_recheck(), Some(300));
+        request_proof_recheck(100); // newer, lower request arrives mid-run
+        clear_proof_recheck_if(300); // the run that saw 300 finishes
+        assert_eq!(pending_proof_recheck(), Some(100), "must not drop the newer request");
+        clear_proof_recheck_if(100);
+        assert_eq!(pending_proof_recheck(), None);
+    }
     use crate::header_chain::{compact_to_target, Params, U256};
     use std::collections::HashMap;
 
