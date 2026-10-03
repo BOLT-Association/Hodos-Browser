@@ -13844,6 +13844,30 @@ pub async fn internalize_action(
         }
     }
 
+    // spv mode, zero-conf (default on; HODOS_ZERO_CONF=off disables): a received output whose tx is
+    // not mined is spendable once the network has seen it. The BEEF's ancestry was validated and its
+    // BUMPs verified above; here every tx in it without a BUMP must also be seen on Arcade with no
+    // conflict. Spendable == linked to its (incoming, unproven) transaction row, exactly how the
+    // wallet's own unproven change is spendable. See `zero_conf.rs`.
+    if crate::chain_mode::zero_conf_enabled() && !derived_utxos.is_empty() {
+        if let Some(ref beef) = parsed_beef {
+            if !beef.tx_has_proof(&txid)
+                && crate::zero_conf::beef_zero_conf_ok(&state.services, beef, std::time::Duration::from_secs(4)).await
+            {
+                let db = state.database.lock().unwrap();
+                let output_repo = crate::database::OutputRepository::new(db.connection());
+                match output_repo.link_received_outputs_for_zero_conf(&txid) {
+                    Ok(n) if n > 0 => {
+                        drop(db);
+                        state.balance_cache.invalidate();
+                    }
+                    Ok(_) => {}
+                    Err(e) => log::warn!("   ⚠️  zero-conf link failed for {}: {}", txid, e),
+                }
+            }
+        }
+    }
+
     log::info!("✅ Incoming transaction internalized: {}", txid);
     if has_beef {
         if is_atomic_beef {

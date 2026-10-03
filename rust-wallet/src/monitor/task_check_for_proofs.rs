@@ -338,6 +338,12 @@ pub async fn run(state: &web::Data<AppState>, client: &reqwest::Client) -> Resul
                         // mempool), don't fail — it may still get mined. Only fail if
                         // WoC returns 404 (tx genuinely not found).
                         warn!("   ⚠️ {} DOUBLE_SPEND_ATTEMPTED — cross-verifying with WoC", &txid[..txid.len().min(16)]);
+                        // A received tx that Arcade now says conflicts is no longer safe to spend at
+                        // zero-conf: withdraw it (no-op for our own sends and for proven outputs).
+                        if let Ok(db) = state.database.lock() {
+                            let _ = crate::database::OutputRepository::new(db.connection()).unlink_received_outputs(txid);
+                        }
+                        state.balance_cache.invalidate();
                         match check_whatsonchain_confirmation(client, txid).await {
                             Ok(Some((confirmations, block_height))) => {
                                 if confirmations > 0 {

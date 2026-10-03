@@ -35,6 +35,7 @@ mod services;  // Phase 1.6d.B: WalletServices facade — IndexerProvider trait 
 mod permission_service;  // Phase 2.6-A.5: wrapper around hodos_permission_engine pure crate (dormant in A.5; wired into AppState in A.6)
 mod manifest;  // Phase 2.6-G: Rust port of C++ ManifestFetcher (fetch + lenient parse of .well-known/wallet-manifest.json)
 mod chain_mode;
+mod zero_conf;  // spv mode: received outputs spendable once seen on the network (HODOS_ZERO_CONF)
 mod arcade_push;  // spv mode: Arcade SSE wake-up for the proof task (polling stays the safety net)  // HODOS_CHAIN_MODE: public | spv (Arcade + verified headers only)
 mod header_chain;
 mod header_sync;  // WS4: header sync + process-wide HeaderService  // Wallet-Hardening WS4: verified header chain (PoW, linkage, most-work, reorg)

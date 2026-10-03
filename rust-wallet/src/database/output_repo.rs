@@ -546,6 +546,40 @@ impl<'a> OutputRepository<'a> {
         Ok(rows_affected)
     }
 
+    /// Zero-conf (spv mode): link a RECEIVED tx's still-unconfirmed, unlinked outputs to its
+    /// incoming transaction row. That link is what makes an unproven output selectable (the same
+    /// rule that lets the wallet spend its own unproven change). Returns rows changed; 0 when the
+    /// tx row is missing, is outgoing, or the outputs are already linked or confirmed.
+    pub fn link_received_outputs_for_zero_conf(&self, txid: &str) -> Result<usize> {
+        let rows = self.conn.execute(
+            "UPDATE outputs
+                SET transaction_id = (SELECT id FROM transactions WHERE txid = ?1 AND is_outgoing = 0)
+              WHERE txid = ?1 AND transaction_id IS NULL AND confirmed = 0
+                AND (SELECT COUNT(*) FROM transactions WHERE txid = ?1 AND is_outgoing = 0) = 1",
+            rusqlite::params![txid],
+        )?;
+        if rows > 0 {
+            info!("   ✅ Zero-conf: {} output(s) of {} are spendable (seen on the network)", rows, &txid[..std::cmp::min(16, txid.len())]);
+        }
+        Ok(rows)
+    }
+
+    /// Undo `link_received_outputs_for_zero_conf` (the tx was reported as a double-spend): the
+    /// outputs go back to "unconfirmed, not selectable". Only touches unconfirmed outputs of a
+    /// received tx, so proven or self-created outputs are never affected.
+    pub fn unlink_received_outputs(&self, txid: &str) -> Result<usize> {
+        let rows = self.conn.execute(
+            "UPDATE outputs SET transaction_id = NULL
+              WHERE txid = ?1 AND confirmed = 0
+                AND transaction_id IN (SELECT id FROM transactions WHERE txid = ?1 AND is_outgoing = 0)",
+            rusqlite::params![txid],
+        )?;
+        if rows > 0 {
+            info!("   ⚠️ Zero-conf withdrawn for {} output(s) of {}", rows, &txid[..std::cmp::min(16, txid.len())]);
+        }
+        Ok(rows)
+    }
+
     /// Mark every still-unconfirmed output of `txid` as confirmed. Called when a merkle proof
     /// for that transaction has been verified against the wallet's own header chain (spv
     /// mode), which is what makes an internalized output selectable. Returns rows changed.
@@ -2102,6 +2136,70 @@ mod promotion_tests {
         assert_eq!(repo.mark_tx_outputs_confirmed("aa").unwrap(), 2);
         assert_eq!((confirmed(&c, "aa", 0), confirmed(&c, "aa", 1)), (1, 1));
         assert_eq!(confirmed(&c, "bb", 0), 0);
+    }
+
+    // ---- zero-conf link / unlink: selectability is judged by the real selector query ----------
+
+    fn insert_received(c: &Connection, txid: &str, status: &str, is_outgoing: i64) {
+        c.execute(
+            "INSERT INTO transactions (txid, reference_number, status, is_outgoing, satoshis, created_at, updated_at)
+             VALUES (?1, ?2, ?3, ?4, 1000, 0, 0)",
+            rusqlite::params![txid, format!("ref-{}", txid), status, is_outgoing],
+        )
+        .unwrap();
+        c.execute(
+            "INSERT INTO outputs (user_id, vout, satoshis, txid, spendable, confirmed, derivation_prefix, derivation_suffix, purpose, created_at, updated_at)
+             VALUES (1, 0, 1000, ?1, 1, 0, '2-3241645161d8', 'a b', 'receive', 0, 0)",
+            rusqlite::params![txid],
+        )
+        .unwrap();
+    }
+
+    fn selectable(c: &Connection, txid: &str) -> bool {
+        OutputRepository::new(c)
+            .get_spendable_by_user(1)
+            .unwrap()
+            .iter()
+            .any(|o| o.txid.as_deref() == Some(txid))
+    }
+
+    #[test]
+    fn a_received_unproven_output_is_selectable_only_after_zero_conf_linking() {
+        let c = db();
+        insert_received(&c, "aa", "unproven", 0);
+        let repo = OutputRepository::new(&c);
+        assert!(!selectable(&c, "aa"), "unlinked and unconfirmed: not selectable (the conservative default)");
+        assert_eq!(repo.link_received_outputs_for_zero_conf("aa").unwrap(), 1);
+        assert!(selectable(&c, "aa"), "linked to its unproven tx row: selectable, like own change");
+        assert_eq!(repo.link_received_outputs_for_zero_conf("aa").unwrap(), 0, "idempotent");
+    }
+
+    #[test]
+    fn unlinking_withdraws_it_and_a_failed_tx_keeps_it_unselectable() {
+        let c = db();
+        insert_received(&c, "aa", "unproven", 0);
+        let repo = OutputRepository::new(&c);
+        repo.link_received_outputs_for_zero_conf("aa").unwrap();
+        assert_eq!(repo.unlink_received_outputs("aa").unwrap(), 1);
+        assert!(!selectable(&c, "aa"), "double-spend reported: back to not selectable");
+
+        repo.link_received_outputs_for_zero_conf("aa").unwrap();
+        c.execute("UPDATE transactions SET status = 'failed' WHERE txid = 'aa'", []).unwrap();
+        assert!(!selectable(&c, "aa"), "even if still linked, a failed tx's output is excluded by the selector");
+    }
+
+    #[test]
+    fn zero_conf_never_touches_outgoing_confirmed_or_unknown_txs() {
+        let c = db();
+        insert_received(&c, "out", "unproven", 1); // OUR outgoing tx's row
+        let repo = OutputRepository::new(&c);
+        assert_eq!(repo.link_received_outputs_for_zero_conf("out").unwrap(), 0, "outgoing tx row is not a received tx");
+        assert_eq!(repo.link_received_outputs_for_zero_conf("nope").unwrap(), 0);
+
+        insert_received(&c, "done", "unproven", 0);
+        c.execute("UPDATE outputs SET confirmed = 1 WHERE txid = 'done'", []).unwrap();
+        assert_eq!(repo.link_received_outputs_for_zero_conf("done").unwrap(), 0, "already confirmed");
+        assert_eq!(repo.unlink_received_outputs("done").unwrap(), 0, "a proven output is never withdrawn");
     }
 
     #[test]

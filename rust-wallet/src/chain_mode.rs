@@ -26,6 +26,8 @@ pub const ENV_CHAINTRACKS: &str = "HODOS_CHAINTRACKS_URL";
 pub const ENV_ARCADE_SSE: &str = "HODOS_ARCADE_SSE_URL";
 /// `off` / `0` / `false` / `no` disables push even when the SSE URL is set. Polling is never off.
 pub const ENV_ARCADE_PUSH: &str = "HODOS_ARCADE_PUSH";
+/// `off` / `0` / `false` / `no` disables zero-conf acceptance of received outputs.
+pub const ENV_ZERO_CONF: &str = "HODOS_ZERO_CONF";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ChainMode {
@@ -123,6 +125,16 @@ pub fn denied(what: &str) -> String {
         "{} needs a public indexer, which is disabled in spv mode ({}=spv)",
         what, ENV_MODE
     )
+}
+
+/// Zero-conf acceptance of received outputs: on by default in spv mode; `HODOS_ZERO_CONF=off`
+/// (or `0` / `false` / `no`) restores "wait for a verified proof". No effect in public mode.
+pub fn zero_conf_enabled() -> bool {
+    is_spv()
+        && !matches!(
+            std::env::var(ENV_ZERO_CONF).ok().map(|v| v.trim().to_ascii_lowercase()).as_deref(),
+            Some("off") | Some("0") | Some("false") | Some("no")
+        )
 }
 
 /// Base URL of Arcade's SSE service (spv mode only).
@@ -233,6 +245,24 @@ mod tests {
         with_env(Some("spv"), Some("http://a"), Some("http://c"), || {
             assert_eq!(validate_startup(), Ok(ChainMode::Spv));
         });
+    }
+
+    #[test]
+    fn zero_conf_is_on_in_spv_mode_unless_switched_off_and_never_in_public_mode() {
+        let with_zc = |mode: Option<&str>, zc: Option<&str>, f: &dyn Fn()| {
+            let old = std::env::var(ENV_ZERO_CONF).ok();
+            with_env(mode, Some("http://a"), Some("http://c"), || {
+                match zc { Some(v) => std::env::set_var(ENV_ZERO_CONF, v), None => std::env::remove_var(ENV_ZERO_CONF) }
+                f();
+            });
+            match old { Some(v) => std::env::set_var(ENV_ZERO_CONF, v), None => std::env::remove_var(ENV_ZERO_CONF) }
+        };
+        with_zc(Some("spv"), None, &|| assert!(zero_conf_enabled(), "default on"));
+        with_zc(Some("spv"), Some("on"), &|| assert!(zero_conf_enabled()));
+        for off in ["off", "OFF", "0", "false", "no"] {
+            with_zc(Some("spv"), Some(off), &|| assert!(!zero_conf_enabled(), "{}", off));
+        }
+        with_zc(None, None, &|| assert!(!zero_conf_enabled(), "public mode: feature does not exist"));
     }
 
     #[test]
