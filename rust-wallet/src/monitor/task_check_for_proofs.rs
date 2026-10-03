@@ -188,6 +188,7 @@ pub async fn run(state: &web::Data<AppState>, client: &reqwest::Client) -> Resul
                         let block_height = tx_status.block_height.unwrap_or(0) as u64;
                         info!("   ⛏️ {} MINED (block {})", txid, block_height);
 
+                        let mut proof_stored = false;
                         if let Some(ref merkle_path_hex) = tx_status.merkle_path_bump {
                             match create_proven_tx_from_arc(
                                 state, client, txid, merkle_path_hex, block_height,
@@ -195,11 +196,20 @@ pub async fn run(state: &web::Data<AppState>, client: &reqwest::Client) -> Resul
                             ).await {
                                 Ok(proven_tx_id) => {
                                     info!("   ✅ Created proven_txs {} for {}", proven_tx_id, txid);
+                                    proof_stored = true;
                                 }
                                 Err(e) => {
                                     warn!("   ⚠️ Failed to create proven_txs for {}: {}", txid, e);
                                 }
                             }
+                        }
+
+                        // spv mode: "confirmed" means a verified proof is stored. If it could not be
+                        // (header not synced yet, no BUMP from Arcade), stay pending and retry next
+                        // tick; marking it confirmed here would drop the tx from this task for good.
+                        if !should_mark_confirmed(crate::chain_mode::is_spv(), proof_stored) {
+                            info!("   ⏳ {} mined but no verified proof stored yet — will retry", txid);
+                            continue;
                         }
 
                         // Update transaction status
@@ -455,6 +465,13 @@ async fn try_whatsonchain_confirmation(
 }
 
 /// Mark a transaction as confirmed (completed)
+/// Whether a MINED transaction may be marked confirmed this tick. Outside spv mode the
+/// historical behaviour stands (confirmed even if the proof could not be stored); in spv mode
+/// a verified, stored proof is required.
+fn should_mark_confirmed(spv: bool, proof_stored: bool) -> bool {
+    !spv || proof_stored
+}
+
 fn mark_confirmed(state: &web::Data<AppState>, txid: &str, block_height: u32) {
     if let Ok(db) = state.database.lock() {
         let conn = db.connection();
@@ -576,9 +593,11 @@ async fn create_proven_tx_from_arc(
     let tx_index = tsc_json["index"].as_u64().unwrap_or(0);
 
     // Verify merkle root against actual block header before storing
+    let mut proof_verified = false;
     match crate::verify_tsc_proof_against_block(client, txid, &tsc_json).await {
         Ok(true) => {
             // Proof verified — safe to store
+            proof_verified = true;
         }
         Ok(false) => {
             return Err(format!("ARC BUMP has wrong merkle root for {} at height {} — proof rejected", txid, height));
@@ -626,6 +645,18 @@ async fn create_proven_tx_from_arc(
             "completed",
             &format!("Proof acquired from ARC at height {} (merkle root verified)", height),
         );
+    }
+
+    // spv mode: a proof that verified against the wallet's own header chain is what makes an
+    // internalized output (stored unconfirmed) selectable. Public mode keeps its existing
+    // promotion (TaskSyncPending via WhatsOnChain).
+    if proof_verified && crate::chain_mode::is_spv() {
+        let promoted = crate::database::OutputRepository::new(conn)
+            .mark_tx_outputs_confirmed(txid)
+            .unwrap_or(0);
+        if promoted > 0 {
+            state.balance_cache.invalidate();
+        }
     }
 
     Ok(proven_tx_id)
@@ -923,6 +954,14 @@ async fn query_bitails_txid(client: &reqwest::Client, txid: &str) -> OracleStatu
 #[cfg(test)]
 mod spv_oracle_tests {
     use super::*;
+
+    #[test]
+    fn spv_mode_needs_a_stored_proof_to_confirm_public_mode_keeps_its_behaviour() {
+        assert!(should_mark_confirmed(false, false), "public mode: unchanged");
+        assert!(should_mark_confirmed(false, true));
+        assert!(should_mark_confirmed(true, true));
+        assert!(!should_mark_confirmed(true, false), "spv: no verified proof, no confirmation");
+    }
     use crate::services::{IndexerError, TxState, TxStatus};
 
     fn st(state: TxState) -> Result<TxStatus, IndexerError> {

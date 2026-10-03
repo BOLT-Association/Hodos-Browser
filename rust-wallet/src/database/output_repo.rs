@@ -546,6 +546,24 @@ impl<'a> OutputRepository<'a> {
         Ok(rows_affected)
     }
 
+    /// Mark every still-unconfirmed output of `txid` as confirmed. Called when a merkle proof
+    /// for that transaction has been verified against the wallet's own header chain (spv
+    /// mode), which is what makes an internalized output selectable. Returns rows changed.
+    pub fn mark_tx_outputs_confirmed(&self, txid: &str) -> Result<usize> {
+        let now = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_secs() as i64;
+        let rows = self.conn.execute(
+            "UPDATE outputs SET confirmed = 1, updated_at = ?1 WHERE txid = ?2 AND confirmed = 0",
+            rusqlite::params![now, txid],
+        )?;
+        if rows > 0 {
+            info!("   ✅ Marked {} output(s) of {} confirmed (proof verified)", rows, &txid[..std::cmp::min(16, txid.len())]);
+        }
+        Ok(rows)
+    }
+
     /// Mark a previously-unconfirmed output as confirmed.
     /// Called when an output that was only in mempool now appears in the confirmed API.
     pub fn mark_output_confirmed(&self, txid: &str, vout: i32) -> Result<usize> {
@@ -2046,5 +2064,53 @@ mod spent_reservation_resolution_tests {
             .query_row("SELECT spending_description FROM outputs WHERE txid='aa'", [], |r| r.get(0))
             .unwrap();
         assert_eq!(desc, "pending-1-0", "and it changed nothing while reporting Ok");
+    }
+}
+
+#[cfg(test)]
+mod promotion_tests {
+    use super::*;
+
+    fn db() -> Connection {
+        let c = Connection::open_in_memory().unwrap();
+        crate::database::migrations::create_schema_v1(&c).unwrap();
+        // The test rows have no `users` row; this exercises one UPDATE, not the schema's FKs.
+        c.execute_batch("PRAGMA foreign_keys = OFF").unwrap();
+        c
+    }
+
+    fn insert(c: &Connection, txid: &str, vout: i64, confirmed: i64) {
+        c.execute(
+            "INSERT INTO outputs (user_id, vout, satoshis, txid, spendable, confirmed, created_at, updated_at)
+             VALUES (1, ?1, 1000, ?2, 1, ?3, 0, 0)",
+            rusqlite::params![vout, txid, confirmed],
+        )
+        .unwrap();
+    }
+
+    fn confirmed(c: &Connection, txid: &str, vout: i64) -> i64 {
+        c.query_row("SELECT confirmed FROM outputs WHERE txid=?1 AND vout=?2", rusqlite::params![txid, vout], |r| r.get(0)).unwrap()
+    }
+
+    #[test]
+    fn promotes_all_unconfirmed_outputs_of_that_tx_and_nothing_else() {
+        let c = db();
+        insert(&c, "aa", 0, 0);
+        insert(&c, "aa", 1, 0);
+        insert(&c, "bb", 0, 0); // a different tx must be left alone
+        let repo = OutputRepository::new(&c);
+        assert_eq!(repo.mark_tx_outputs_confirmed("aa").unwrap(), 2);
+        assert_eq!((confirmed(&c, "aa", 0), confirmed(&c, "aa", 1)), (1, 1));
+        assert_eq!(confirmed(&c, "bb", 0), 0);
+    }
+
+    #[test]
+    fn is_idempotent_and_a_noop_for_unknown_txids() {
+        let c = db();
+        insert(&c, "aa", 0, 0);
+        let repo = OutputRepository::new(&c);
+        assert_eq!(repo.mark_tx_outputs_confirmed("aa").unwrap(), 1);
+        assert_eq!(repo.mark_tx_outputs_confirmed("aa").unwrap(), 0);
+        assert_eq!(repo.mark_tx_outputs_confirmed("nope").unwrap(), 0);
     }
 }

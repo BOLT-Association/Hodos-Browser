@@ -121,6 +121,13 @@ pub fn denied(what: &str) -> String {
     )
 }
 
+/// MessageBox (PeerPay) polling and outbox retries are off in spv mode. They contact an
+/// external relay as the wallet's identity and acknowledge messages there, which a local
+/// chain run must never do (least of all from a copy of a real wallet database).
+pub fn message_polling_allowed() -> bool {
+    !is_spv()
+}
+
 /// `Err` in spv mode: a public-indexer lookup cannot be made.
 pub fn ensure_public(what: &str) -> Result<(), String> {
     if is_spv() {
@@ -206,6 +213,13 @@ mod tests {
         with_env(Some("spv"), Some("http://a"), Some("http://c"), || {
             assert_eq!(validate_startup(), Ok(ChainMode::Spv));
         });
+    }
+
+    #[test]
+    fn messagebox_polling_is_only_allowed_outside_spv_mode() {
+        with_env(None, None, None, || assert!(message_polling_allowed()));
+        with_env(Some("spv"), Some("http://a"), Some("http://c"), || assert!(!message_polling_allowed()));
+        with_env(Some("typo"), None, None, || assert!(!message_polling_allowed(), "unknown value fails closed"));
     }
 
     #[test]
