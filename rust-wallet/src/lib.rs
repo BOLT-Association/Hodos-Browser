@@ -25,6 +25,7 @@ pub mod permission_service;
 pub mod manifest;
 // Wallet-Hardening WS1 — spent-input reconcile primitives (c1 check_outpoint_spent; c2/c3 dormant).
 pub mod reconcile;
+pub mod header_chain;
 
 // Re-export commonly used modules for convenience
 pub use crypto::brc2;
