@@ -22,7 +22,7 @@ pub use provider::{
 };
 
 use providers::{
-    ArcGorillaPoolProvider, ArcTaalProvider, ArcadeProvider, BitailsProvider, GorillaPoolMapiProvider,
+    ArcGorillaPoolProvider, ArcTaalProvider, ArcadeProvider, BitailsProvider, ChaintracksProvider, GorillaPoolMapiProvider,
     GorillaPoolOrdinalsProvider, JungleBusProvider, WhatsOnChainProvider,
 };
 
@@ -95,6 +95,13 @@ impl WalletServices {
                 ),
             };
 
+        // A configured chaintracks server (HODOS_CHAINTRACKS_URL) is the only header source.
+        let header_chain: Vec<Arc<dyn IndexerProvider>> =
+            match ChaintracksProvider::from_env(client.clone()) {
+                Some(p) => vec![Arc::new(p)],
+                None => vec![woc.clone(), jb.clone()],
+            };
+
         Self {
             client,
             // Bitails demoted from raw_tx/proof/header chains: it returns HTTP 500
@@ -102,7 +109,7 @@ impl WalletServices {
             // Kept on tx_status where its response shape is reliable.
             raw_tx: ProviderCollection::new(vec![arc_gp.clone(), woc.clone(), jb.clone()]),
             proof: ProviderCollection::new(proof_chain),
-            header: ProviderCollection::new(vec![woc.clone(), jb.clone()]),
+            header: ProviderCollection::new(header_chain),
             tx_status_chain: ProviderCollection::new(status_chain),
             outspend_chain: ProviderCollection::new(vec![woc.clone(), jb.clone()]),
             utxo: ProviderCollection::new(vec![woc.clone(), gp_ords.clone()]),
