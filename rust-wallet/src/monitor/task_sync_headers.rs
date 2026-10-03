@@ -43,10 +43,12 @@ pub async fn run(state: &web::Data<AppState>) -> Result<(), String> {
     }
 
     let report = result?;
+    header_sync::request_startup_recheck_once();
     for r in &report.reorgs {
         if let AddOutcome::Reorg { fork_height, depth, old_tip, new_tip } = r {
+            header_sync::request_proof_recheck(fork_height + 1);
             warn!(
-                "🔀 Header chain REORG: depth {} from height {} ({} -> {}). Proofs in the old branch need re-checking.",
+                "🔀 Header chain REORG: depth {} from height {} ({} -> {}). Re-checking stored proofs above the fork.",
                 depth, fork_height, old_tip, new_tip
             );
         }

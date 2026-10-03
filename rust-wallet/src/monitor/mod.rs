@@ -31,6 +31,7 @@ pub mod task_replay_overlay;
 pub mod task_consolidate_dust;
 pub mod task_verify_double_spend;
 pub mod task_sync_headers;
+pub mod task_recheck_proofs;
 pub mod task_retry_peerpay_outbox;
 pub mod task_refresh_ship_cache;
 pub mod task_sweep_reservations;
@@ -372,6 +373,10 @@ impl Monitor {
                 last_sync_headers = now;
                 if let Err(e) = task_sync_headers::run(&self.state).await {
                     warn!("   ⚠️ TaskSyncHeaders failed: {}", e);
+                }
+                // Re-check stored proofs after a reorg / at startup (no-op when nothing pending).
+                if let Err(e) = task_recheck_proofs::run(&self.state).await {
+                    warn!("   ⚠️ TaskRecheckProofs failed: {}", e);
                 }
             }
 

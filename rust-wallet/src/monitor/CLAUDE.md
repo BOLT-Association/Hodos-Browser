@@ -41,6 +41,7 @@ The Monitor replaces the ad-hoc background services (`arc_status_poller`, `cache
 | `task_verify_double_spend.rs` | Independent verification of suspected double-spends against WhatsOnChain (SDK-style, never trusts a single broadcaster) | 60s |
 | `task_retry_peerpay_outbox.rs` | Retry MessageBox delivery for PeerPay sends that succeeded on-chain but failed to deliver | 30s (fast tick; actual retry gated by `next_retry_at`) |
 | `task_sync_headers.rs` | WS4: sync the verified header chain from `HODOS_CHAINTRACKS_URL`, persist new headers (V26 `header_chain`), log reorgs. No-op when unset | 30s |
+| `task_recheck_proofs.rs` | WS4: after a header-chain reorg (and once after the first sync) find `proven_txs` whose root no longer matches the active chain; replace with a verified re-mined proof via `apply_replacement`. Never changes tx status/outputs. Runs in the same tick as `task_sync_headers`; no-op when nothing pending | 30s |
 | `task_refresh_ship_cache.rs` | Keep `AppState.ship_cache` warm for `tm_identity` — **runs outside the `db_available()` gate** | 300s |
 
 **First-tick seeding** (`mod.rs :: Monitor::run`): most `last_*` markers start at `0` so the task fires on the first eligible tick. Exceptions: `last_backup` is seeded from `SettingsRepository::get_last_backup_at()` (so a backup triggers soon after a long shutdown rather than 3 hours later), and `last_consolidate_dust` is seeded to "now" so the daily dust sweep does not run at startup. The loop also sleeps 5 seconds before its first tick.
