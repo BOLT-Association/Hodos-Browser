@@ -22,7 +22,7 @@ pub use provider::{
 };
 
 use providers::{
-    ArcGorillaPoolProvider, ArcTaalProvider, BitailsProvider, GorillaPoolMapiProvider,
+    ArcGorillaPoolProvider, ArcTaalProvider, ArcadeProvider, BitailsProvider, GorillaPoolMapiProvider,
     GorillaPoolOrdinalsProvider, JungleBusProvider, WhatsOnChainProvider,
 };
 
@@ -79,23 +79,34 @@ impl WalletServices {
         let jb: Arc<dyn IndexerProvider> = Arc::new(JungleBusProvider::new(client.clone()));
         let bt: Arc<dyn IndexerProvider> = Arc::new(BitailsProvider::new(client.clone()));
 
+        // A configured Arcade (HODOS_ARCADE_URL) replaces ARC GorillaPool and TAAL for
+        // broadcast, tx status and proofs. Raw-tx, header, outspend and UTXO chains are
+        // unchanged until the local chain has providers for them.
+        let (proof_chain, status_chain, broadcast_chain) =
+            match ArcadeProvider::from_env(client.clone()) {
+                Some(p) => {
+                    let a: Arc<dyn IndexerProvider> = Arc::new(p);
+                    (vec![a.clone()], vec![a.clone()], vec![a])
+                }
+                None => (
+                    vec![arc_gp.clone(), woc.clone(), jb.clone()],
+                    vec![arc_gp.clone(), woc.clone(), jb.clone(), bt.clone()],
+                    vec![arc_gp.clone(), arc_tl.clone(), gp_mapi.clone(), woc.clone()],
+                ),
+            };
+
         Self {
             client,
             // Bitails demoted from raw_tx/proof/header chains: it returns HTTP 500
             // (instead of a proper 404) for unknown txids, poisoning error messages.
             // Kept on tx_status where its response shape is reliable.
             raw_tx: ProviderCollection::new(vec![arc_gp.clone(), woc.clone(), jb.clone()]),
-            proof: ProviderCollection::new(vec![arc_gp.clone(), woc.clone(), jb.clone()]),
+            proof: ProviderCollection::new(proof_chain),
             header: ProviderCollection::new(vec![woc.clone(), jb.clone()]),
-            tx_status_chain: ProviderCollection::new(vec![
-                arc_gp.clone(),
-                woc.clone(),
-                jb.clone(),
-                bt.clone(),
-            ]),
+            tx_status_chain: ProviderCollection::new(status_chain),
             outspend_chain: ProviderCollection::new(vec![woc.clone(), jb.clone()]),
             utxo: ProviderCollection::new(vec![woc.clone(), gp_ords.clone()]),
-            broadcast: ProviderCollection::new(vec![arc_gp, arc_tl, gp_mapi, woc]),
+            broadcast: ProviderCollection::new(broadcast_chain),
         }
     }
 

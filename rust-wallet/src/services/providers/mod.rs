@@ -4,6 +4,7 @@
 //! wires these into per-operation `ProviderCollection`s in step 11.
 
 pub mod arc_gorillapool;
+pub mod arcade;
 pub mod arc_taal;
 pub mod bitails;
 pub mod gorillapool_mapi;
@@ -12,6 +13,7 @@ pub mod junglebus;
 pub mod whatsonchain;
 
 pub use arc_gorillapool::ArcGorillaPoolProvider;
+pub use arcade::ArcadeProvider;
 pub use arc_taal::ArcTaalProvider;
 pub use bitails::BitailsProvider;
 pub use gorillapool_mapi::GorillaPoolMapiProvider;
