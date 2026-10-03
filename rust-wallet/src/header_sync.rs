@@ -168,6 +168,16 @@ pub fn global() -> Option<Arc<HeaderService>> {
 }
 
 impl HeaderService {
+    /// Tip height of the wallet's own verified chain (`None` until the first header).
+    pub fn tip_height(&self) -> Option<u32> {
+        self.chain.lock().unwrap().tip_height()
+    }
+
+    /// 80-byte header hex at `height` on the active verified chain.
+    pub fn header_hex_at_height(&self, height: u32) -> Option<String> {
+        self.chain.lock().unwrap().header_at_height(height).map(|e| e.header.to_hex())
+    }
+
     /// `Ok(true/false)` = verdict against the verified chain; `Err` = we cannot say
     /// (no header at that height yet), which callers must not treat as a verdict.
     pub fn check_merkle_root(&self, height: u32, root_hex: &str) -> Result<bool, String> {
@@ -420,6 +430,21 @@ mod tests {
         }
         assert!(!chain.lock().unwrap().is_active(&old_tip));
         assert_eq!(chain.lock().unwrap().tip_height(), Some(want));
+    }
+
+    #[test]
+    fn cwi_accessors_come_from_the_verified_chain_only() {
+        let (mut c, g) = fixture();
+        let svc0 = HeaderService { chain: Mutex::new(HeaderChain::new(crate::header_chain::Params::regtest())) };
+        assert_eq!(svc0.tip_height(), None, "unsynced chain has no height to report");
+        assert_eq!(svc0.header_hex_at_height(0), None);
+
+        let a1 = mine(g.hash(), 1, 0x207f_ffff);
+        c.add_header(a1.clone(), NOW).unwrap();
+        let svc = HeaderService { chain: Mutex::new(c) };
+        assert_eq!(svc.tip_height(), Some(1));
+        assert_eq!(svc.header_hex_at_height(1), Some(a1.to_hex()));
+        assert_eq!(svc.header_hex_at_height(2), None);
     }
 
     #[test]

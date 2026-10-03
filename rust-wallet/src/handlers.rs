@@ -18315,6 +18315,16 @@ pub struct GetHeaderForHeightRequest {
 pub async fn get_height(_body: web::Bytes) -> HttpResponse {
     log::info!("📋 /getHeight called");
 
+    // spv mode: the wallet's own verified header chain is the only source.
+    if crate::chain_mode::is_spv() {
+        return match crate::header_sync::global().and_then(|s| s.tip_height()) {
+            Some(height) => HttpResponse::Ok().json(serde_json::json!({ "height": height })),
+            None => HttpResponse::ServiceUnavailable().json(serde_json::json!({
+                "error": "header chain not synced yet"
+            })),
+        };
+    }
+
     // Fetch current blockchain height from WhatsOnChain API
     let url = "https://api.whatsonchain.com/v1/bsv/main/chain/info";
     let client = reqwest::Client::builder()
@@ -18369,6 +18379,17 @@ pub async fn get_header_for_height(
 ) -> HttpResponse {
     log::info!("📋 /getHeaderForHeight called");
     log::info!("   Height: {}", req.height);
+
+    // spv mode: answer only from the verified header chain. The block_headers cache
+    // below holds unverified third-party answers and is deliberately not consulted.
+    if crate::chain_mode::is_spv() {
+        return match crate::header_sync::global().and_then(|s| s.header_hex_at_height(req.height)) {
+            Some(header) => HttpResponse::Ok().json(serde_json::json!({ "header": header })),
+            None => HttpResponse::NotFound().json(serde_json::json!({
+                "error": format!("no verified header at height {}", req.height)
+            })),
+        };
+    }
 
     // Check database cache first
     let db = state.database.lock().unwrap();
