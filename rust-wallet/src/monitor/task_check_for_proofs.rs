@@ -584,6 +584,11 @@ async fn create_proven_tx_from_arc(
             return Err(format!("ARC BUMP has wrong merkle root for {} at height {} — proof rejected", txid, height));
         }
         Err(e) => {
+            if crate::services::providers::chaintracks::configured_base_url().is_some() {
+                // WS4: a configured header chain makes "cannot verify" a reason to wait
+                // (header sync pending), not to store. The next tick retries.
+                return Err(format!("proof for {} not stored, cannot verify yet: {}", txid, e));
+            }
             // Can't verify — log warning but still store (better than no proof)
             warn!("   ⚠️ Could not verify ARC proof against block header: {} — storing anyway", e);
         }

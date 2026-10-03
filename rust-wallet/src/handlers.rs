@@ -13172,6 +13172,25 @@ pub async fn internalize_action(
     // ******************************************************************************
 
     if let Some(ref beef) = parsed_beef {
+        // WS4: with a verified header chain configured, every BUMP's merkle root must
+        // match the wallet's own chain (and each proven tx must be a leaf of its BUMP).
+        // "Cannot verify" (no header at that height yet) rejects: it is not a pass.
+        if beef.has_proofs() && crate::services::providers::chaintracks::configured_base_url().is_some() {
+            let verdict = crate::beef::verify_beef_bumps(beef, &|height, root| {
+                crate::header_sync::global()
+                    .ok_or_else(|| "header chain configured but not initialised".to_string())?
+                    .check_merkle_root(height, root)
+            });
+            if let Err(e) = verdict {
+                log::error!("   ❌ BEEF proofs failed header-chain verification: {}", e);
+                return HttpResponse::BadRequest().json(serde_json::json!({
+                    "status": "error",
+                    "code": "ERR_PROOF_NOT_VERIFIED",
+                    "description": format!("BEEF merkle proof failed verification against the header chain: {}", e)
+                }));
+            }
+        }
+
         // Validate ancestry
         if !beef.parent_transactions().is_empty() {
             log::info!("   🔍 Validating {} parent transaction(s)...", beef.parent_transactions().len());
