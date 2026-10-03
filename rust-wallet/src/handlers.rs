@@ -13568,6 +13568,22 @@ pub async fn internalize_action(
         }
     }
 
+    // spv mode: keep every transaction the BEEF carried. There is no public indexer to fetch a
+    // parent from later, and spending an internalized output needs its parent's raw bytes (to
+    // build the Extended Format Arcade validates). This is the SPV model: parents travel in the
+    // BEEF; the wallet stores them. (Same cache the PeerPay path fills.)
+    if crate::chain_mode::is_spv() {
+        if let Some(ref beef) = parsed_beef {
+            let db = state.database.lock().unwrap();
+            let parent_tx_repo = crate::database::ParentTransactionRepository::new(db.connection());
+            for (tx_txid, tx_hex) in beef.txids_and_hex() {
+                if let Err(e) = parent_tx_repo.upsert(None, &tx_txid, &tx_hex) {
+                    log::warn!("   ⚠️  Could not cache BEEF tx {}: {}", tx_txid, e);
+                }
+            }
+        }
+    }
+
     // spv mode: a BRC-42 output whose own transaction came with a BUMP has just been
     // verified against the wallet's header chain (`verify_beef_bumps`, above), so that
     // proof IS the confirmation. Mark it confirmed now. `store_derived_utxo` inserts

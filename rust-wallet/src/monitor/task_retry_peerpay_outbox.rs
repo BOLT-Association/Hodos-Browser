@@ -18,6 +18,10 @@ use crate::database::PeerPayRepository;
 
 /// Run the TaskRetryPeerPayOutbox task
 pub async fn run(state: &web::Data<AppState>, _client: &reqwest::Client) -> Result<(), String> {
+    if !crate::chain_mode::message_polling_allowed() {
+        // spv mode: no MessageBox traffic (see chain_mode::message_polling_allowed).
+        return Ok(());
+    }
     // 1. Get wallet master keys (brief DB lock)
     let (master_privkey, master_pubkey) = {
         let db = state.database.lock().map_err(|e| format!("DB lock: {}", e))?;

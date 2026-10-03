@@ -285,6 +285,18 @@ impl Beef {
         !self.bumps.is_empty()
     }
 
+    /// `(txid display hex, raw tx hex)` for every transaction in this BEEF, parents first.
+    pub fn txids_and_hex(&self) -> Vec<(String, String)> {
+        use sha2::{Digest, Sha256};
+        self.transactions
+            .iter()
+            .map(|tx| {
+                let txid: String = Sha256::digest(Sha256::digest(tx)).iter().rev().map(|b| format!("{:02x}", b)).collect();
+                (txid, hex::encode(tx))
+            })
+            .collect()
+    }
+
     /// Does the transaction with this txid (display hex) carry its own BUMP in this BEEF?
     pub fn tx_has_proof(&self, txid: &str) -> bool {
         self.find_txid(txid)
@@ -1337,6 +1349,16 @@ mod verify_bumps_tests {
             tx_to_bump: vec![Some(0)],
         };
         (beef, hex::encode(root))
+    }
+
+    #[test]
+    fn txids_and_hex_lists_every_tx_with_its_real_txid() {
+        let (b, _) = fixture();
+        let listed = b.txids_and_hex();
+        assert_eq!(listed.len(), 1);
+        let expect: String = dsha(&b.transactions[0]).iter().rev().map(|x| format!("{:02x}", x)).collect();
+        assert_eq!(listed[0].0, expect);
+        assert_eq!(listed[0].1, hex::encode(&b.transactions[0]));
     }
 
     #[test]
