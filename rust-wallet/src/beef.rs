@@ -1221,6 +1221,172 @@ pub fn read_node_offset(node: &[u8]) -> Result<(u64, usize), String> {
 }
 
 /// Log the structure of a MerkleProof for debugging
+/// Merkle root (display-order hex) computed from **every** txid leaf in a BUMP.
+/// A well-formed BUMP yields the same root from each; callers must compare them.
+fn bump_roots_from_all_txid_leaves(proof: &MerkleProof) -> Result<Vec<String>, String> {
+    if proof.levels.is_empty() {
+        return Err("BUMP has no levels".to_string());
+    }
+    let mut roots = Vec::new();
+    for node in &proof.levels[0] {
+        let (_, vl) = read_node_offset(node)?;
+        let flag = if node.len() > vl { node[vl] } else { 0 };
+        if flag & 0x02 != 0 && node.len() >= vl + 33 {
+            let mut root = compute_root_from_bump(proof, &node[vl + 1..vl + 33])?;
+            root.reverse();
+            roots.push(hex::encode(root));
+        }
+    }
+    if roots.is_empty() {
+        return Err("BUMP has no txid leaf".to_string());
+    }
+    Ok(roots)
+}
+
+/// Verify every BUMP in a BEEF against a header source (WS4).
+///
+/// For each BUMP: all of its txid leaves must compute the same merkle root, and that
+/// root must pass `check(block_height, root_hex)`. For each transaction that claims a
+/// BUMP, its own txid must be one of that BUMP's txid leaves, otherwise the BUMP
+/// proves nothing about it. `check` returns `Ok(true)` (matches the verified chain),
+/// `Ok(false)` (does not), or `Err` (cannot say); `Err` and `Ok(false)` both reject.
+pub fn verify_beef_bumps(
+    beef: &Beef,
+    check: &dyn Fn(u32, &str) -> Result<bool, String>,
+) -> Result<(), String> {
+    use sha2::{Digest, Sha256};
+
+    let mut bump_roots: Vec<String> = Vec::with_capacity(beef.bumps.len());
+    for (i, bump) in beef.bumps.iter().enumerate() {
+        let roots = bump_roots_from_all_txid_leaves(bump).map_err(|e| format!("BUMP {}: {}", i, e))?;
+        if roots.iter().any(|r| r != &roots[0]) {
+            return Err(format!("BUMP {} txid leaves compute different merkle roots", i));
+        }
+        match check(bump.block_height, &roots[0]) {
+            Ok(true) => {}
+            Ok(false) => {
+                return Err(format!(
+                    "BUMP {} root {} does not match the verified header at height {}",
+                    i, roots[0], bump.block_height
+                ))
+            }
+            Err(e) => return Err(format!("BUMP {} cannot be verified: {}", i, e)),
+        }
+        bump_roots.push(roots[0].clone());
+    }
+
+    for (tx_idx, bump_idx) in beef.tx_to_bump.iter().enumerate() {
+        let Some(bi) = bump_idx else { continue };
+        let bump = beef
+            .bumps
+            .get(*bi)
+            .ok_or_else(|| format!("transaction {} references missing BUMP {}", tx_idx, bi))?;
+        let tx = beef
+            .transactions
+            .get(tx_idx)
+            .ok_or_else(|| format!("BUMP maps to missing transaction {}", tx_idx))?;
+        let txid_natural = Sha256::digest(Sha256::digest(tx));
+        let mut found = false;
+        for node in &bump.levels[0] {
+            let (_, vl) = read_node_offset(node)?;
+            let flag = if node.len() > vl { node[vl] } else { 0 };
+            if flag & 0x02 != 0 && node.len() >= vl + 33 && node[vl + 1..vl + 33] == txid_natural[..] {
+                found = true;
+                break;
+            }
+        }
+        if !found {
+            return Err(format!("transaction {} is not a txid leaf of its BUMP {}", tx_idx, bi));
+        }
+    }
+    Ok(())
+}
+
+#[cfg(test)]
+mod verify_bumps_tests {
+    use super::*;
+    use sha2::{Digest, Sha256};
+
+    fn dsha(b: &[u8]) -> Vec<u8> {
+        Sha256::digest(Sha256::digest(b)).to_vec()
+    }
+
+    /// Two-tx block: our tx at offset 0, a sibling at offset 1.
+    fn fixture() -> (Beef, String) {
+        let tx = vec![1u8, 2, 3, 4, 5];
+        let txid = dsha(&tx);
+        let sibling = vec![9u8; 32];
+        let mut leaf0 = vec![0u8, 0x02];
+        leaf0.extend_from_slice(&txid);
+        let mut leaf1 = vec![1u8, 0x00];
+        leaf1.extend_from_slice(&sibling);
+        let mut root = dsha(&[txid.clone(), sibling].concat());
+        root.reverse();
+        let beef = Beef {
+            version: BEEF_V1_MARKER,
+            bumps: vec![MerkleProof { block_height: 7, tree_height: 1, levels: vec![vec![leaf0, leaf1]] }],
+            transactions: vec![tx],
+            tx_to_bump: vec![Some(0)],
+        };
+        (beef, hex::encode(root))
+    }
+
+    #[test]
+    fn accepts_matching_root_at_the_claimed_height() {
+        let (b, root) = fixture();
+        let r = verify_beef_bumps(&b, &|h, got| {
+            assert_eq!(h, 7);
+            Ok(got == root)
+        });
+        assert_eq!(r, Ok(()));
+    }
+
+    #[test]
+    fn rejects_root_that_differs_from_the_chain() {
+        let (b, _) = fixture();
+        let r = verify_beef_bumps(&b, &|_, _| Ok(false));
+        assert!(r.unwrap_err().contains("does not match"));
+    }
+
+    #[test]
+    fn unknown_header_is_a_rejection_not_a_pass() {
+        let (b, _) = fixture();
+        let r = verify_beef_bumps(&b, &|_, _| Err("no header".into()));
+        assert!(r.unwrap_err().contains("cannot be verified"));
+    }
+
+    #[test]
+    fn bump_that_does_not_cover_its_transaction_is_rejected() {
+        let (mut b, root) = fixture();
+        b.transactions[0] = vec![6u8, 6, 6]; // different tx, same (valid-looking) BUMP
+        let r = verify_beef_bumps(&b, &|_, got| Ok(got == root));
+        assert!(r.unwrap_err().contains("not a txid leaf"));
+    }
+
+    #[test]
+    fn inconsistent_txid_leaves_are_rejected() {
+        // Four leaves (two pairs) plus an explicit level-1 node that disagrees with what
+        // leaves 2/3 compute: the root from leaf 0 and the root from leaf 2 differ.
+        let (mut b, _) = fixture();
+        let leaf = |off: u8, flags: u8, byte: u8| {
+            let mut n = vec![off, flags];
+            n.extend_from_slice(&[byte; 32]);
+            n
+        };
+        let tx_leaf = b.bumps[0].levels[0][0].clone();
+        b.bumps[0] = MerkleProof {
+            block_height: 7,
+            tree_height: 2,
+            levels: vec![
+                vec![tx_leaf, leaf(1, 0x00, 9), leaf(2, 0x02, 7), leaf(3, 0x00, 8)],
+                vec![leaf(1, 0x00, 5)],
+            ],
+        };
+        let r = verify_beef_bumps(&b, &|_, _| Ok(true));
+        assert!(r.unwrap_err().contains("different merkle roots"));
+    }
+}
+
 fn log_bump_structure(proof: &MerkleProof) {
     log::info!("      blockHeight={}, treeHeight={}, levels={}", proof.block_height, proof.tree_height, proof.levels.len());
     for (level, nodes) in proof.levels.iter().enumerate() {
