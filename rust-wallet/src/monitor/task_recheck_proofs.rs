@@ -322,6 +322,8 @@ mod tests {
         use crate::services::providers::{ArcadeProvider, ChaintracksProvider};
         use crate::services::IndexerProvider;
 
+        std::env::set_var("HODOS_CHAIN_MODE", "spv");
+        std::env::set_var("HODOS_ARCADE_URL", "http://localhost:8080");
         std::env::set_var("HODOS_CHAINTRACKS_URL", "http://localhost:8083/chaintracks/v2");
         let http = reqwest::Client::new();
         let now = || std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_secs() as u32;

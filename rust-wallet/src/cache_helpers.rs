@@ -214,7 +214,7 @@ pub async fn verify_tsc_proof_against_block(
             // WoC TSC proofs often lack height — try target (block hash) to look it up
             if let Some(target) = tsc["target"].as_str().filter(|t| !t.is_empty()) {
                 let header_url = format!("https://api.whatsonchain.com/v1/bsv/main/block/hash/{}", target);
-                let resp = client.get(&header_url).send().await
+                let resp = crate::chain_mode::get(&client, &header_url).send().await
                     .map_err(|e| CacheError::Api(format!("Failed to fetch block header for target {}: {}", target, e)))?;
                 if !resp.status().is_success() {
                     return Err(CacheError::Api(format!("Block header API returned {} for target {}", resp.status(), target)));
@@ -248,7 +248,7 @@ pub async fn verify_tsc_proof_against_block(
 
     // Fetch the actual block header from WoC
     let block_url = format!("https://api.whatsonchain.com/v1/bsv/main/block/height/{}", block_height);
-    let response = client.get(&block_url).send().await
+    let response = crate::chain_mode::get(&client, &block_url).send().await
         .map_err(|e| CacheError::Api(format!("Failed to fetch block {}: {}", block_height, e)))?;
 
     if !response.status().is_success() {

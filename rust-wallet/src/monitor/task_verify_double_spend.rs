@@ -203,7 +203,7 @@ async fn check_our_txid_on_woc(client: &reqwest::Client, txid: &str) -> TxidStat
             tokio::time::sleep(Duration::from_secs(1)).await;
         }
 
-        match client.get(&url).send().await {
+        match crate::chain_mode::get(&client, &url).send().await {
             Ok(resp) => {
                 let status_code = resp.status().as_u16();
                 if status_code == 404 {
@@ -247,7 +247,7 @@ async fn check_output_spent(
         txid, vout
     );
 
-    let resp = client.get(&url).send().await
+    let resp = crate::chain_mode::get(&client, &url).send().await
         .map_err(|e| format!("HTTP error: {}", e))?;
 
     let status_code = resp.status().as_u16();

@@ -11,6 +11,7 @@ pub mod chaintracks;
 pub mod gorillapool_mapi;
 pub mod gorillapool_ordinals;
 pub mod junglebus;
+pub mod spv_no_indexer;
 pub mod whatsonchain;
 
 pub use arc_gorillapool::ArcGorillaPoolProvider;
@@ -21,4 +22,5 @@ pub use chaintracks::ChaintracksProvider;
 pub use gorillapool_mapi::GorillaPoolMapiProvider;
 pub use gorillapool_ordinals::GorillaPoolOrdinalsProvider;
 pub use junglebus::JungleBusProvider;
+pub use spv_no_indexer::SpvNoIndexerProvider;
 pub use whatsonchain::WhatsOnChainProvider;

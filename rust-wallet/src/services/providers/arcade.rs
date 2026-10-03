@@ -22,10 +22,7 @@ pub const ENV_URL: &str = "HODOS_ARCADE_URL";
 
 /// Base URL of the configured Arcade instance, without a trailing slash.
 pub fn configured_base_url() -> Option<String> {
-    std::env::var(ENV_URL)
-        .ok()
-        .map(|u| u.trim().trim_end_matches('/').to_string())
-        .filter(|u| !u.is_empty())
+    crate::chain_mode::spv_url(ENV_URL)
 }
 
 pub struct ArcadeProvider {
@@ -178,7 +175,7 @@ mod tests {
     async fn arcade_live_broadcast_status_and_proof() {
         use crate::services::provider::TxState;
         let raw = std::env::var("HODOS_LIVE_RAWTX_HEX").expect("HODOS_LIVE_RAWTX_HEX");
-        let base = configured_base_url().unwrap_or_else(|| "http://localhost:8080".into());
+        let base = std::env::var(crate::chain_mode::ENV_ARCADE).unwrap_or_else(|_| "http://localhost:8080".into());
         let client = reqwest::Client::new();
         let p = ArcadeProvider::new(client.clone(), base);
 

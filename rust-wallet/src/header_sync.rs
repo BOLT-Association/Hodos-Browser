@@ -347,8 +347,8 @@ mod tests {
     #[tokio::test]
     #[ignore]
     async fn header_sync_live_real_chain() {
-        let base = crate::services::providers::chaintracks::configured_base_url()
-            .unwrap_or_else(|| "http://localhost:8083/chaintracks/v2".into());
+        let base = std::env::var(crate::chain_mode::ENV_CHAINTRACKS)
+            .unwrap_or_else(|_| "http://localhost:8083/chaintracks/v2".into());
         let src = ChaintracksSource(ChaintracksProvider::new(reqwest::Client::new(), base));
         let chain = Mutex::new(HeaderChain::new(Params::regtest()));
         let now = std::time::SystemTime::now()

@@ -20,10 +20,7 @@ pub const ENV_URL: &str = "HODOS_CHAINTRACKS_URL";
 
 /// Base URL (including the `/chaintracks/v2` path), without a trailing slash.
 pub fn configured_base_url() -> Option<String> {
-    std::env::var(ENV_URL)
-        .ok()
-        .map(|u| u.trim().trim_end_matches('/').to_string())
-        .filter(|u| !u.is_empty())
+    crate::chain_mode::spv_url(ENV_URL)
 }
 
 pub struct ChaintracksProvider {
@@ -245,8 +242,8 @@ mod tests {
     #[tokio::test]
     #[ignore]
     async fn chaintracks_live_header_by_height_and_hash() {
-        let base = configured_base_url()
-            .unwrap_or_else(|| "http://localhost:8083/chaintracks/v2".into());
+        let base = std::env::var(crate::chain_mode::ENV_CHAINTRACKS)
+            .unwrap_or_else(|_| "http://localhost:8083/chaintracks/v2".into());
         let p = ChaintracksProvider::new(reqwest::Client::new(), base);
         let by_height = p.get_block_header(BlockKey::Height(5)).await.expect("by height");
         let by_hash = p

@@ -236,7 +236,7 @@ async fn resolve_block_height(
     }
     let target = proof_obj.get("target").and_then(|v| v.as_str()).filter(|t| !t.is_empty())?;
     let header_url = format!("https://api.whatsonchain.com/v1/bsv/main/block/hash/{}", target);
-    let resp = client.get(&header_url).send().await.ok()?;
+    let resp = crate::chain_mode::get(&client, &header_url).send().await.ok()?;
     if !resp.status().is_success() { return None; }
     let header_json: serde_json::Value = resp.json().await.ok()?;
     header_json.get("height").and_then(|v| v.as_u64()).map(|h| h as u32)

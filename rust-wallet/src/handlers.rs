@@ -14605,7 +14605,7 @@ async fn adopt_onchain_backup(
         "https://api.whatsonchain.com/v1/bsv/main/tx/{}/hex",
         chain_txid
     );
-    let raw_hex = match client.get(&tx_url).send().await {
+    let raw_hex = match crate::chain_mode::get(&client, &tx_url).send().await {
         Ok(resp) => {
             if !resp.status().is_success() {
                 log::warn!("   ⚠️  WoC returned status {} for tx {}", resp.status(), &chain_txid[..16.min(chain_txid.len())]);
@@ -14870,7 +14870,7 @@ pub async fn do_onchain_backup(
         );
 
         // Fetch all unspent marker UTXOs at the backup address
-        let onchain_markers: Vec<(String, i64)> = match client.get(&utxo_url).send().await {
+        let onchain_markers: Vec<(String, i64)> = match crate::chain_mode::get(&client, &utxo_url).send().await {
             Ok(resp) => {
                 let body: serde_json::Value = resp.json().await.unwrap_or_default();
                 let utxos = body.get("result").and_then(|r| r.as_array())
@@ -14980,7 +14980,7 @@ pub async fn do_onchain_backup(
             for (orphan_txid, _height) in &orphaned {
                 // Fetch the tx to get the marker output script (vout 1 = marker)
                 let tx_url = format!("https://api.whatsonchain.com/v1/bsv/main/tx/hash/{}", orphan_txid);
-                match client.get(&tx_url).send().await {
+                match crate::chain_mode::get(&client, &tx_url).send().await {
                     Ok(resp) if resp.status().is_success() => {
                         if let Ok(tx_data) = resp.json::<serde_json::Value>().await {
                             if let Some(vouts) = tx_data["vout"].as_array() {
@@ -16213,7 +16213,7 @@ async fn fetch_onchain_backup(
     );
     log::info!("   🔍 Querying marker UTXOs at backup address {}...", backup_address);
 
-    let resp = client.get(&utxo_url).send().await
+    let resp = crate::chain_mode::get(&client, &utxo_url).send().await
         .map_err(|e| format!("WhatsOnChain UTXO fetch failed: {}", e))?;
 
     if !resp.status().is_success() {
@@ -16256,7 +16256,7 @@ async fn fetch_onchain_backup(
         "https://api.whatsonchain.com/v1/bsv/main/tx/{}/hex",
         txid
     );
-    let tx_resp = client.get(&tx_url).send().await
+    let tx_resp = crate::chain_mode::get(&client, &tx_url).send().await
         .map_err(|e| format!("WhatsOnChain tx fetch failed: {}", e))?;
 
     if !tx_resp.status().is_success() {
@@ -18322,7 +18322,7 @@ pub async fn get_height(_body: web::Bytes) -> HttpResponse {
         .build()
         .unwrap_or_else(|_| reqwest::Client::new());
 
-    match client.get(url).send().await {
+    match crate::chain_mode::get(&client, url).send().await {
         Ok(response) => {
             if !response.status().is_success() {
                 log::error!("   WhatsOnChain API returned status: {}", response.status());
@@ -18400,7 +18400,7 @@ pub async fn get_header_for_height(
         .unwrap_or_else(|_| reqwest::Client::new());
 
     // Step 1: Get block hash from height
-    let block_hash = match client.get(&block_info_url).send().await {
+    let block_hash = match crate::chain_mode::get(&client, &block_info_url).send().await {
         Ok(response) => {
             if !response.status().is_success() {
                 log::error!("   WhatsOnChain API returned status: {}", response.status());
@@ -18441,7 +18441,7 @@ pub async fn get_header_for_height(
     // Step 2: Get block header by hash using /block/{hash}/header endpoint (as per ts-brc100)
     let block_header_url = format!("https://api.whatsonchain.com/v1/bsv/main/block/{}/header", block_hash);
 
-    match client.get(&block_header_url).send().await {
+    match crate::chain_mode::get(&client, &block_header_url).send().await {
         Ok(response) => {
             if !response.status().is_success() {
                 log::error!("   WhatsOnChain API returned status: {}", response.status());

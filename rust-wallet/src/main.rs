@@ -34,6 +34,7 @@ mod overlay;  // BSV Overlay Services client for certificate publish/unpublish
 mod services;  // Phase 1.6d.B: WalletServices facade — IndexerProvider trait + provider chains
 mod permission_service;  // Phase 2.6-A.5: wrapper around hodos_permission_engine pure crate (dormant in A.5; wired into AppState in A.6)
 mod manifest;  // Phase 2.6-G: Rust port of C++ ManifestFetcher (fetch + lenient parse of .well-known/wallet-manifest.json)
+mod chain_mode;  // HODOS_CHAIN_MODE: public | spv (Arcade + verified headers only)
 mod header_chain;
 mod header_sync;  // WS4: header sync + process-wide HeaderService  // Wallet-Hardening WS4: verified header chain (PoW, linkage, most-work, reorg)
 mod reconcile;  // Wallet-Hardening WS1: spent-input reconcile primitives (c1 check_outpoint_spent; c2/c3 dormant)
@@ -519,6 +520,12 @@ async fn main() -> std::io::Result<()> {
     // mis-launched dev build (HODOS_DEV unset) bails via eprintln! before we
     // touch the production data directory.
     enforce_dev_safeguard();
+
+    // HODOS_CHAIN_MODE must be valid (and complete, in spv mode) before anything starts.
+    if let Err(e) = chain_mode::validate_startup() {
+        eprintln!("❌ {}", e);
+        return Err(std::io::Error::new(std::io::ErrorKind::InvalidInput, e));
+    }
 
     // Initialize logging: console + rotating file in <data_root>/logs/.
     // Held for the process lifetime (drop = logging stops). Flushed explicitly in
@@ -1066,7 +1073,7 @@ async fn main() -> std::io::Result<()> {
                     checked_txids.insert(txid.clone());
 
                     let url = format!("https://api.whatsonchain.com/v1/bsv/main/tx/hash/{}", txid);
-                    match client.get(&url).send().await {
+                    match crate::chain_mode::get(&client, &url).send().await {
                         Ok(resp) if resp.status().as_u16() == 404 => {
                             log::warn!(
                                 "   🔴 Phantom output detected: tx {} not found on WoC (404)",
