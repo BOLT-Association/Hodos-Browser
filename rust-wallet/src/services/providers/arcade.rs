@@ -99,11 +99,17 @@ impl IndexerProvider for ArcadeProvider {
     }
 
     async fn broadcast_beef(&self, beef: &[u8]) -> Result<BroadcastResult, IndexerError> {
-        let body = serde_json::json!({ "rawTx": hex::encode(beef) });
+        // Arcade parses the body as a raw or Extended Format transaction; it does not
+        // accept BEEF. Convert (the parents inside the BEEF supply the EF source data).
+        let body = arcade_body_from_beef(beef).map_err(|reason| IndexerError::InvalidResponse {
+            provider: NAME,
+            reason,
+        })?;
         let resp = self
             .client
             .post(format!("{}/tx", self.base))
-            .json(&body)
+            .header("Content-Type", "text/plain")
+            .body(body)
             .send()
             .await
             .map_err(|e| IndexerError::Transport(e.to_string()))?;
@@ -128,9 +134,79 @@ impl IndexerProvider for ArcadeProvider {
     }
 }
 
+/// Hex body for Arcade's `POST /tx` (`text/plain`) from the bytes Hodos broadcasts.
+///
+/// BEEF (Atomic, V1 or V2) becomes the main transaction in Extended Format, built from the
+/// parents carried in the BEEF; it fails if a parent is missing, because Arcade cannot
+/// validate scripts without the source outputs. Bytes that are not a BEEF are assumed to
+/// already be a raw/EF transaction and are sent as they are.
+pub(crate) fn arcade_body_from_beef(bytes: &[u8]) -> Result<String, String> {
+    let parsed = if bytes.len() >= 4 && bytes[0..4] == crate::beef::ATOMIC_BEEF_MARKER {
+        crate::beef::Beef::from_atomic_beef_bytes(bytes).map(|(_, b)| b)
+    } else {
+        crate::beef::Beef::from_bytes(bytes)
+    };
+    match parsed {
+        Ok(beef) => beef
+            .to_ef_hex()
+            .map_err(|e| format!("cannot build Extended Format for Arcade: {}", e)),
+        Err(_) => Ok(hex::encode(bytes)),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn raw_tx(prev_txid_wire: [u8; 32], prev_vout: u32, out_sats: u64) -> Vec<u8> {
+        let mut t = Vec::new();
+        t.extend_from_slice(&1u32.to_le_bytes());
+        t.push(1); // one input
+        t.extend_from_slice(&prev_txid_wire);
+        t.extend_from_slice(&prev_vout.to_le_bytes());
+        t.push(0); // empty scriptSig
+        t.extend_from_slice(&0xffff_ffffu32.to_le_bytes());
+        t.push(1); // one output
+        t.extend_from_slice(&out_sats.to_le_bytes());
+        t.push(1);
+        t.push(0x51); // OP_TRUE
+        t.extend_from_slice(&0u32.to_le_bytes());
+        t
+    }
+
+    #[test]
+    fn beef_is_converted_to_extended_format_with_the_parents_outputs() {
+        use sha2::{Digest, Sha256};
+        let parent = raw_tx([7u8; 32], 0, 5000);
+        let parent_txid_wire: [u8; 32] = Sha256::digest(Sha256::digest(&parent)).into();
+        let child = raw_tx(parent_txid_wire, 0, 4000);
+
+        let mut beef = crate::beef::Beef::new();
+        beef.add_parent_transaction(parent);
+        beef.set_main_transaction(child);
+        let bytes = beef.to_bytes().expect("beef bytes");
+
+        let ef = arcade_body_from_beef(&bytes).expect("ef");
+        let raw = hex::decode(&ef).unwrap();
+        assert_eq!(&raw[4..10], &[0, 0, 0, 0, 0, 0xEF], "EF marker after the version");
+        // the source output (5000 sats = 0x1388 LE) sits after the input's sequence
+        assert!(raw.windows(8).any(|w| w == 5000u64.to_le_bytes()), "source satoshis present");
+    }
+
+    #[test]
+    fn a_missing_parent_is_an_error_not_a_silent_fallback() {
+        let child = raw_tx([9u8; 32], 0, 1000);
+        let mut beef = crate::beef::Beef::new();
+        beef.set_main_transaction(child);
+        let bytes = beef.to_bytes().expect("beef bytes");
+        assert!(arcade_body_from_beef(&bytes).unwrap_err().contains("Extended Format"));
+    }
+
+    #[test]
+    fn non_beef_bytes_pass_through_unchanged() {
+        let raw = raw_tx([1u8; 32], 0, 10);
+        assert_eq!(arcade_body_from_beef(&raw).unwrap(), hex::encode(&raw));
+    }
 
     #[test]
     fn supports_broadcast_status_and_proof_only() {

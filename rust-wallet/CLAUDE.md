@@ -27,6 +27,8 @@ cargo check              # Fast type-check without building
 
 **Dev/prod guard** (`main.rs :: enforce_dev_safeguard`, runs first in `main()`): a dev-build path without `HODOS_DEV=1` aborts; a stray `HODOS_DEV=1` on a non-dev-build binary is scrubbed and forced to prod.
 
+**Dev storage override**: with `HODOS_DEV=1`, `HODOS_DATA_DIR=<dir>` relocates the whole data root (wallet DB + logs; `main.rs :: data_root`). Used for throwaway wallets, e.g. the spv-mode runs in `ChainBrowsers/docs/hodos-spv.md`. Ignored without `HODOS_DEV=1`.
+
 **Dev storage**: `%APPDATA%/HodosBrowserDev/wallet/wallet.db`
 **Production storage**: `%APPDATA%/HodosBrowser/wallet/wallet.db`
 

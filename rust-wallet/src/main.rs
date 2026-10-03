@@ -339,6 +339,16 @@ pub fn wallet_port() -> u16 {
 /// Windows dev: `%APPDATA%\HodosBrowserDev`, macOS: `~/Library/Application Support/HodosBrowser`.
 /// Subdirs `wallet/` (db) and `logs/` (rotating log files) hang off this root.
 fn data_root() -> PathBuf {
+    // Dev-only: HODOS_DATA_DIR relocates the whole data root (wallet DB + logs) so a run
+    // against a local chain can use a throwaway wallet. Honoured only with HODOS_DEV=1
+    // (which the dev safeguard scrubs on non-dev binaries), never in an installed build.
+    if std::env::var("HODOS_DEV").as_deref() == Ok("1") {
+        if let Ok(dir) = std::env::var("HODOS_DATA_DIR") {
+            if !dir.trim().is_empty() {
+                return PathBuf::from(dir);
+            }
+        }
+    }
     dirs::data_dir()
         .unwrap_or_else(|| match std::env::var("APPDATA") {
             Ok(appdata) => PathBuf::from(appdata),

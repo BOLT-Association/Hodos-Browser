@@ -13568,6 +13568,28 @@ pub async fn internalize_action(
         }
     }
 
+    // spv mode: a BRC-42 output whose own transaction came with a BUMP has just been
+    // verified against the wallet's header chain (`verify_beef_bumps`, above), so that
+    // proof IS the confirmation. Mark it confirmed now. `store_derived_utxo` inserts
+    // `confirmed = 0` and leaves promotion to `TaskSyncPending`, which asks WhatsOnChain
+    // and is blocked in spv mode; without this the output could never be selected.
+    // A BEEF whose subject has no BUMP stays unconfirmed (nothing has proved it yet).
+    if crate::chain_mode::is_spv() && !derived_utxos.is_empty() {
+        if let Some(ref beef) = parsed_beef {
+            if beef.tx_has_proof(&txid) {
+                let db = state.database.lock().unwrap();
+                let output_repo = crate::database::OutputRepository::new(db.connection());
+                for (vout, _, _, _, _) in &derived_utxos {
+                    if let Err(e) = output_repo.mark_output_confirmed(&txid, *vout as i32) {
+                        log::warn!("   ⚠️  Could not mark {}:{} confirmed: {}", txid, vout, e);
+                    }
+                }
+                drop(db);
+                state.balance_cache.invalidate();
+            }
+        }
+    }
+
     // ============================================================
     // BRC-100 Basket Insertion: Store outputs with basket/tag assignments
     // ============================================================
