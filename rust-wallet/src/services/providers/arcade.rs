@@ -169,4 +169,69 @@ mod tests {
             other => panic!("expected ProviderStatus 400, got {:?}", other),
         }
     }
+
+    /// Live check against the spv-testnet stack (`stack.ps1 up`). Run with
+    /// `HODOS_LIVE_RAWTX_HEX=<signed tx hex> cargo test --lib arcade_live -- --ignored --nocapture`.
+    /// Needs a mature coinbase spend that has not been broadcast yet.
+    #[tokio::test]
+    #[ignore]
+    async fn arcade_live_broadcast_status_and_proof() {
+        use crate::services::provider::TxState;
+        let raw = std::env::var("HODOS_LIVE_RAWTX_HEX").expect("HODOS_LIVE_RAWTX_HEX");
+        let base = configured_base_url().unwrap_or_else(|| "http://localhost:8080".into());
+        let client = reqwest::Client::new();
+        let p = ArcadeProvider::new(client.clone(), base);
+
+        let sent = p.broadcast_beef(&hex::decode(raw).unwrap()).await.expect("broadcast");
+        println!("broadcast: {:?}", sent);
+        assert_eq!(sent.provider, "arcade");
+
+        // Let block assembly pick the tx up, then mine until Arcade reports it MINED.
+        tokio::time::sleep(std::time::Duration::from_secs(8)).await;
+        let mut status = None;
+        for _ in 0..5 {
+            let r = client
+                .post("http://localhost:29292")
+                .basic_auth("bitcoin", Some("bitcoin"))
+                .json(&serde_json::json!({"method": "generate", "params": [1]}))
+                .timeout(std::time::Duration::from_secs(200))
+                .send()
+                .await
+                .expect("mine");
+            println!("generate: {}", r.status());
+            for _ in 0..15 {
+                tokio::time::sleep(std::time::Duration::from_secs(2)).await;
+                let s = p.tx_status(&sent.txid).await.expect("status");
+                println!("status: {:?} {:?}", s.state, s.raw_provider_status);
+                if s.state == TxState::Mined {
+                    status = Some(s);
+                    break;
+                }
+            }
+            if status.is_some() {
+                break;
+            }
+        }
+        let status = status.expect("tx never MINED");
+        assert!(status.merkle_path_bump.is_some());
+
+        let tsc = p.get_merkle_proof_tsc(&sent.txid).await.expect("proof");
+        let root = crate::beef::compute_merkle_root_from_tsc(
+            &sent.txid,
+            tsc["height"].as_u64().unwrap() as u32,
+            tsc["index"].as_u64().unwrap(),
+            tsc["nodes"].as_array().unwrap(),
+        )
+        .expect("root");
+        let hdr: serde_json::Value = client
+            .get(format!("http://localhost:8083/chaintracks/v2/header/height/{}", tsc["height"]))
+            .send()
+            .await
+            .unwrap()
+            .json()
+            .await
+            .unwrap();
+        println!("computed root {} / header root {}", root, hdr["merkleRoot"]);
+        assert_eq!(hdr["merkleRoot"].as_str().unwrap(), root);
+    }
 }
