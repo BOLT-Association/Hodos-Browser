@@ -27,6 +27,7 @@ pub mod manifest;
 pub mod reconcile;
 pub mod chain_mode;
 pub mod arcade_push;
+pub mod zero_conf;
 pub mod header_chain;
 pub mod header_sync;
 
