@@ -638,7 +638,7 @@ async fn check_whatsonchain_confirmation(
 ) -> Result<Option<(u32, Option<u32>)>, String> {
     let url = format!("https://api.whatsonchain.com/v1/bsv/main/tx/hash/{}", txid);
 
-    let response = client.get(&url)
+    let response = crate::chain_mode::get(&client, &url)
         .timeout(Duration::from_secs(15))
         .send()
         .await
@@ -673,7 +673,7 @@ async fn fetch_and_store_woc_proof(
 ) -> Result<i64, String> {
     let url = format!("https://api.whatsonchain.com/v1/bsv/main/tx/{}/proof/tsc", txid);
 
-    let response = client.get(&url)
+    let response = crate::chain_mode::get(&client, &url)
         .timeout(Duration::from_secs(15))
         .send()
         .await
@@ -830,7 +830,7 @@ async fn oracle_quorum_check(client: &reqwest::Client, txid: &str) -> OracleVerd
 
 async fn query_woc_txid(client: &reqwest::Client, txid: &str) -> OracleStatus {
     let url = format!("https://api.whatsonchain.com/v1/bsv/main/tx/hash/{}", txid);
-    match client.get(&url).timeout(Duration::from_secs(10)).send().await {
+    match crate::chain_mode::get(&client, &url).timeout(Duration::from_secs(10)).send().await {
         Ok(resp) => {
             let code = resp.status().as_u16();
             if code == 404 { return OracleStatus::NotFound; }
@@ -848,7 +848,7 @@ async fn query_woc_txid(client: &reqwest::Client, txid: &str) -> OracleStatus {
 
 async fn query_junglebus_txid(client: &reqwest::Client, txid: &str) -> OracleStatus {
     let url = format!("https://junglebus.gorillapool.io/v1/transaction/get/{}", txid);
-    match client.get(&url).timeout(Duration::from_secs(10)).send().await {
+    match crate::chain_mode::get(&client, &url).timeout(Duration::from_secs(10)).send().await {
         Ok(resp) => {
             let code = resp.status().as_u16();
             if code == 404 { return OracleStatus::NotFound; }
@@ -872,7 +872,7 @@ async fn query_junglebus_txid(client: &reqwest::Client, txid: &str) -> OracleSta
 
 async fn query_bitails_txid(client: &reqwest::Client, txid: &str) -> OracleStatus {
     let url = format!("https://api.bitails.io/tx/{}", txid);
-    match client.get(&url).timeout(Duration::from_secs(10)).send().await {
+    match crate::chain_mode::get(&client, &url).timeout(Duration::from_secs(10)).send().await {
         Ok(resp) => {
             let code = resp.status().as_u16();
             if code == 404 { return OracleStatus::NotFound; }

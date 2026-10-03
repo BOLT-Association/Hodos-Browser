@@ -23,7 +23,7 @@ pub use provider::{
 
 use providers::{
     ArcGorillaPoolProvider, ArcTaalProvider, ArcadeProvider, BitailsProvider, ChaintracksProvider, GorillaPoolMapiProvider,
-    GorillaPoolOrdinalsProvider, JungleBusProvider, WhatsOnChainProvider,
+    GorillaPoolOrdinalsProvider, JungleBusProvider, SpvNoIndexerProvider, WhatsOnChainProvider,
 };
 
 /// Per-operation soft-timeout defaults from DESIGN §2.3.
@@ -102,17 +102,29 @@ impl WalletServices {
                 None => vec![woc.clone(), jb.clone()],
             };
 
+        // spv mode: nothing here can be answered without a public indexer, so these chains
+        // hold one provider that says so explicitly.
+        let no_indexer: Option<Arc<dyn IndexerProvider>> = if crate::chain_mode::is_spv() {
+            Some(Arc::new(SpvNoIndexerProvider))
+        } else {
+            None
+        };
+        let or_public = |public: Vec<Arc<dyn IndexerProvider>>| match &no_indexer {
+            Some(n) => vec![n.clone()],
+            None => public,
+        };
+
         Self {
             client,
             // Bitails demoted from raw_tx/proof/header chains: it returns HTTP 500
             // (instead of a proper 404) for unknown txids, poisoning error messages.
             // Kept on tx_status where its response shape is reliable.
-            raw_tx: ProviderCollection::new(vec![arc_gp.clone(), woc.clone(), jb.clone()]),
+            raw_tx: ProviderCollection::new(or_public(vec![arc_gp.clone(), woc.clone(), jb.clone()])),
             proof: ProviderCollection::new(proof_chain),
             header: ProviderCollection::new(header_chain),
             tx_status_chain: ProviderCollection::new(status_chain),
-            outspend_chain: ProviderCollection::new(vec![woc.clone(), jb.clone()]),
-            utxo: ProviderCollection::new(vec![woc.clone(), gp_ords.clone()]),
+            outspend_chain: ProviderCollection::new(or_public(vec![woc.clone(), jb.clone()])),
+            utxo: ProviderCollection::new(or_public(vec![woc.clone(), gp_ords.clone()])),
             broadcast: ProviderCollection::new(broadcast_chain),
         }
     }

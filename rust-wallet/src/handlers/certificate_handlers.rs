@@ -3031,7 +3031,7 @@ async fn create_certificate_transaction(
                     .timeout(crate::services::CallClass::IndexerSync.timeout())
                     .build()
                     .unwrap_or_else(|_| reqwest::Client::new());
-                match client.get(&url).send().await {
+                match crate::chain_mode::get(&client, &url).send().await {
                     Ok(response) => {
                         if response.status() == 404 {
                             // 404 means likely spent
@@ -5729,7 +5729,7 @@ async fn resolve_and_add_tsc_proof_to_beef(
     } else if let Some(target) = proof_obj.get("target").and_then(|v| v.as_str()).filter(|t| !t.is_empty()) {
         // Resolve height from block hash via WoC
         let header_url = format!("https://api.whatsonchain.com/v1/bsv/main/block/hash/{}", target);
-        let resp = client.get(&header_url).send().await
+        let resp = crate::chain_mode::get(&client, &header_url).send().await
             .map_err(|e| format!("Failed to fetch block header for target {}: {}", target, e))?;
         if !resp.status().is_success() {
             return Err(format!("Block header API returned {} for target {}", resp.status(), target));
