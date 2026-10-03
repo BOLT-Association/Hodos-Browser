@@ -136,7 +136,11 @@ impl Default for FeeRateCache {
 /// }
 /// ```
 async fn fetch_arc_fee_rate(client: &reqwest::Client) -> Result<u64, String> {
-    let response = client.get(ARC_POLICY_URL)
+    let policy_url = match crate::services::providers::arcade::configured_base_url() {
+        Some(base) => format!("{}/v1/policy", base),
+        None => ARC_POLICY_URL.to_string(),
+    };
+    let response = client.get(&policy_url)
         .send()
         .await
         .map_err(|e| format!("HTTP error: {}", e))?;
