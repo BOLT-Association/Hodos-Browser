@@ -38,6 +38,25 @@ impl ArcadeProvider {
     pub fn from_env(client: reqwest::Client) -> Option<Self> {
         configured_base_url().map(|base| Self::new(client, base))
     }
+
+    /// Re-submit an Extended Format tx Arcade may already know, only to subscribe this wallet's
+    /// callback token to its status updates (Arcade treats a re-submit as idempotent). Best-effort:
+    /// the proof task polls whether or not this works. Returns the HTTP status.
+    pub async fn register_for_push(&self, ef_hex: &str) -> Result<u16, String> {
+        let Some(token) = crate::arcade_push::token() else {
+            return Err("no callback token yet".to_string());
+        };
+        let resp = self
+            .client
+            .post(format!("{}/tx", self.base))
+            .header("Content-Type", "text/plain")
+            .header("X-CallbackToken", token)
+            .body(ef_hex.to_string())
+            .send()
+            .await
+            .map_err(|e| e.to_string())?;
+        Ok(resp.status().as_u16())
+    }
 }
 
 #[async_trait]
@@ -105,10 +124,15 @@ impl IndexerProvider for ArcadeProvider {
             provider: NAME,
             reason,
         })?;
-        let resp = self
+        let mut req = self
             .client
             .post(format!("{}/tx", self.base))
-            .header("Content-Type", "text/plain")
+            .header("Content-Type", "text/plain");
+        // Subscribe this wallet's callback token so Arcade pushes this tx's status over SSE.
+        if let Some(token) = callback_token_header(crate::chain_mode::push_enabled(), crate::arcade_push::token()) {
+            req = req.header("X-CallbackToken", token);
+        }
+        let resp = req
             .body(body)
             .send()
             .await
@@ -132,6 +156,11 @@ impl IndexerProvider for ArcadeProvider {
             r
         })
     }
+}
+
+/// The `X-CallbackToken` to send with a submission: only when push is on and a token exists.
+pub(crate) fn callback_token_header(push_enabled: bool, token: Option<String>) -> Option<String> {
+    if push_enabled { token } else { None }
 }
 
 /// Hex body for Arcade's `POST /tx` (`text/plain`) from the bytes Hodos broadcasts.
@@ -206,6 +235,14 @@ mod tests {
     fn non_beef_bytes_pass_through_unchanged() {
         let raw = raw_tx([1u8; 32], 0, 10);
         assert_eq!(arcade_body_from_beef(&raw).unwrap(), hex::encode(&raw));
+    }
+
+    #[test]
+    fn callback_token_is_sent_only_when_push_is_on_and_a_token_exists() {
+        let t = Some("tok".to_string());
+        assert_eq!(callback_token_header(true, t.clone()).as_deref(), Some("tok"));
+        assert_eq!(callback_token_header(false, t), None, "push off: no subscription");
+        assert_eq!(callback_token_header(true, None), None, "no token yet (wallet locked): plain submit");
     }
 
     #[test]

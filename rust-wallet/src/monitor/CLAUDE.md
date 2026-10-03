@@ -41,6 +41,7 @@ The Monitor replaces the ad-hoc background services (`arc_status_poller`, `cache
 | `task_verify_double_spend.rs` | Independent verification of suspected double-spends against WhatsOnChain (SDK-style, never trusts a single broadcaster) | 60s |
 | `task_retry_peerpay_outbox.rs` | Retry MessageBox delivery for PeerPay sends that succeeded on-chain but failed to deliver | 30s (fast tick; actual retry gated by `next_retry_at`) |
 | `task_sync_headers.rs` | WS4: sync the verified header chain from `HODOS_CHAINTRACKS_URL` (spv mode only), persist new headers (V26 `header_chain`), log reorgs. No-op when unset | 30s |
+| `task_push.rs` | spv + `HODOS_ARCADE_SSE_URL`: owns the Arcade SSE client and the callback token; a MINED/IMMUTABLE/REJECTED/... event runs `task_sync_headers` then `task_check_for_proofs` at once, retrying every 2 s (up to 8 times) while a mined tx is still waiting for its header. Wake-up only; polling is unchanged. `task_check_for_proofs::run` and `task_sync_headers::run` take a static async lock so a push-triggered run and the monitor's tick never overlap | event-driven |
 | `task_recheck_proofs.rs` | WS4: after a header-chain reorg (and once after the first sync) find `proven_txs` whose root no longer matches the active chain; replace with a verified re-mined proof via `apply_replacement`. Never changes tx status/outputs. Runs in the same tick as `task_sync_headers`; no-op when nothing pending | 30s |
 | `task_refresh_ship_cache.rs` | Keep `AppState.ship_cache` warm for `tm_identity` — **runs outside the `db_available()` gate** | 300s |
 

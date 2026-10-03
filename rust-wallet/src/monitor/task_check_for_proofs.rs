@@ -53,7 +53,12 @@ struct PendingTxInfo {
 }
 
 /// Run the TaskCheckForProofs task
+/// One proof check at a time: the monitor's tick and the push driver (`task_push`) both call `run`.
+static RUN_LOCK: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
+
 pub async fn run(state: &web::Data<AppState>, client: &reqwest::Client) -> Result<(), String> {
+    let _one_at_a_time = RUN_LOCK.lock().await;
+    crate::arcade_push::set_proof_waiting(false);
     // Step 1: Get transactions needing proof
     let pending_txs: Vec<PendingTxInfo> = {
         let db = state.database.lock().map_err(|e| format!("DB lock: {}", e))?;
@@ -209,6 +214,7 @@ pub async fn run(state: &web::Data<AppState>, client: &reqwest::Client) -> Resul
                         // tick; marking it confirmed here would drop the tx from this task for good.
                         if !should_mark_confirmed(crate::chain_mode::is_spv(), proof_stored) {
                             info!("   ⏳ {} mined but no verified proof stored yet — will retry", txid);
+                            crate::arcade_push::set_proof_waiting(true);
                             continue;
                         }
 

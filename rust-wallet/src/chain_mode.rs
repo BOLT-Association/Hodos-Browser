@@ -22,6 +22,10 @@ use reqwest::{Client, RequestBuilder};
 pub const ENV_MODE: &str = "HODOS_CHAIN_MODE";
 pub const ENV_ARCADE: &str = "HODOS_ARCADE_URL";
 pub const ENV_CHAINTRACKS: &str = "HODOS_CHAINTRACKS_URL";
+/// Arcade serves Server-Sent Events from a separate listener, so push needs its own URL.
+pub const ENV_ARCADE_SSE: &str = "HODOS_ARCADE_SSE_URL";
+/// `off` / `0` / `false` / `no` disables push even when the SSE URL is set. Polling is never off.
+pub const ENV_ARCADE_PUSH: &str = "HODOS_ARCADE_PUSH";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ChainMode {
@@ -121,6 +125,22 @@ pub fn denied(what: &str) -> String {
     )
 }
 
+/// Base URL of Arcade's SSE service (spv mode only).
+pub fn arcade_sse_url() -> Option<String> {
+    spv_url(ENV_ARCADE_SSE)
+}
+
+/// Push (SSE wake-up) is on only in spv mode, with an SSE URL, and not switched off.
+pub fn push_enabled() -> bool {
+    if arcade_sse_url().is_none() {
+        return false;
+    }
+    !matches!(
+        std::env::var(ENV_ARCADE_PUSH).ok().map(|v| v.trim().to_ascii_lowercase()).as_deref(),
+        Some("off") | Some("0") | Some("false") | Some("no")
+    )
+}
+
 /// MessageBox (PeerPay) polling and outbox retries are off in spv mode. They contact an
 /// external relay as the wallet's identity and acknowledge messages there, which a local
 /// chain run must never do (least of all from a copy of a real wallet database).
@@ -213,6 +233,31 @@ mod tests {
         with_env(Some("spv"), Some("http://a"), Some("http://c"), || {
             assert_eq!(validate_startup(), Ok(ChainMode::Spv));
         });
+    }
+
+    #[test]
+    fn push_needs_spv_mode_an_sse_url_and_not_to_be_switched_off() {
+        let url = "http://localhost:8082";
+        let with_push = |mode: Option<&str>, sse: Option<&str>, push: Option<&str>, f: &dyn Fn()| {
+            // ENV_LOCK is taken inside with_env; set the extra vars around it.
+            let old_sse = std::env::var(ENV_ARCADE_SSE).ok();
+            let old_push = std::env::var(ENV_ARCADE_PUSH).ok();
+            let set = |k: &str, v: Option<&str>| match v { Some(v) => std::env::set_var(k, v), None => std::env::remove_var(k) };
+            with_env(mode, Some("http://a"), Some("http://c"), || {
+                set(ENV_ARCADE_SSE, sse);
+                set(ENV_ARCADE_PUSH, push);
+                f();
+            });
+            set(ENV_ARCADE_SSE, old_sse.as_deref());
+            set(ENV_ARCADE_PUSH, old_push.as_deref());
+        };
+        with_push(Some("spv"), Some(url), None, &|| assert!(push_enabled()));
+        with_push(Some("spv"), Some(url), Some("on"), &|| assert!(push_enabled()));
+        for off in ["off", "OFF", "0", "false", "no"] {
+            with_push(Some("spv"), Some(url), Some(off), &|| assert!(!push_enabled(), "{}", off));
+        }
+        with_push(Some("spv"), None, None, &|| assert!(!push_enabled(), "no SSE url => no push"));
+        with_push(None, Some(url), None, &|| assert!(!push_enabled(), "public mode ignores the SSE url"));
     }
 
     #[test]
