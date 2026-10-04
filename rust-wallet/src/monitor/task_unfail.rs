@@ -294,6 +294,9 @@ fn create_proven_tx_and_recover(
     let merkle_path_bytes = serde_json::to_vec(&tsc_json)
         .map_err(|e| format!("Serialize TSC: {}", e))?;
 
+    // spv: a `proven_txs` row means "verified against our own headers", so check before storing.
+    crate::cache_helpers::check_proof_before_storing(txid, &tsc_json)?;
+
     let proven_tx_id = {
         let db = state.database.lock().map_err(|e| format!("DB lock: {}", e))?;
         let conn = db.connection();

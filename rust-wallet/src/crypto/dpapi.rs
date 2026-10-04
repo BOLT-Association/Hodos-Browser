@@ -135,11 +135,25 @@ const KEYCHAIN_SENTINEL: &[u8] = b"KEYCHAIN";
 /// Keychain service name — MUST differ between dev and production to prevent
 /// cross-contamination (dev wallet overwriting production mnemonic in Keychain).
 #[cfg(target_os = "macos")]
-fn keychain_service() -> &'static str {
-    if std::env::var("HODOS_DEV").unwrap_or_default() == "1" {
-        "HodosBrowserDev"
-    } else {
-        "HodosBrowser"
+fn keychain_service() -> String {
+    keychain_service_name(
+        std::env::var("HODOS_DEV").unwrap_or_default() == "1",
+        std::env::var("HODOS_DATA_DIR").ok().as_deref(),
+    )
+}
+
+/// The service name for the given environment. A dev run with `HODOS_DATA_DIR` set (a throwaway
+/// wallet in another directory) gets its own service, so it cannot overwrite the real dev
+/// wallet's auto-unlock entry: the Keychain is not under the data dir, so otherwise both would
+/// share one entry and the real wallet would "unlock" with the scratch wallet's mnemonic.
+#[cfg_attr(not(target_os = "macos"), allow(dead_code))]
+fn keychain_service_name(dev: bool, data_dir: Option<&str>) -> String {
+    if !dev {
+        return "HodosBrowser".to_string(); // HODOS_DATA_DIR is not honoured outside dev builds
+    }
+    match data_dir.map(str::trim).filter(|d| !d.is_empty()) {
+        Some(dir) => format!("HodosBrowserDev:{}", dir),
+        None => "HodosBrowserDev".to_string(),
     }
 }
 
@@ -152,7 +166,8 @@ const KEYCHAIN_ACCOUNT: &str = "wallet-mnemonic";
 pub fn dpapi_encrypt(plaintext: &[u8]) -> Result<Vec<u8>, String> {
     use security_framework::passwords::{set_generic_password, delete_generic_password};
 
-    let service = keychain_service();
+    let service_owned = keychain_service();
+    let service = service_owned.as_str();
 
     // Delete any existing entry first (set_generic_password fails if entry exists)
     let _ = delete_generic_password(service, KEYCHAIN_ACCOUNT);
@@ -173,7 +188,8 @@ pub fn dpapi_encrypt(plaintext: &[u8]) -> Result<Vec<u8>, String> {
 pub fn dpapi_decrypt(_encrypted: &[u8]) -> Result<Vec<u8>, String> {
     use security_framework::passwords::get_generic_password;
 
-    let service = keychain_service();
+    let service_owned = keychain_service();
+    let service = service_owned.as_str();
     let password = get_generic_password(service, KEYCHAIN_ACCOUNT)
         .map_err(|e| format!("Keychain retrieve failed (service={}): {}", service, e))?;
 
@@ -255,6 +271,17 @@ mod tests {
     use super::*;
 
     #[test]
+    fn keychain_service_is_separate_for_prod_dev_and_a_relocated_dev_wallet() {
+        assert_eq!(keychain_service_name(false, None), "HodosBrowser");
+        assert_eq!(keychain_service_name(false, Some("/tmp/x")), "HodosBrowser", "ignored outside dev");
+        assert_eq!(keychain_service_name(true, None), "HodosBrowserDev");
+        assert_eq!(keychain_service_name(true, Some("  ")), "HodosBrowserDev", "blank = not set");
+        let a = keychain_service_name(true, Some("/tmp/a"));
+        assert_ne!(a, "HodosBrowserDev", "a relocated wallet must not share the real dev entry");
+        assert_ne!(a, keychain_service_name(true, Some("/tmp/b")), "two scratch wallets do not share one either");
+    }
+
+    #[test]
     #[cfg(windows)]
     fn test_dpapi_round_trip() {
         let mnemonic = "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about";
@@ -295,7 +322,7 @@ mod tests {
         assert_eq!(retrieved, mnemonic.as_bytes());
 
         let _ = security_framework::passwords::delete_generic_password(
-            keychain_service(), KEYCHAIN_ACCOUNT);
+            &keychain_service(), KEYCHAIN_ACCOUNT);
     }
 
     #[test]

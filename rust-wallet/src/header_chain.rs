@@ -371,6 +371,36 @@ impl HeaderChain {
             .unwrap_or(false)
     }
 
+    /// Does `merkle_root_hex` belong to a header at `height` on a competing branch that is still
+    /// in the running, i.e. a branch whose tip has at least the active tip's work? Such a root
+    /// is undecided. A branch that has clearly lost (less work, e.g. orphaned by a reorg) is not
+    /// in the running: its proofs are plainly not on the active chain.
+    pub fn side_branch_has_root(&self, height: u32, merkle_root_hex: &str) -> bool {
+        let Some(active_tip) = self.tip() else { return false };
+        for t in self.entries.values() {
+            if t.hash == active_tip.hash || t.chainwork < active_tip.chainwork || t.height < height {
+                continue;
+            }
+            // Walk this competing tip back to `height`.
+            let mut cur = t;
+            while cur.height > height {
+                let mut prev = cur.header.prev_hash;
+                prev.reverse();
+                match self.entries.get(&hex::encode(prev)) {
+                    Some(p) => cur = p,
+                    None => break,
+                }
+            }
+            if cur.height == height
+                && self.active.get(height as usize).map(|h| h != &cur.hash).unwrap_or(true)
+                && cur.header.merkle_root_hex().eq_ignore_ascii_case(merkle_root_hex)
+            {
+                return true;
+            }
+        }
+        false
+    }
+
     pub fn add_header(&mut self, header: Header, now: u32) -> Result<AddOutcome, HeaderError> {
         let hash = header.hash_hex();
         if self.entries.contains_key(&hash) {

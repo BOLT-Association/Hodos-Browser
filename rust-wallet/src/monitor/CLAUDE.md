@@ -1,6 +1,6 @@
 # Monitor — Background Task Scheduler
 
-> Single tokio task that runs 14 named background tasks on configurable intervals, handling transaction lifecycle, proof acquisition, UTXO sync, PeerPay delivery, on-chain backup, dust consolidation, double-spend verification, and SHIP cache warming.
+> Single tokio task that runs 16 named background tasks on configurable intervals, handling transaction lifecycle, proof acquisition, UTXO sync, PeerPay delivery, on-chain backup, dust consolidation, double-spend verification, and SHIP cache warming.
 
 **Last Updated:** 2026-08-03
 
@@ -22,11 +22,11 @@ The Monitor replaces the ad-hoc background services (`arc_status_poller`, `cache
 
 ## Files
 
-15 files: `mod.rs` plus 14 `task_*.rs` modules — one per entry in `TaskSchedule`.
+`mod.rs` plus the `task_*.rs` modules — one per entry in `TaskSchedule` (16), plus `task_push.rs` (spv SSE listener, started once, not scheduled) and `task_recheck_proofs.rs` (run right after `sync_headers`).
 
 | File | Purpose | Interval |
 |------|---------|----------|
-| `mod.rs` | `Monitor` struct, `TaskSchedule` (14 fields), tick loop, `MONITOR_STARTED` guard, `Monitor::log_event()`, `log_monitor_event()`, `Monitor::db_available()`, `Monitor::now_secs()` | 30s tick |
+| `mod.rs` | `Monitor` struct, `TaskSchedule` (16 fields), tick loop, `MONITOR_STARTED` guard, `Monitor::log_event()`, `log_monitor_event()`, `Monitor::db_available()`, `Monitor::now_secs()` | 30s tick |
 | `task_check_for_proofs.rs` | Acquire merkle proofs for `sending`/`unproven`/`nosend` transactions via the `services` tx-status chain + 3-oracle txid quorum | 60s |
 | `task_send_waiting.rs` | Crash recovery: re-broadcast or clean up transactions stuck in `sending` status | 120s |
 | `task_fail_abandoned.rs` | Fail `unprocessed`/`unsigned` transactions older than 5 minutes (and stuck backup broadcasts older than 10 minutes), restore reserved outputs | 300s |

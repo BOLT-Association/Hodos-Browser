@@ -275,11 +275,7 @@ pub(crate) fn interpret_broadcast_response(
 }
 
 fn truncate(s: &str, max: usize) -> &str {
-    if s.len() <= max {
-        s
-    } else {
-        &s[..max]
-    }
+    crate::chain_mode::truncate_chars(s, max)
 }
 
 #[cfg(test)]

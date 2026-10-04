@@ -10047,6 +10047,12 @@ pub fn cache_arc_merkle_proof(
         }
     };
 
+    // spv: a proven_txs row means "verified against our own headers"; don't store one that is not.
+    if let Err(e) = crate::cache_helpers::check_proof_before_storing(txid, &tsc) {
+        log::warn!("   ⚠️  Not caching ARC merklePath for {}: {}", txid, e);
+        return;
+    }
+
     let height = tsc["height"].as_u64().unwrap_or(0) as u32;
     let tx_index = tsc["index"].as_u64().unwrap_or(0);
 
@@ -13840,6 +13846,17 @@ pub async fn internalize_action(
                     "code": "ERR_STORAGE",
                     "description": format!("Database error: {}", e)
                 }));
+            }
+        }
+    }
+
+    // spv mode: the subject came with a BUMP that `verify_beef_bumps` already checked against the
+    // header chain. Keep it as the tx's proof now (re-checked by the same gate), so the wallet
+    // does not depend on Arcade still knowing a tx it did not process to keep it confirmed.
+    if crate::chain_mode::is_spv() {
+        if let Some(ref beef) = parsed_beef {
+            if let Some(bump_hex) = beef.bump_hex_for(&txid) {
+                cache_arc_merkle_proof(&state.database, &txid, &bump_hex);
             }
         }
     }
@@ -19240,6 +19257,13 @@ pub async fn peerpay_send(
     body: web::Bytes,
 ) -> HttpResponse {
     log::info!("💸 /wallet/peerpay/send called");
+
+    if let Err(e) = crate::chain_mode::require_messagebox("PeerPay send (MessageBox)") {
+        return HttpResponse::ServiceUnavailable().json(serde_json::json!({
+            "success": false,
+            "error": e
+        }));
+    }
 
     let req: PeerpaySendRequest = match serde_json::from_slice(&body) {
         Ok(r) => r,

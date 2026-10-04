@@ -42,6 +42,18 @@ pub fn classify_proof(check: &Result<bool, String>, header_chain_configured: boo
     }
 }
 
+/// May a proof an indexer handed back be stored as a verified `proven_txs` row? With a header
+/// chain configured (spv) only a proof that verified against it may; anything the chain cannot
+/// judge yet is not stored, so the caller asks again later. Without one (public mode) the
+/// existing behaviour is kept, except that a contradicted proof is never stored.
+pub fn storage_gate(check: &Result<bool, String>, header_chain_configured: bool) -> Result<(), String> {
+    match classify_proof(check, header_chain_configured) {
+        ProofDecision::StoreVerified | ProofDecision::StoreUnverifiedLegacy => Ok(()),
+        ProofDecision::RejectBad => Err("proof does not match the header chain".to_string()),
+        ProofDecision::HoldPending => Err("proof cannot be verified yet (no header for its block)".to_string()),
+    }
+}
+
 /// Outcome of re-checking one held proof.
 #[derive(Debug, Clone, PartialEq)]
 pub enum Resolution {
@@ -55,6 +67,8 @@ pub enum Resolution {
     Expired { txid: String },
     /// No header at that height yet; kept.
     StillWaiting { txid: String },
+    /// The tx is `failed`; the held row was dropped.
+    TxFailed { txid: String },
 }
 
 /// Re-check every held proof. `check(height, merkle_root_display_hex)` is the header-chain check
@@ -76,6 +90,14 @@ pub fn resolve_pending(
             let _ = repo.delete(&txid);
             log::debug!("   held proof for {} dropped: {}", &txid[..txid.len().min(16)], why);
         };
+
+        // A `failed` tx had its inputs released and its change disabled. Confirming it from here
+        // would only set `completed`, leaving it half-undone; only UnFail's recovery restores it.
+        if tx_is_failed(conn, &txid) {
+            drop_row("tx is failed");
+            out.push(Resolution::TxFailed { txid });
+            continue;
+        }
 
         // A stored proof already exists: nothing to verify, nothing to keep.
         let proven: i64 = conn
@@ -126,6 +148,12 @@ pub fn resolve_pending(
     Ok(out)
 }
 
+fn tx_is_failed(conn: &Connection, txid: &str) -> bool {
+    conn.query_row("SELECT COUNT(*) FROM transactions WHERE txid = ?1 AND status = 'failed'", [txid], |r| r.get::<_, i64>(0))
+        .map(|n| n > 0)
+        .unwrap_or(false)
+}
+
 /// Hold the proofs carried by push events (`source = "push"`). Only a MINED frame that has both a
 /// merkle path and a block height, for a tx this wallet knows about, is held; everything else is
 /// ignored. Returns how many were held.
@@ -144,7 +172,7 @@ pub fn hold_events(conn: &Connection, events: &[crate::arcade_push::StatusEvent]
         let known: i64 = conn
             .query_row("SELECT COUNT(*) FROM transactions WHERE txid = ?1", [&e.txid], |r| r.get(0))
             .unwrap_or(0);
-        if known == 0 {
+        if known == 0 || tx_is_failed(conn, &e.txid) {
             continue;
         }
         let height = u32::try_from(height).unwrap_or(0);
@@ -224,6 +252,24 @@ mod tests {
             ProofDecision::StoreUnverifiedLegacy,
             "public mode keeps its existing behaviour"
         );
+    }
+
+    // ---- storage_gate -------------------------------------------------------------------
+
+    #[test]
+    fn spv_mode_stores_only_a_proof_verified_against_the_header_chain() {
+        assert_eq!(storage_gate(&Ok(true), true), Ok(()));
+        assert!(storage_gate(&Ok(false), true).unwrap_err().contains("does not match"));
+        assert!(
+            storage_gate(&Err("no header at 120".into()), true).unwrap_err().contains("cannot be verified yet"),
+            "an unjudgeable proof is not stored; the caller asks again later"
+        );
+    }
+
+    #[test]
+    fn public_mode_keeps_its_existing_behaviour_but_never_stores_a_contradicted_proof() {
+        assert_eq!(storage_gate(&Err("no chain".into()), false), Ok(()));
+        assert!(storage_gate(&Ok(false), false).is_err());
     }
 
     // ---- resolve_pending: the three cases -----------------------------------------------
@@ -339,6 +385,34 @@ mod tests {
         let all = PendingProofRepository::new(&c).list().unwrap();
         assert_eq!(all.len(), 1);
         assert_eq!((all[0].height, all[0].received_at), (143, 200));
+    }
+
+    fn set_status(c: &Connection, txid: &str, status: &str) {
+        c.execute("UPDATE transactions SET status = ?1 WHERE txid = ?2", rusqlite::params![status, txid]).unwrap();
+    }
+
+    #[test]
+    fn a_mined_event_for_a_failed_tx_is_not_held() {
+        // `failed` released the inputs and disabled the change. Confirming it from a held proof
+        // would flip it to completed without undoing that (only UnFail's recovery does).
+        let c = db();
+        let (txid, bump) = tx_and_bump(144);
+        known_tx(&c, &txid);
+        set_status(&c, &txid, "failed");
+        assert_eq!(hold_events(&c, &[mined(&txid, Some(144), Some(&bump))], 5_000), 0);
+        assert!(PendingProofRepository::new(&c).list().unwrap().is_empty());
+    }
+
+    #[test]
+    fn a_proof_held_before_its_tx_failed_is_dropped_not_handed_back_to_be_confirmed() {
+        let c = db();
+        let (txid, bump) = tx_and_bump(145);
+        known_tx(&c, &txid);
+        hold(&c, &txid, 145, &bump, 1_000);
+        set_status(&c, &txid, "failed");
+        let r = resolve_pending(&c, &|_, _| Ok(true), 1_010, MAX_AGE).unwrap();
+        assert_eq!(r, vec![Resolution::TxFailed { txid: txid.clone() }]);
+        assert!(!held(&c, &txid), "the held row is dropped");
     }
 
     // ---- resolve_pending: edge cases -----------------------------------------------------

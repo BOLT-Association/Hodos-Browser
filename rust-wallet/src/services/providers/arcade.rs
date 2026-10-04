@@ -148,7 +148,7 @@ impl IndexerProvider for ArcadeProvider {
                 reason: format!(
                     "Arcade parse error: {} — body: {}",
                     e,
-                    &text[..text.len().min(200)]
+                    crate::chain_mode::truncate_chars(&text, 200)
                 ),
             })?;
         interpret_broadcast_response(http_status, &arc, &text).map(|mut r| {
@@ -170,15 +170,18 @@ pub(crate) fn callback_token_header(push_enabled: bool, token: Option<String>) -
 /// validate scripts without the source outputs. Bytes that are not a BEEF are assumed to
 /// already be a raw/EF transaction and are sent as they are.
 pub(crate) fn arcade_body_from_beef(bytes: &[u8]) -> Result<String, String> {
+    // An Atomic BEEF names its subject; a plain BEEF's subject is its last transaction.
     let parsed = if bytes.len() >= 4 && bytes[0..4] == crate::beef::ATOMIC_BEEF_MARKER {
-        crate::beef::Beef::from_atomic_beef_bytes(bytes).map(|(_, b)| b)
+        crate::beef::Beef::from_atomic_beef_bytes(bytes).map(|(subject, b)| (Some(subject), b))
     } else {
-        crate::beef::Beef::from_bytes(bytes)
+        crate::beef::Beef::from_bytes(bytes).map(|b| (None, b))
     };
     match parsed {
-        Ok(beef) => beef
-            .to_ef_hex()
-            .map_err(|e| format!("cannot build Extended Format for Arcade: {}", e)),
+        Ok((subject, beef)) => match subject {
+            Some(txid) => beef.to_ef_hex_for(&txid),
+            None => beef.to_ef_hex(),
+        }
+        .map_err(|e| format!("cannot build Extended Format for Arcade: {}", e)),
         Err(_) => Ok(hex::encode(bytes)),
     }
 }
@@ -220,6 +223,26 @@ mod tests {
         assert_eq!(&raw[4..10], &[0, 0, 0, 0, 0, 0xEF], "EF marker after the version");
         // the source output (5000 sats = 0x1388 LE) sits after the input's sequence
         assert!(raw.windows(8).any(|w| w == 5000u64.to_le_bytes()), "source satoshis present");
+    }
+
+    #[test]
+    fn an_atomic_beef_is_converted_for_its_subject_not_for_the_last_transaction() {
+        use sha2::{Digest, Sha256};
+        let wire = |t: &[u8]| -> [u8; 32] { Sha256::digest(Sha256::digest(t)).into() };
+        let g = raw_tx([7u8; 32], 0, 5000);
+        let p = raw_tx(wire(&g), 0, 4000);
+        let c = raw_tx(wire(&p), 0, 3000);
+        let p_txid: String = wire(&p).iter().rev().map(|b| format!("{:02x}", b)).collect();
+
+        let mut beef = crate::beef::Beef::new();
+        beef.add_parent_transaction(g);
+        beef.add_parent_transaction(p);
+        beef.set_main_transaction(c);
+        let atomic = hex::decode(beef.to_atomic_beef_hex(&p_txid).expect("atomic")).unwrap();
+
+        let raw = hex::decode(arcade_body_from_beef(&atomic).expect("ef")).unwrap();
+        assert!(raw.windows(8).any(|w| w == 5000u64.to_le_bytes()), "subject p: source output of g is present");
+        assert!(!raw.windows(8).any(|w| w == 3000u64.to_le_bytes()), "the later tx c must not be what is sent");
     }
 
     #[test]

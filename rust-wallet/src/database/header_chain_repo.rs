@@ -16,13 +16,29 @@ impl<'a> HeaderChainRepository<'a> {
         Self { conn }
     }
 
-    /// Insert a header; a duplicate (same network + hash) is ignored.
+    /// Insert a header. A duplicate (same network + hash) only refreshes the stored height: the
+    /// header bytes are identified by their hash, so only the height can be wrong.
     pub fn insert(&self, network: &str, block_hash: &str, height: u32, header_hex: &str) -> CacheResult<()> {
         self.conn.execute(
-            "INSERT OR IGNORE INTO header_chain (network, block_hash, height, header_hex, created_at)
-             VALUES (?1, ?2, ?3, ?4, strftime('%s','now'))",
+            "INSERT INTO header_chain (network, block_hash, height, header_hex, created_at)
+             VALUES (?1, ?2, ?3, ?4, strftime('%s','now'))
+             ON CONFLICT(network, block_hash) DO UPDATE SET height = excluded.height",
             rusqlite::params![network, block_hash, height, header_hex],
         )?;
+        Ok(())
+    }
+
+    /// Insert a batch in ONE transaction. The sync used to insert header by header, each its own
+    /// fsynced commit, which blocks every other DB user for the length of a long first sync.
+    pub fn insert_many(&self, network: &str, rows: &[(String, u32, String)]) -> CacheResult<()> {
+        if rows.is_empty() {
+            return Ok(());
+        }
+        let tx = self.conn.unchecked_transaction()?;
+        for (block_hash, height, header_hex) in rows {
+            self.insert(network, block_hash, *height, header_hex)?;
+        }
+        tx.commit()?;
         Ok(())
     }
 
@@ -58,6 +74,27 @@ mod tests {
         r.insert("other", "cc", 9, "09").unwrap();
         assert_eq!(r.load("regtest").unwrap(), vec![(1, "01".into()), (2, "02".into())]);
         assert_eq!(r.load("other").unwrap().len(), 1);
+    }
+
+    #[test]
+    fn re_inserting_a_known_header_corrects_a_wrong_stored_height() {
+        // The height only orders the rows on load; a bad one would make the header (and every
+        // descendant) fail to link on every start unless a later sync can overwrite it.
+        let c = db();
+        let r = HeaderChainRepository::new(&c);
+        r.insert("regtest", "aa", 0, "0a").unwrap();
+        r.insert("regtest", "aa", 100, "0a").unwrap();
+        assert_eq!(r.load("regtest").unwrap(), vec![(100, "0a".into())]);
+    }
+
+    #[test]
+    fn insert_many_stores_the_batch_and_heals_heights_like_insert() {
+        let c = db();
+        let r = HeaderChainRepository::new(&c);
+        r.insert("regtest", "aa", 0, "0a").unwrap();
+        r.insert_many("regtest", &[("aa".into(), 1, "0a".into()), ("bb".into(), 2, "0b".into()), ("cc".into(), 3, "0c".into())]).unwrap();
+        assert_eq!(r.load("regtest").unwrap(), vec![(1, "0a".into()), (2, "0b".into()), (3, "0c".into())]);
+        r.insert_many("regtest", &[]).unwrap();
     }
 
     #[test]

@@ -196,6 +196,18 @@ pub fn verify_tsc_proof_against_header_chain(txid: &str, tsc: &Value) -> CacheRe
     svc.check_merkle_root(height, &root).map_err(CacheError::Api)
 }
 
+/// Gate for storing a proof an indexer (Arcade) returned: in spv mode it must verify against the
+/// wallet's own header chain first (see `pending_proofs::storage_gate`). `Err` = do not store.
+pub fn check_proof_before_storing(txid: &str, tsc: &Value) -> Result<(), String> {
+    let configured = crate::services::providers::chaintracks::configured_base_url().is_some();
+    let check = if configured {
+        verify_tsc_proof_against_header_chain(txid, tsc).map_err(|e| e.to_string())
+    } else {
+        Err("no header chain configured".to_string())
+    };
+    crate::pending_proofs::storage_gate(&check, configured)
+}
+
 pub async fn verify_tsc_proof_against_block(
     client: &Client,
     txid: &str,
