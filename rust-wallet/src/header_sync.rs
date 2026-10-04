@@ -68,6 +68,7 @@ pub async fn sync_once_reporting(
     (report, result)
 }
 
+#[allow(dead_code)] // the monitor uses `sync_once_reporting`; kept as the simple form for callers and tests
 /// Sync `chain` from `source`. `persist` is called for every header newly stored
 /// (outside any lock). Errors are returned, never turned into a "synced" verdict.
 pub async fn sync_once(
