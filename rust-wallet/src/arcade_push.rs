@@ -179,6 +179,31 @@ pub struct StatusEvent {
     pub tx_status: String,
     #[serde(rename = "blockHeight", default)]
     pub block_height: Option<u64>,
+    #[serde(rename = "blockHash", default)]
+    pub block_hash: Option<String>,
+    /// BUMP (hex) carried by the MINED frame. Held until the wallet can verify it; never trusted.
+    #[serde(rename = "merklePath", default)]
+    pub merkle_path: Option<String>,
+}
+
+/// Most events kept between driver wake-ups; the oldest are dropped first.
+pub const EVENT_BUFFER_CAP: usize = 256;
+
+static EVENTS: std::sync::Mutex<Vec<StatusEvent>> = std::sync::Mutex::new(Vec::new());
+
+/// Remember a wake-up event so the driver can read its payload (the MINED merkle path).
+pub fn buffer_event(e: &StatusEvent) {
+    let mut buf = EVENTS.lock().unwrap_or_else(|p| p.into_inner());
+    buf.push(e.clone());
+    let excess = buf.len().saturating_sub(EVENT_BUFFER_CAP);
+    if excess > 0 {
+        buf.drain(..excess); // drop the oldest
+    }
+}
+
+/// Take (and clear) the buffered events, oldest first.
+pub fn take_events() -> Vec<StatusEvent> {
+    std::mem::take(&mut *EVENTS.lock().unwrap_or_else(|p| p.into_inner()))
 }
 
 pub fn parse_status(data: &str) -> Option<StatusEvent> {
@@ -364,6 +389,45 @@ mod tests {
         let mut p = SseParser::new();
         let items = p.feed(b"retry: 3000\r\nid: 9\r\nevent: x\r\ndata: a\r\ndata: b\r\nfoo: bar\r\n\r\n");
         assert_eq!(items, vec![SseItem::Event { id: Some("9".into()), event: "x".into(), data: "a\nb".into() }]);
+    }
+
+    #[test]
+    fn a_mined_frame_exposes_its_block_hash_and_merkle_path() {
+        let st = parse_status(r#"{"txid":"aa","txStatus":"MINED","blockHash":"bb","blockHeight":7,"merklePath":"fd7f01"}"#).unwrap();
+        assert_eq!(st.block_hash.as_deref(), Some("bb"));
+        assert_eq!(st.merkle_path.as_deref(), Some("fd7f01"));
+        assert_eq!(st.block_height, Some(7));
+        let seen = parse_status(r#"{"txid":"aa","txStatus":"SEEN_ON_NETWORK"}"#).unwrap();
+        assert_eq!((seen.block_hash, seen.merkle_path), (None, None), "intermediate frames carry no proof");
+    }
+
+    fn ev(txid: &str, st: &str, mp: Option<&str>) -> StatusEvent {
+        StatusEvent { txid: txid.into(), tx_status: st.into(), block_height: None, block_hash: None, merkle_path: mp.map(|s| s.to_string()) }
+    }
+
+    #[test]
+    fn buffered_events_come_back_oldest_first_and_the_buffer_empties() {
+        let _g = STATE_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        take_events(); // start clean
+        buffer_event(&ev("a", "MINED", Some("01")));
+        buffer_event(&ev("b", "MINED", Some("02")));
+        let got = take_events();
+        assert_eq!(got.iter().map(|e| e.txid.as_str()).collect::<Vec<_>>(), vec!["a", "b"]);
+        assert_eq!(got[1].merkle_path.as_deref(), Some("02"), "payload preserved");
+        assert!(take_events().is_empty(), "taking clears it");
+    }
+
+    #[test]
+    fn the_event_buffer_is_bounded_and_drops_the_oldest() {
+        let _g = STATE_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        take_events();
+        for i in 0..(EVENT_BUFFER_CAP + 10) {
+            buffer_event(&ev(&format!("t{}", i), "MINED", None));
+        }
+        let got = take_events();
+        assert_eq!(got.len(), EVENT_BUFFER_CAP);
+        assert_eq!(got.first().unwrap().txid, "t10", "the 10 oldest were dropped");
+        assert_eq!(got.last().unwrap().txid, format!("t{}", EVENT_BUFFER_CAP + 9));
     }
 
     #[test]

@@ -36,6 +36,7 @@ This module provides the complete data access layer for the HodosBrowser wallet.
 | `Address` | `addresses` | `wallet_id`, `index`, `address`, `public_key`, `used`, `balance`, `pending_utxo_check` | index: -1=master, -2=external, -3=backup, 0+=derived |
 | `Output` | `outputs` | `user_id`, `txid`, `vout`, `satoshis`, `spendable`, `change`, `spent_by`, `derivation_prefix/suffix`, `sender_identity_key`, `locking_script` (BLOB) | Primary UTXO tracking table. Note: the `confirmed` column (V14) is **not** a field on the struct — it is read/written by dedicated `OutputRepository` methods |
 | `ParentTransaction` | `parent_transactions` | `txid`, `raw_hex`, `utxo_id` | Raw tx cache for BEEF building |
+| `PendingProofRepository` | `pending_proofs` (V27) | `txid` (PK), `height`, `bump_hex`, `block_hash`, `source` (`poll`/`push`), `received_at` | spv mode: proofs held until the header chain can verify them; read only by `pending_proofs::resolve_pending`, never as a proof |
 | `HeaderChainRepository` | `header_chain` (V26) | `network`, `block_hash`, `height`, `header_hex` | WS4 candidate headers per network; a cache, not an authority — `HeaderChain::from_stored` re-validates all on load |
 | `BlockHeader` | `block_headers` | `block_hash`, `height`, `header_hex` | Cached for TSC proof enhancement |
 | `ProvenTx` | `proven_txs` | `txid`, `height`, `merkle_path` (BLOB), `raw_tx` (BLOB) | Immutable in normal operation; `replace_proof`/`delete_by_txid` exist for repair paths |
@@ -329,6 +330,9 @@ Migration runner: `connection.rs :: WalletDatabase::migrate`. Migration bodies: 
 | V22 | **Phase 2.6-D Fix #4.** `bundled_scope_grant` column on `domain_permissions` — silences ProtocolUse/BasketAccess prompts for the domain (protected baskets still prompt) |
 | V23 | **Phase 2.6-H cleanup.** Drops `engine_shadow_log`; `permission_audit_log` is kept |
 | V24 | **beta.3 Phase 0.8** (owner-approved 2026-08-22). Two additive changes: the `domain_manifest_snapshots` child table (FK + `ON DELETE CASCADE` off `domain_permissions(id)`, an **informational** record of what a site asked for **as approved** — never a decision input, `R-SNAPSHOT`), and `settings.default_prefill_from_manifest` (default `0`) — the opt-in that decides whether the connect modal's limit fields start from the user's defaults or the site's suggestion |
+| V25 | `settings.default_bundled_scope_grant` (default 1): user-level default for quiet mode on the connect screen. Behaviour-neutral |
+| V26 | **WS4** (owner-approved 2026-10-03). `header_chain` (`network`, `block_hash`, `height`, `header_hex`): candidate headers for the wallet's own verified header chain; a cache, every header is re-validated on load (`HeaderChain::from_stored`) |
+| V27 | **spv proofs** (owner-approved 2026-10-04). `pending_proofs`: merkle proofs held until the header chain can verify them. Deliberately **not** `proven_txs`: every reader of that table treats a row as a verified proof |
 
 ### Startup repair blocks (`WalletDatabase::migrate`, after V24)
 

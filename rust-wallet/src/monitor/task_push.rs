@@ -42,6 +42,7 @@ pub fn start(state: web::Data<AppState>) {
             arcade_push::token,
             |st| {
                 info!("📡 Arcade push: {} {} — waking the proof check", &st.txid[..st.txid.len().min(16)], st.tx_status);
+                arcade_push::buffer_event(st); // keep the MINED payload (merkle path) for the driver
                 arcade_push::nudge();
             },
             shutdown,
@@ -60,10 +61,32 @@ pub fn start(state: web::Data<AppState>) {
             tokio::select! {
                 _ = state.shutdown.cancelled() => return,
                 _ = token_ticker.tick() => ensure_token(&state),
-                _ = arcade_push::nudged() => follow_up(&state, &http).await,
+                _ = arcade_push::nudged() => {
+                    hold_pushed_proofs(&state);
+                    follow_up(&state, &http).await
+                }
             }
         }
     });
+}
+
+/// Put the proofs carried by MINED events into `pending_proofs`; the header sync that follows verifies
+/// them locally (no re-fetch). An event that carries no proof just wakes the normal proof check.
+fn hold_pushed_proofs(state: &web::Data<AppState>) {
+    let events = arcade_push::take_events();
+    if events.is_empty() {
+        return;
+    }
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_secs() as i64)
+        .unwrap_or(0);
+    if let Ok(db) = state.database.lock() {
+        let held = crate::pending_proofs::hold_events(db.connection(), &events, now);
+        if held > 0 {
+            info!("📡 Arcade push: holding {} proof(s) until the header chain can verify them", held);
+        }
+    }
 }
 
 /// Derive the callback token once the wallet's master key is readable (after create / unlock).

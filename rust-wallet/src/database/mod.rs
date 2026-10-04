@@ -14,6 +14,7 @@ pub mod helpers;
 pub mod parent_transaction_repo;
 pub mod block_header_repo;
 pub mod header_chain_repo;
+pub mod pending_proof_repo;
 pub mod proven_tx_repo;
 pub mod proven_tx_req_repo;
 pub mod basket_repo;
@@ -55,6 +56,7 @@ pub use helpers::{get_master_private_key_from_db, get_master_public_key_from_db,
 pub use parent_transaction_repo::ParentTransactionRepository;
 pub use block_header_repo::BlockHeaderRepository;
 pub use header_chain_repo::HeaderChainRepository;
+pub use pending_proof_repo::{PendingProof, PendingProofRepository};
 pub use proven_tx_repo::ProvenTxRepository;
 pub use proven_tx_req_repo::ProvenTxReqRepository;
 pub use basket_repo::BasketRepository;

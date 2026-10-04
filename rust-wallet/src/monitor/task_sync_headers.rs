@@ -47,6 +47,8 @@ pub async fn run(state: &web::Data<AppState>) -> Result<(), String> {
     }
 
     let report = result?;
+    // The chain may now be able to judge proofs that were held waiting for these headers.
+    super::task_check_for_proofs::resolve_held(state);
     header_sync::request_startup_recheck_once();
     for r in &report.reorgs {
         if let AddOutcome::Reorg { fork_height, depth, old_tip, new_tip } = r {
