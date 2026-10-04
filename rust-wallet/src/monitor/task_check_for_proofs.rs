@@ -604,28 +604,69 @@ async fn create_proven_tx_from_arc(
     let height = tsc_json["height"].as_u64().unwrap_or(block_height) as u32;
     let tx_index = tsc_json["index"].as_u64().unwrap_or(0);
 
-    // Verify merkle root against actual block header before storing
+    // Verify merkle root against actual block header before storing.
+    let check = crate::verify_tsc_proof_against_block(client, txid, &tsc_json)
+        .await
+        .map_err(|e| e.to_string());
+    let configured = crate::services::providers::chaintracks::configured_base_url().is_some();
     let mut proof_verified = false;
-    match crate::verify_tsc_proof_against_block(client, txid, &tsc_json).await {
-        Ok(true) => {
-            // Proof verified — safe to store
+    match crate::pending_proofs::classify_proof(&check, configured) {
+        crate::pending_proofs::ProofDecision::StoreVerified => {
+            // Proof verified: safe to store.
             proof_verified = true;
         }
-        Ok(false) => {
+        crate::pending_proofs::ProofDecision::RejectBad => {
             return Err(format!("ARC BUMP has wrong merkle root for {} at height {} — proof rejected", txid, height));
         }
-        Err(e) => {
-            if crate::services::providers::chaintracks::configured_base_url().is_some() {
-                // WS4: a configured header chain makes "cannot verify" a reason to wait
-                // (header sync pending), not to store. The next tick retries.
-                return Err(format!("proof for {} not stored, cannot verify yet: {}", txid, e));
-            }
-            // Can't verify — log warning but still store (better than no proof)
-            warn!("   ⚠️ Could not verify ARC proof against block header: {} — storing anyway", e);
+        crate::pending_proofs::ProofDecision::HoldPending => {
+            // The wallet's header chain cannot judge it yet (it has not reached that block). Keep the
+            // proof in `pending_proofs` (never in `proven_txs`): the next header sync verifies it
+            // locally and stores it through `store_proof`, with no re-fetch.
+            hold_proof(state, txid, height, merkle_path_hex, block_hash, "poll");
+            return Err(format!(
+                "proof for {} held pending, cannot verify yet: {}",
+                txid,
+                check.err().unwrap_or_default()
+            ));
+        }
+        crate::pending_proofs::ProofDecision::StoreUnverifiedLegacy => {
+            // No header chain configured (public mode): the historical behaviour.
+            warn!("   ⚠️ Could not verify ARC proof against block header: {} — storing anyway", check.err().unwrap_or_default());
         }
     }
 
-    let merkle_path_bytes = serde_json::to_vec(&tsc_json)
+    store_proof(state, txid, &tsc_json, height, tx_index, block_hash, proof_verified)
+}
+
+/// Keep a proof that cannot be verified yet in `pending_proofs` (V27). Best-effort: if this fails the
+/// poll simply fetches the proof again next tick.
+fn hold_proof(state: &web::Data<AppState>, txid: &str, height: u32, bump_hex: &str, block_hash: &str, source: &str) {
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_secs() as i64)
+        .unwrap_or(0);
+    if let Ok(db) = state.database.lock() {
+        match crate::database::PendingProofRepository::new(db.connection())
+            .upsert(txid, height, bump_hex, block_hash, source, now)
+        {
+            Ok(()) => info!("   📥 holding proof for {} (height {}) until the header chain can verify it", &txid[..txid.len().min(16)], height),
+            Err(e) => warn!("   ⚠️ could not hold proof for {}: {}", txid, e),
+        }
+    }
+}
+
+/// Store a proof that is already verified (or, in public mode, deliberately unverified): the single
+/// place a `proven_txs` row is created. Shared by the poll path and `resolve_held`.
+fn store_proof(
+    state: &web::Data<AppState>,
+    txid: &str,
+    tsc_json: &serde_json::Value,
+    height: u32,
+    tx_index: u64,
+    block_hash: &str,
+    proof_verified: bool,
+) -> Result<i64, String> {
+    let merkle_path_bytes = serde_json::to_vec(tsc_json)
         .map_err(|e| format!("Failed to serialize TSC: {}", e))?;
 
     let db = state.database.lock().map_err(|e| format!("DB lock: {}", e))?;
@@ -672,6 +713,63 @@ async fn create_proven_tx_from_arc(
     }
 
     Ok(proven_tx_id)
+}
+
+/// Held proofs older than this with no header to judge them are dropped (the poll will fetch a fresh
+/// one if the tx is still pending).
+const HELD_PROOF_MAX_AGE_SECS: i64 = 6 * 3600;
+
+/// Verify every held proof the header chain can now judge (spv mode). A verified one goes through
+/// `store_proof` (the same path as a polled proof), the tx is marked confirmed and its held row is
+/// removed; a wrong or stale one is dropped; the rest keep waiting. Called after each header sync.
+pub fn resolve_held(state: &web::Data<AppState>) {
+    let Some(svc) = crate::header_sync::global() else { return };
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_secs() as i64)
+        .unwrap_or(0);
+    let results = {
+        let Ok(db) = state.database.lock() else { return };
+        match crate::pending_proofs::resolve_pending(
+            db.connection(),
+            &|h, root| svc.check_merkle_root(h, root),
+            now,
+            HELD_PROOF_MAX_AGE_SECS,
+        ) {
+            Ok(r) => r,
+            Err(e) => {
+                warn!("   ⚠️ resolving held proofs failed: {}", e);
+                return;
+            }
+        }
+    };
+
+    let mut stored_any = false;
+    for r in results {
+        use crate::pending_proofs::Resolution;
+        match r {
+            Resolution::Verified { txid, height, block_hash, tsc } => {
+                let index = tsc["index"].as_u64().unwrap_or(0);
+                match store_proof(state, &txid, &tsc, height, index, &block_hash, true) {
+                    Ok(id) => {
+                        if let Ok(db) = state.database.lock() {
+                            let _ = crate::pending_proofs::delete_held(db.connection(), &txid);
+                        }
+                        mark_confirmed(state, &txid, height);
+                        stored_any = true;
+                        info!("   ✅ held proof for {} verified once its header arrived — stored (proven_txs {}), no re-fetch", &txid[..txid.len().min(16)], id);
+                    }
+                    Err(e) => warn!("   ⚠️ held proof for {} verified but could not be stored: {} (kept, retrying)", txid, e),
+                }
+            }
+            Resolution::Bad { txid, reason } => warn!("   ❌ held proof for {} rejected: {}", &txid[..txid.len().min(16)], reason),
+            Resolution::Expired { txid } => warn!("   ⌛ held proof for {} expired without a header; the poll will re-fetch", &txid[..txid.len().min(16)]),
+            Resolution::AlreadyProven { .. } | Resolution::StillWaiting { .. } => {}
+        }
+    }
+    if stored_any {
+        state.balance_cache.invalidate();
+    }
 }
 
 /// Check WhatsOnChain for transaction confirmation status

@@ -1090,6 +1090,14 @@ impl WalletDatabase {
             info!("   ✅ Schema V26 applied");
         }
 
+        if current_version < 27 {
+            // spv mode (owner-approved 2026-10-04): proofs held until the header chain can verify them.
+            info!("   Applying migration V27 (pending_proofs)...");
+            migrations::migrate_v26_to_v27(&self.conn)?;
+            self.conn.execute("INSERT INTO schema_version (version) VALUES (27)", [])?;
+            info!("   ✅ Schema V27 applied");
+        }
+
         // Startup repair: V12 migration may have recorded version but failed to add columns
         // (INSERT INTO schema_version succeeded but ALTER TABLE was skipped/failed).
         // Re-run the column checks unconditionally to patch any inconsistent DBs.
