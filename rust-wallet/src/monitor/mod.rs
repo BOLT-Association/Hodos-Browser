@@ -152,7 +152,7 @@ impl Monitor {
 
     /// Main run loop — ticks every 30 seconds, runs tasks that are due
     async fn run(&self) {
-        info!("🔄 Monitor started with 15 tasks (graceful shutdown enabled)");
+        info!("🔄 Monitor started with 16 tasks (graceful shutdown enabled)");
         info!("   TaskCheckForProofs: every {}s", self.schedule.check_for_proofs);
         info!("   TaskSendWaiting: every {}s", self.schedule.send_waiting);
         info!("   TaskFailAbandoned: every {}s", self.schedule.fail_abandoned);

@@ -750,6 +750,9 @@ pub fn resolve_held(state: &web::Data<AppState>) {
         match r {
             Resolution::Verified { txid, height, block_hash, tsc } => {
                 let index = tsc["index"].as_u64().unwrap_or(0);
+                // The root was verified against our header at this height, so record that header's
+                // hash, not the one the push event claimed.
+                let block_hash = svc.block_hash_at_height(height).unwrap_or(block_hash);
                 match store_proof(state, &txid, &tsc, height, index, &block_hash, true) {
                     Ok(id) => {
                         if let Ok(db) = state.database.lock() {
@@ -764,7 +767,7 @@ pub fn resolve_held(state: &web::Data<AppState>) {
             }
             Resolution::Bad { txid, reason } => warn!("   ❌ held proof for {} rejected: {}", &txid[..txid.len().min(16)], reason),
             Resolution::Expired { txid } => warn!("   ⌛ held proof for {} expired without a header; the poll will re-fetch", &txid[..txid.len().min(16)]),
-            Resolution::AlreadyProven { .. } | Resolution::StillWaiting { .. } => {}
+            Resolution::AlreadyProven { .. } | Resolution::StillWaiting { .. } | Resolution::TxFailed { .. } => {}
         }
     }
     if stored_any {

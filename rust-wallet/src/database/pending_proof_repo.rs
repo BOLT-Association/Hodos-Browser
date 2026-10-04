@@ -40,8 +40,15 @@ impl<'a> PendingProofRepository<'a> {
     /// (e.g. after a reorg moved it) replaces the older one.
     pub fn upsert(&self, txid: &str, height: u32, bump_hex: &str, block_hash: &str, source: &str, now: i64) -> CacheResult<()> {
         self.conn.execute(
-            "INSERT OR REPLACE INTO pending_proofs (txid, height, bump_hex, block_hash, source, received_at)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+            // Same proof again (the poll re-holds an unjudgeable one every tick): keep its age so the
+            // expiry can fire. A different proof (e.g. a reorg moved the tx) starts a new age.
+            "INSERT INTO pending_proofs (txid, height, bump_hex, block_hash, source, received_at)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6)
+             ON CONFLICT(txid) DO UPDATE SET
+                 received_at = CASE WHEN height = excluded.height AND bump_hex = excluded.bump_hex
+                                    THEN received_at ELSE excluded.received_at END,
+                 height = excluded.height, bump_hex = excluded.bump_hex,
+                 block_hash = excluded.block_hash, source = excluded.source",
             rusqlite::params![txid, height as i64, bump_hex, block_hash, source, now],
         )?;
         Ok(())
@@ -126,5 +133,15 @@ mod tests {
         let all = r.list().unwrap();
         assert_eq!(all.len(), 1);
         assert_eq!((all[0].height, all[0].bump_hex.as_str(), all[0].source.as_str(), all[0].received_at), (12, "new", "push", 300));
+    }
+    #[test]
+    fn re_holding_the_same_proof_keeps_its_age_so_it_can_expire() {
+        // The poll re-holds a still-unjudgeable proof every tick; that must not make it young again.
+        let c = db();
+        let r = PendingProofRepository::new(&c);
+        r.upsert("aa", 10, "same", "h", "poll", 100).unwrap();
+        r.upsert("aa", 10, "same", "h", "poll", 160).unwrap();
+        r.upsert("aa", 10, "same", "h", "push", 220).unwrap();
+        assert_eq!(r.get("aa").unwrap().unwrap().received_at, 100);
     }
 }

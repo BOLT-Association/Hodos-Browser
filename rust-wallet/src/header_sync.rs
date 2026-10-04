@@ -51,6 +51,23 @@ pub struct SyncReport {
     pub tip_height: Option<u32>,
 }
 
+/// Like `sync_once`, but a failure part-way does not hide what had already happened: the
+/// returned report still lists the reorgs applied before the error, so the caller can act on
+/// them (re-check proofs above the fork) whatever the outcome.
+pub async fn sync_once_reporting(
+    chain: &Mutex<HeaderChain>,
+    source: &dyn HeaderSource,
+    now: u32,
+    persist: &mut (dyn FnMut(&Entry) + Send),
+) -> (SyncReport, Result<(), String>) {
+    let mut report = SyncReport::default();
+    let result = sync_into(chain, source, now, persist, &mut report).await;
+    if result.is_ok() {
+        report.tip_height = chain.lock().unwrap().tip_height();
+    }
+    (report, result)
+}
+
 /// Sync `chain` from `source`. `persist` is called for every header newly stored
 /// (outside any lock). Errors are returned, never turned into a "synced" verdict.
 pub async fn sync_once(
@@ -59,8 +76,18 @@ pub async fn sync_once(
     now: u32,
     persist: &mut (dyn FnMut(&Entry) + Send),
 ) -> Result<SyncReport, String> {
+    let (report, result) = sync_once_reporting(chain, source, now, persist).await;
+    result.map(|()| report)
+}
+
+async fn sync_into(
+    chain: &Mutex<HeaderChain>,
+    source: &dyn HeaderSource,
+    now: u32,
+    persist: &mut (dyn FnMut(&Entry) + Send),
+    report: &mut SyncReport,
+) -> Result<(), String> {
     let server_tip = source.tip_height().await?;
-    let mut report = SyncReport::default();
 
     // Find the highest height where our active chain and the source agree.
     let local_tip = chain.lock().unwrap().tip_height();
@@ -113,8 +140,7 @@ pub async fn sync_once(
             }
         }
     }
-    report.tip_height = chain.lock().unwrap().tip_height();
-    Ok(report)
+    Ok(())
 }
 
 // ---------------------------------------------------------------------------
@@ -178,6 +204,12 @@ impl HeaderService {
         self.chain.lock().unwrap().header_at_height(height).map(|e| e.header.to_hex())
     }
 
+    /// Block hash (display hex) at `height` on the active verified chain, computed from the
+    /// header itself. Use this instead of a hash an indexer or push event claims.
+    pub fn block_hash_at_height(&self, height: u32) -> Option<String> {
+        self.chain.lock().unwrap().header_at_height(height).map(|e| e.header.hash_hex())
+    }
+
     /// `Ok(true/false)` = verdict against the verified chain; `Err` = we cannot say
     /// (no header at that height yet), which callers must not treat as a verdict.
     pub fn check_merkle_root(&self, height: u32, root_hex: &str) -> Result<bool, String> {
@@ -189,7 +221,18 @@ impl HeaderService {
                 c.tip_height()
             ));
         }
-        Ok(c.verify_merkle_root(height, root_hex))
+        if c.verify_merkle_root(height, root_hex) {
+            return Ok(true);
+        }
+        // A root that belongs to a competing branch we know of is not a verdict either way until
+        // one branch wins; calling it `false` would make callers drop a proof that may be right.
+        if c.side_branch_has_root(height, root_hex) {
+            return Err(format!(
+                "proof matches a competing branch at height {} that is not the active chain (yet)",
+                height
+            ));
+        }
+        Ok(false)
     }
 }
 
@@ -305,6 +348,30 @@ mod tests {
             o => panic!("{:?}", o),
         }
         assert_eq!(chain.lock().unwrap().tip().unwrap().hash, b[5].hash_hex());
+    }
+
+    /// A server whose chain stops answering after `last_ok` (tip still claimed higher).
+    #[tokio::test]
+    async fn a_reorg_applied_before_a_later_failure_is_still_reported() {
+        let (_, g) = fixture();
+        let a = chain_of(&g, 3, 100);
+        let server = Fake::from_chain(&a);
+        let chain = empty_with_genesis_of(&g);
+        sync_once(&chain, &server, NOW, &mut |_| {}).await.unwrap();
+
+        // Heavier branch from height 1: heights 2..=4 answer, 5 is claimed but never served.
+        let mut b = vec![a[0].clone(), a[1].clone()];
+        for i in 0..4 {
+            b.push(mine(b.last().unwrap().hash(), 500 + i, 0x207f_ffff));
+        }
+        server.set(&b);
+        server.by_height.lock().unwrap().remove(&5);
+
+        let (report, result) = sync_once_reporting(&chain, &server, NOW, &mut |_| {}).await;
+        assert!(result.is_err(), "the missing header is still an error");
+        assert_eq!(report.reorgs.len(), 1, "but the reorg that already happened is not lost");
+        assert!(matches!(report.reorgs[0], AddOutcome::Reorg { fork_height: 1, .. }));
+        assert_eq!(chain.lock().unwrap().tip().unwrap().hash, b[4].hash_hex(), "chain is on the new branch");
     }
 
     #[tokio::test]
@@ -445,6 +512,40 @@ mod tests {
         assert_eq!(svc.tip_height(), Some(1));
         assert_eq!(svc.header_hex_at_height(1), Some(a1.to_hex()));
         assert_eq!(svc.header_hex_at_height(2), None);
+    }
+
+    #[test]
+    fn block_hash_at_height_is_the_verified_headers_own_hash() {
+        let (mut c, g) = fixture();
+        let a1 = mine(g.hash(), 1, 0x207f_ffff);
+        c.add_header(a1.clone(), NOW).unwrap();
+        let svc = HeaderService { chain: Mutex::new(c) };
+        assert_eq!(svc.block_hash_at_height(1), Some(a1.hash_hex()));
+        assert_eq!(svc.block_hash_at_height(0), Some(g.hash_hex()));
+        assert_eq!(svc.block_hash_at_height(2), None);
+    }
+
+    #[test]
+    fn a_root_from_an_equal_work_competing_branch_is_not_a_verdict() {
+        // Two blocks at height 1 with equal work: we stay on the first. A proof for the other
+        // one is neither valid nor bogus yet, so it must be "cannot say" (held), not "false"
+        // (dropped); it becomes a verdict once one branch wins.
+        let (mut c, g) = fixture();
+        let a1 = mine(g.hash(), 1, 0x207f_ffff);
+        let b1 = mine(g.hash(), 2, 0x207f_ffff);
+        assert_ne!(a1.merkle_root_hex(), b1.merkle_root_hex(), "fixture must give distinct roots");
+        c.add_header(a1.clone(), NOW).unwrap();
+        assert_eq!(c.add_header(b1.clone(), NOW).unwrap(), AddOutcome::Fork);
+        let svc = HeaderService { chain: Mutex::new(c) };
+        assert_eq!(svc.check_merkle_root(1, &a1.merkle_root_hex()), Ok(true));
+        assert!(svc.check_merkle_root(1, &b1.merkle_root_hex()).is_err(), "competing branch: cannot say yet");
+        assert_eq!(svc.check_merkle_root(1, &"ff".repeat(32)), Ok(false), "a root no branch has is still false");
+
+        // Once the other branch pulls ahead, the loser's proofs are plainly orphaned: a verdict.
+        let b2 = mine(b1.hash(), 3, 0x207f_ffff);
+        assert!(matches!(svc.chain.lock().unwrap().add_header(b2, NOW).unwrap(), AddOutcome::Reorg { .. }));
+        assert_eq!(svc.check_merkle_root(1, &a1.merkle_root_hex()), Ok(false), "orphaned branch: not on the chain");
+        assert_eq!(svc.check_merkle_root(1, &b1.merkle_root_hex()), Ok(true));
     }
 
     #[test]

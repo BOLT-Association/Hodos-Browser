@@ -86,6 +86,19 @@ pub fn validate_startup() -> Result<ChainMode, String> {
                 missing.join(" and ")
             ));
         }
+        // The chain URLs must be the operator's own Arcade, never a public indexer: that would
+        // defeat the "no public indexer" guarantee without a single log line.
+        for var in [ENV_ARCADE, ENV_CHAINTRACKS, ENV_ARCADE_SSE] {
+            if let Ok(url) = std::env::var(var) {
+                if is_blocked_url(url.trim()) {
+                    return Err(format!(
+                        "{} points at a public indexer ({}), which spv mode does not use",
+                        var,
+                        url.trim()
+                    ));
+                }
+            }
+        }
     }
     Ok(mode)
 }
@@ -119,6 +132,15 @@ pub fn is_blocked_url(url: &str) -> bool {
         .unwrap_or(false)
 }
 
+/// At most `max` characters of `s`, cut on a character boundary (a plain byte slice panics when
+/// a multi-byte character straddles the cut, and these are slices of remote error bodies).
+pub fn truncate_chars(s: &str, max: usize) -> &str {
+    match s.char_indices().nth(max) {
+        Some((i, _)) => &s[..i],
+        None => s,
+    }
+}
+
 /// Why a public lookup is unavailable, for error messages.
 pub fn denied(what: &str) -> String {
     format!(
@@ -135,6 +157,20 @@ pub fn zero_conf_enabled() -> bool {
             std::env::var(ENV_ZERO_CONF).ok().map(|v| v.trim().to_ascii_lowercase()).as_deref(),
             Some("off") | Some("0") | Some("false") | Some("no")
         )
+}
+
+/// Gate for a user-initiated action that would talk to MessageBox as the wallet's identity
+/// (PeerPay send). Refused in spv mode before anything is broadcast, so no tx is sent whose
+/// payment token could not be delivered.
+pub fn require_messagebox(what: &str) -> Result<(), String> {
+    if message_polling_allowed() {
+        Ok(())
+    } else {
+        Err(format!(
+            "{} would contact MessageBox as the wallet's identity, which is disabled in spv mode ({}=spv)",
+            what, ENV_MODE
+        ))
+    }
 }
 
 /// Base URL of Arcade's SSE service (spv mode only).
@@ -244,6 +280,51 @@ mod tests {
         });
         with_env(Some("spv"), Some("http://a"), Some("http://c"), || {
             assert_eq!(validate_startup(), Ok(ChainMode::Spv));
+        });
+    }
+
+    #[test]
+    fn spv_refuses_to_start_when_a_chain_url_points_at_a_public_indexer() {
+        for bad in ["https://arc.gorillapool.io", "https://api.whatsonchain.com/v1", "https://arc.taal.com"] {
+            with_env(Some("spv"), Some(bad), Some("http://c"), || {
+                let e = validate_startup().unwrap_err();
+                assert!(e.contains(ENV_ARCADE) && e.contains("public"), "{}", e);
+            });
+            with_env(Some("spv"), Some("http://a"), Some(bad), || {
+                assert!(validate_startup().unwrap_err().contains(ENV_CHAINTRACKS));
+            });
+        }
+        with_env(Some("spv"), Some("http://a"), Some("http://c"), || {
+            std::env::set_var(ENV_ARCADE_SSE, "https://junglebus.gorillapool.io/sse");
+            let e = validate_startup();
+            std::env::remove_var(ENV_ARCADE_SSE);
+            assert!(e.unwrap_err().contains(ENV_ARCADE_SSE));
+        });
+    }
+
+    #[test]
+    fn spv_accepts_local_and_self_hosted_chain_urls() {
+        with_env(Some("spv"), Some("http://127.0.0.1:8080"), Some("https://arcade.example.org/chaintracks/v2"), || {
+            assert_eq!(validate_startup(), Ok(ChainMode::Spv));
+        });
+    }
+
+    #[test]
+    fn truncate_chars_never_splits_a_character() {
+        assert_eq!(truncate_chars("abc", 10), "abc");
+        assert_eq!(truncate_chars("abcdef", 3), "abc");
+        let s = format!("{}é{}", "a".repeat(199), "b"); // 'é' spans bytes 199..201
+        let t = truncate_chars(&s, 200);
+        assert_eq!(t.chars().count(), 200);
+        assert!(t.ends_with('é'));
+    }
+
+    #[test]
+    fn messagebox_traffic_is_refused_up_front_in_spv_mode_only() {
+        with_env(None, None, None, || assert_eq!(require_messagebox("PeerPay send"), Ok(())));
+        with_env(Some("spv"), Some("http://a"), Some("http://c"), || {
+            let e = require_messagebox("PeerPay send").unwrap_err();
+            assert!(e.contains("PeerPay send") && e.contains("spv"), "{}", e);
         });
     }
 

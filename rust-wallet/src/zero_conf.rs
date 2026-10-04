@@ -12,7 +12,7 @@
 //! "Spendable" means the output is linked to its incoming transaction row, the same thing that
 //! makes the wallet's own unproven change spendable (see `OutputRepository::get_spendable_by_user`).
 //! If Arcade later reports a double-spend for that transaction the output is unlinked again, and
-//! a rejection fails the transaction, which deletes its outputs. Off-switch: `HODOS_ZERO_CONF=off`.
+//! a rejection fails the transaction, and `mark_failed` disables its outputs (they stay in the table, not selectable). Off-switch: `HODOS_ZERO_CONF=off`.
 
 use std::future::Future;
 use std::time::Duration;

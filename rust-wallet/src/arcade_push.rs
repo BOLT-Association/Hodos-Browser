@@ -233,6 +233,9 @@ pub struct ClientOptions {
     pub max_backoff: Duration,
     /// How often to look for a token while the wallet is still locked / not created.
     pub token_poll: Duration,
+    /// A stream that delivers nothing (not even a keepalive) for this long is treated as dead and
+    /// reconnected; without it a half-open connection would leave push silent until restart.
+    pub idle_timeout: Duration,
 }
 
 impl Default for ClientOptions {
@@ -241,6 +244,7 @@ impl Default for ClientOptions {
             min_backoff: Duration::from_secs(1),
             max_backoff: Duration::from_secs(60),
             token_poll: Duration::from_secs(5),
+            idle_timeout: Duration::from_millis(HEALTHY_WINDOW_MS),
         }
     }
 }
@@ -297,7 +301,11 @@ pub async fn run_client<T, W>(
                 loop {
                     let chunk = tokio::select! {
                         _ = shutdown.cancelled() => { mark_disconnected(); return; }
-                        c = resp.chunk() => c,
+                        c = tokio::time::timeout(opts.idle_timeout, resp.chunk()) => c,
+                    };
+                    let Ok(chunk) = chunk else {
+                        log::warn!("arcade push: nothing received for {:?}; reconnecting", opts.idle_timeout);
+                        break;
                     };
                     match chunk {
                         Ok(Some(bytes)) => {
@@ -502,7 +510,7 @@ mod tests {
     }
 
     fn fast() -> ClientOptions {
-        ClientOptions { min_backoff: Duration::from_millis(20), max_backoff: Duration::from_millis(80), token_poll: Duration::from_millis(20) }
+        ClientOptions { min_backoff: Duration::from_millis(20), max_backoff: Duration::from_millis(80), token_poll: Duration::from_millis(20), idle_timeout: Duration::from_secs(30) }
     }
 
     #[tokio::test]
@@ -548,6 +556,42 @@ mod tests {
         assert!(reqs.len() >= 2, "it reconnected");
         assert!(!reqs[0].to_lowercase().contains("last-event-id"));
         assert!(reqs[1].to_lowercase().contains("last-event-id: 41"), "replay point sent: {}", reqs[1]);
+    }
+
+    #[tokio::test]
+    async fn a_silent_stream_is_dropped_and_reconnected_with_last_event_id() {
+        let _g = STATE_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        // Both connections deliver one event and then go silent while staying open (a half-open
+        // socket looks exactly like this).
+        let (url, requests) = fake_sse(
+            vec![
+                "id: 51
+event: status
+data: {\"txid\":\"aa\",\"txStatus\":\"MINED\"}
+
+",
+                "id: 52
+event: status
+data: {\"txid\":\"bb\",\"txStatus\":\"MINED\"}
+
+",
+            ],
+            true,
+        )
+        .await;
+        let wakes = Arc::new(AtomicUsize::new(0));
+        let w = wakes.clone();
+        let shutdown = CancellationToken::new();
+        let sd = shutdown.clone();
+        let opts = ClientOptions { idle_timeout: Duration::from_millis(150), ..fast() };
+        let h = tokio::spawn(run_client(url, || Some("tok".to_string()), move |_| { w.fetch_add(1, Ordering::SeqCst); }, sd, opts));
+        tokio::time::sleep(Duration::from_millis(900)).await;
+        shutdown.cancel();
+        let _ = h.await;
+        let reqs = requests.lock().unwrap();
+        assert!(reqs.len() >= 2, "it gave up on the silent stream and reconnected ({} requests)", reqs.len());
+        assert!(reqs[1].to_lowercase().contains("last-event-id: 51"), "{}", reqs[1]);
+        assert!(wakes.load(Ordering::SeqCst) >= 2);
     }
 
     #[tokio::test]

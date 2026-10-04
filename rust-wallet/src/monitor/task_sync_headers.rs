@@ -24,7 +24,7 @@ pub async fn run(state: &web::Data<AppState>) -> Result<(), String> {
     let Some(svc) = header_sync::global() else {
         return Ok(());
     };
-    let Some(provider) = ChaintracksProvider::from_env(reqwest::Client::new()) else {
+    let Some(provider) = ChaintracksProvider::from_env(http_client(crate::services::CallClass::IndexerAsync.timeout())) else {
         return Ok(());
     };
     let network = svc.chain.lock().unwrap().params().name;
@@ -34,22 +34,11 @@ pub async fn run(state: &web::Data<AppState>) -> Result<(), String> {
         .unwrap_or(0);
 
     let mut fresh: Vec<Entry> = Vec::new();
-    let result =
-        header_sync::sync_once(&svc.chain, &ChaintracksSource(provider), now, &mut |e| fresh.push(e.clone())).await;
+    let (report, result) =
+        header_sync::sync_once_reporting(&svc.chain, &ChaintracksSource(provider), now, &mut |e| fresh.push(e.clone())).await;
 
-    if !fresh.is_empty() {
-        let db = state.database.lock().map_err(|e| format!("DB lock: {}", e))?;
-        let repo = HeaderChainRepository::new(db.connection());
-        for e in &fresh {
-            repo.insert(network, &e.hash, e.height, &e.header.to_hex())
-                .map_err(|err| format!("persist header {}: {}", e.height, err))?;
-        }
-    }
-
-    let report = result?;
-    // The chain may now be able to judge proofs that were held waiting for these headers.
-    super::task_check_for_proofs::resolve_held(state);
-    header_sync::request_startup_recheck_once();
+    // Act on reorgs even when the run then failed: the chain has already switched branches in
+    // memory, and a later run will not see a reorg to report.
     for r in &report.reorgs {
         if let AddOutcome::Reorg { fork_height, depth, old_tip, new_tip } = r {
             header_sync::request_proof_recheck(fork_height + 1);
@@ -59,8 +48,53 @@ pub async fn run(state: &web::Data<AppState>) -> Result<(), String> {
             );
         }
     }
+    if !fresh.is_empty() {
+        let db = state.database.lock().map_err(|e| format!("DB lock: {}", e))?;
+        let repo = HeaderChainRepository::new(db.connection());
+        let rows: Vec<(String, u32, String)> =
+            fresh.iter().map(|e| (e.hash.clone(), e.height, e.header.to_hex())).collect();
+        repo.insert_many(network, &rows)
+            .map_err(|err| format!("persist {} header(s): {}", rows.len(), err))?;
+    }
+
+    result?;
+    // The chain may now be able to judge proofs that were held waiting for these headers.
+    super::task_check_for_proofs::resolve_held(state);
+    header_sync::request_startup_recheck_once();
     if report.added > 0 {
         info!("🔗 Header chain: +{} header(s), tip {:?}", report.added, report.tip_height);
     }
     Ok(())
+}
+
+/// The sync runs inside the Monitor tick while holding `RUN_LOCK`, so a request that never
+/// answers would stall every other task and the push follow-ups. Always bound it.
+fn http_client(timeout: std::time::Duration) -> reqwest::Client {
+    reqwest::Client::builder()
+        .timeout(timeout)
+        .build()
+        .unwrap_or_else(|_| reqwest::Client::new())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use tokio::io::AsyncReadExt;
+
+    #[tokio::test]
+    async fn a_chaintracks_server_that_never_answers_fails_the_request_instead_of_hanging() {
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let addr = listener.local_addr().unwrap();
+        tokio::spawn(async move {
+            let (mut sock, _) = listener.accept().await.unwrap();
+            let mut buf = [0u8; 1024];
+            let _ = sock.read(&mut buf).await; // accept, read, then say nothing
+            tokio::time::sleep(std::time::Duration::from_secs(30)).await;
+        });
+        let client = http_client(std::time::Duration::from_millis(150));
+        let started = std::time::Instant::now();
+        let r = client.get(format!("http://{}/height", addr)).send().await;
+        assert!(r.is_err(), "must time out");
+        assert!(started.elapsed() < std::time::Duration::from_secs(5));
+    }
 }
