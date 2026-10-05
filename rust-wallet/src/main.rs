@@ -38,6 +38,7 @@ mod chain_mode;
 mod pending_proofs;  // spv mode: proofs held until the header chain can verify them (V27 pending_proofs)
 mod zero_conf;  // spv mode: received outputs spendable once seen on the network (HODOS_ZERO_CONF)
 mod arcade_push;  // spv mode: Arcade SSE wake-up for the proof task (polling stays the safety net)  // HODOS_CHAIN_MODE: public | spv (Arcade + verified headers only)
+mod tip_stream;  // spv mode: chaintracks tip stream, a wake-up for the header sync (the 30 s sync stays)
 mod header_chain;
 mod header_sync;  // WS4: header sync + process-wide HeaderService  // Wallet-Hardening WS4: verified header chain (PoW, linkage, most-work, reorg)
 mod reconcile;  // Wallet-Hardening WS1: spent-input reconcile primitives (c1 check_outpoint_spent; c2/c3 dormant)

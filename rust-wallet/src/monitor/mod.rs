@@ -32,6 +32,7 @@ pub mod task_consolidate_dust;
 pub mod task_verify_double_spend;
 pub mod task_sync_headers;
 pub mod task_push;
+pub mod task_tip_stream;
 pub mod task_recheck_proofs;
 pub mod task_retry_peerpay_outbox;
 pub mod task_refresh_ship_cache;
@@ -124,6 +125,7 @@ impl Monitor {
             return None;
         }
         task_push::start(state.clone());
+        task_tip_stream::start(state.clone());
         let monitor = Self::new(state);
         Some(tokio::spawn(async move {
             monitor.run().await;

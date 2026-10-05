@@ -495,7 +495,7 @@ exactly what produces a hasty kill — which is why the script exists.
 
 ## Testing against a local chain (spv mode)
 
-`HODOS_CHAIN_MODE=spv` + `HODOS_ARCADE_URL` + `HODOS_CHAINTRACKS_URL` (optionally `HODOS_ARCADE_SSE_URL`, `HODOS_ARCADE_PUSH=off`, `HODOS_ZERO_CONF=off`) makes the wallet use only Arcade and a header chain it verifies itself, with no public indexers and no MessageBox traffic. Layer detail: `rust-wallet/src/CLAUDE.md` (`chain_mode`, `header_chain`, `header_sync`, `arcade_push`, `zero_conf`). ⛔ Always run such a wallet with `HODOS_DEV=1` and `HODOS_DATA_DIR=<scratch dir>` (the Windows data dir ignores `APPDATA`, so an un-redirected run would open and migrate the real `HodosBrowserDev` DB); to test against a real DB, copy `wallet.db`, `-wal` and `-shm` into `<scratch>\wallet\`. The harness and run guide live in the ChainBrowsers repo (`tests/hodos-spv`, `docs/hodos-spv.md`).
+`HODOS_CHAIN_MODE=spv` + `HODOS_ARCADE_URL` + `HODOS_CHAINTRACKS_URL` (optionally `HODOS_ARCADE_SSE_URL`, `HODOS_ARCADE_PUSH=off`, `HODOS_TIP_STREAM=off`, `HODOS_ZERO_CONF=off`) makes the wallet use only Arcade and a header chain it verifies itself, with no public indexers and no MessageBox traffic. Layer detail: `rust-wallet/src/CLAUDE.md` (`chain_mode`, `header_chain`, `header_sync`, `arcade_push`, `tip_stream`, `zero_conf`). ⛔ Always run such a wallet with `HODOS_DEV=1` and `HODOS_DATA_DIR=<scratch dir>` (the Windows data dir ignores `APPDATA`, so an un-redirected run would open and migrate the real `HodosBrowserDev` DB); to test against a real DB, copy `wallet.db`, `-wal` and `-shm` into `<scratch>\wallet\`. The harness and run guide live in the ChainBrowsers repo (`tests/hodos-spv`, `docs/hodos-spv.md`).
 
 ## Branch & Remote Workflow
 
