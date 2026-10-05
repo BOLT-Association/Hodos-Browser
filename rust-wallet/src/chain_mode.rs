@@ -26,6 +26,8 @@ pub const ENV_CHAINTRACKS: &str = "HODOS_CHAINTRACKS_URL";
 pub const ENV_ARCADE_SSE: &str = "HODOS_ARCADE_SSE_URL";
 /// `off` / `0` / `false` / `no` disables push even when the SSE URL is set. Polling is never off.
 pub const ENV_ARCADE_PUSH: &str = "HODOS_ARCADE_PUSH";
+/// `off` / `0` / `false` / `no` disables the chaintracks tip stream. The scheduled header sync is never off.
+pub const ENV_TIP_STREAM: &str = "HODOS_TIP_STREAM";
 /// `off` / `0` / `false` / `no` disables zero-conf acceptance of received outputs.
 pub const ENV_ZERO_CONF: &str = "HODOS_ZERO_CONF";
 
@@ -187,6 +189,15 @@ pub fn push_enabled() -> bool {
         std::env::var(ENV_ARCADE_PUSH).ok().map(|v| v.trim().to_ascii_lowercase()).as_deref(),
         Some("off") | Some("0") | Some("false") | Some("no")
     )
+}
+
+/// The chaintracks tip stream (a wake-up for the header sync) is on in spv mode unless switched off.
+pub fn tip_stream_enabled() -> bool {
+    spv_url(ENV_CHAINTRACKS).is_some()
+        && !matches!(
+            std::env::var(ENV_TIP_STREAM).ok().map(|v| v.trim().to_ascii_lowercase()).as_deref(),
+            Some("off") | Some("0") | Some("false") | Some("no")
+        )
 }
 
 /// MessageBox (PeerPay) polling and outbox retries are off in spv mode. They contact an
@@ -369,6 +380,25 @@ mod tests {
         }
         with_push(Some("spv"), None, None, &|| assert!(!push_enabled(), "no SSE url => no push"));
         with_push(None, Some(url), None, &|| assert!(!push_enabled(), "public mode ignores the SSE url"));
+    }
+
+    #[test]
+    fn the_tip_stream_needs_spv_mode_and_not_to_be_switched_off() {
+        let with_switch = |mode: Option<&str>, switch: Option<&str>, f: &dyn Fn()| {
+            let old = std::env::var(ENV_TIP_STREAM).ok();
+            let set = |v: Option<&str>| match v { Some(v) => std::env::set_var(ENV_TIP_STREAM, v), None => std::env::remove_var(ENV_TIP_STREAM) };
+            with_env(mode, Some("http://a"), Some("http://c"), || {
+                set(switch);
+                f();
+            });
+            set(old.as_deref());
+        };
+        with_switch(Some("spv"), None, &|| assert!(tip_stream_enabled(), "on by default in spv mode"));
+        with_switch(Some("spv"), Some("on"), &|| assert!(tip_stream_enabled()));
+        for off in ["off", "OFF", "0", "false", "no"] {
+            with_switch(Some("spv"), Some(off), &|| assert!(!tip_stream_enabled(), "{}", off));
+        }
+        with_switch(None, None, &|| assert!(!tip_stream_enabled(), "public mode has no header chain to sync"));
     }
 
     #[test]
