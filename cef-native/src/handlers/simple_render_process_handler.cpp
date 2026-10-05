@@ -22,6 +22,7 @@
 #include "../../include/core/LogSafeUrl.h"
 #include "../../include/core/FingerprintProtection.h"
 #include "../../include/core/CWIShimScript.h"
+#include "../../include/core/BoltShimScript.h"
 
 #include <unordered_map>
 #include <unordered_set>
@@ -1270,6 +1271,10 @@ void SimpleRenderProcessHandler::OnContextCreated(
             frame->ExecuteJavaScript(WALLET_CALL_BRIDGE_SCRIPT, url, 0);
             LOG_INFO_RENDER("💉 Injecting window.CWI / window.yours / window.panda shim for " + hodos::LogSafeUrl(url));
             frame->ExecuteJavaScript(CWI_SHIM_SCRIPT, url, 0);
+            // window.BOLT: the in-page BOLT token interface, bundled with b017 + @bsv/sdk. It drives the
+            // wallet over the same __hodos_walletCall bridge (injected above), so it needs no new rail.
+            LOG_INFO_RENDER("💉 Injecting window.BOLT shim for " + hodos::LogSafeUrl(url));
+            frame->ExecuteJavaScript(BoltShimScript(), url, 0);
         }
     }
 
