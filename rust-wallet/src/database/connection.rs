@@ -1098,6 +1098,14 @@ impl WalletDatabase {
             info!("   ✅ Schema V27 applied");
         }
 
+        if current_version < 28 {
+            // BOLT (owner-requested 2026-10-06): tokens held by this wallet, for the window.BOLT interface.
+            info!("   Applying migration V28 (bolt_tokens)...");
+            migrations::migrate_v27_to_v28(&self.conn)?;
+            self.conn.execute("INSERT INTO schema_version (version) VALUES (28)", [])?;
+            info!("   ✅ Schema V28 applied");
+        }
+
         // Startup repair: V12 migration may have recorded version but failed to add columns
         // (INSERT INTO schema_version succeeded but ALTER TABLE was skipped/failed).
         // Re-run the column checks unconditionally to patch any inconsistent DBs.

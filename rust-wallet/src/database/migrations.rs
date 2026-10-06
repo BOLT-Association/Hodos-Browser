@@ -1437,3 +1437,35 @@ pub fn migrate_v26_to_v27(conn: &Connection) -> Result<()> {
     info!("   ✅ V27 migration applied (pending_proofs)");
     Ok(())
 }
+
+/// V28 (owner-requested 2026-10-06): BOLT tokens held by this wallet. One row per held token output;
+/// the Atomic BEEF is the source of truth and the other columns are generic indexes, so a new token
+/// type adds no column. Same columns as `TOKENS_SCHEMA` in ChainBrowsers `packages/bolt/src/store.js`.
+/// Additive: no existing table is touched.
+pub fn migrate_v27_to_v28(conn: &Connection) -> Result<()> {
+    conn.execute_batch(
+        "CREATE TABLE IF NOT EXISTS bolt_tokens (
+            outpoint           TEXT PRIMARY KEY,
+            type               TEXT NOT NULL,
+            issuer             TEXT NOT NULL,
+            owner_pkh          TEXT,
+            status             TEXT NOT NULL DEFAULT 'held',
+            amount             TEXT,
+            attributes         TEXT NOT NULL DEFAULT '{}',
+            beef               TEXT NOT NULL,
+            anchor_txid        TEXT,
+            anchor_kind        TEXT,
+            anchor_network     TEXT,
+            anchor_proven      INTEGER NOT NULL DEFAULT 0,
+            anchor_height      INTEGER,
+            anchor_merkle_root TEXT,
+            provenance         TEXT,
+            created_at         INTEGER NOT NULL,
+            updated_at         INTEGER NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS idx_bolt_tokens_issuer_type ON bolt_tokens(issuer, type, status);
+        CREATE INDEX IF NOT EXISTS idx_bolt_tokens_unproven ON bolt_tokens(anchor_proven);",
+    )?;
+    info!("   ✅ V28 migration applied (bolt_tokens)");
+    Ok(())
+}
