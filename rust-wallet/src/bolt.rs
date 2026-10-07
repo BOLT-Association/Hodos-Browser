@@ -12,8 +12,14 @@
 //! Neither spends the wallet's coins: funding and signing still go through `createAction` /
 //! `createSignature` and their own permission gates. Both are reachable by any domain the user has
 //! approved (`domain_trust_mw`), like the rest of the BRC-100 surface.
+//!
+//! **AuthBOLT identities are the wallet's own** (ChainBrowsers `docs/authbolt-registration.md`).
+//! Hodos's own UI (no `X-Requesting-Domain`) mints and presents them and keeps its notes on each
+//! (`attributes.wallet`: its keys and the sites it is linked to, written with `op: "annotate"`). A
+//! site sees only the identities linked to it, and cannot put, retire or annotate an identity row.
+//! Every other token type is unchanged.
 
-use actix_web::{web, HttpResponse};
+use actix_web::{web, HttpRequest, HttpResponse};
 use serde::Deserialize;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
@@ -164,6 +170,41 @@ enum TokensRequest {
         token_type: Option<String>,
     },
     Spend { outpoint: String },
+    /// The wallet's own notes on a token (Hodos's UI only).
+    Annotate { outpoint: String, wallet: serde_json::Value },
+}
+
+/// The token type of an AuthBOLT identity.
+const IDENTITY_TYPE: &str = "AuthBOLT";
+
+/// The site asking (`X-Requesting-Domain`), or `None` for Hodos's own UI.
+fn requesting_site(http_req: &HttpRequest) -> Option<String> {
+    http_req
+        .headers()
+        .get(crate::permission_service::request_gate::X_REQUESTING_DOMAIN)
+        .and_then(|v| v.to_str().ok())
+        .filter(|d| !d.is_empty())
+        .map(str::to_string)
+}
+
+/// Whether `site` may see a row: every token type but an identity; an identity only when the
+/// wallet linked it to that site. Hodos's own UI (`None`) sees everything.
+pub(crate) fn visible_to(row: &BoltTokenRow, site: Option<&str>) -> bool {
+    let Some(site) = site else { return true };
+    if row.token_type != IDENTITY_TYPE {
+        return true;
+    }
+    let attrs: serde_json::Value = serde_json::from_str(&row.attributes).unwrap_or_default();
+    attrs["wallet"]["apps"]
+        .as_array()
+        .is_some_and(|apps| apps.iter().any(|a| a["domain"].as_str() == Some(site)))
+}
+
+fn identity_refused() -> HttpResponse {
+    HttpResponse::Forbidden().json(serde_json::json!({
+        "error": "AuthBOLT identities are the wallet's own: a site cannot store, retire or annotate them",
+        "code": "IDENTITY_TOKEN"
+    }))
 }
 
 fn is_outpoint(s: &str) -> bool {
@@ -252,15 +293,19 @@ fn db_error(e: impl std::fmt::Display) -> HttpResponse {
 /// - `{op:"get", outpoint}` → `{row}` (`null` when unknown)
 /// - `{op:"list", status?, issuer?, type?}` → `{rows}` (`status` defaults to `held`)
 /// - `{op:"spend", outpoint}` → `{ok, spent}`: retire a held token; nothing is deleted
-pub async fn bolt_tokens(state: web::Data<AppState>, body: web::Bytes) -> HttpResponse {
+pub async fn bolt_tokens(state: web::Data<AppState>, http_req: HttpRequest, body: web::Bytes) -> HttpResponse {
     let req: TokensRequest = match serde_json::from_slice(&body) {
         Ok(r) => r,
         Err(e) => return bad_request(format!("invalid request: {e}")),
     };
+    let site = requesting_site(&http_req);
     let db = state.database.lock().unwrap();
     let repo = BoltTokenRepository::new(db.connection());
     match req {
         TokensRequest::Put { row } => {
+            if site.is_some() && row.token_type == IDENTITY_TYPE {
+                return identity_refused();
+            }
             if let Err(e) = validate_row(&row) {
                 return bad_request(e);
             }
@@ -274,7 +319,10 @@ pub async fn bolt_tokens(state: web::Data<AppState>, body: web::Bytes) -> HttpRe
                 return bad_request("outpoint must be <64 hex>.<vout>");
             }
             match repo.get(&outpoint) {
-                Ok(row) => HttpResponse::Ok().json(serde_json::json!({ "row": row })),
+                Ok(row) => {
+                    let row = row.filter(|r| visible_to(r, site.as_deref()));
+                    HttpResponse::Ok().json(serde_json::json!({ "row": row }))
+                }
                 Err(e) => db_error(e),
             }
         }
@@ -284,7 +332,10 @@ pub async fn bolt_tokens(state: web::Data<AppState>, body: web::Bytes) -> HttpRe
                 return bad_request("status must be held or spent");
             }
             match repo.list(&status, issuer.as_deref(), token_type.as_deref()) {
-                Ok(rows) => HttpResponse::Ok().json(serde_json::json!({ "rows": rows })),
+                Ok(rows) => {
+                    let rows: Vec<_> = rows.into_iter().filter(|r| visible_to(r, site.as_deref())).collect();
+                    HttpResponse::Ok().json(serde_json::json!({ "rows": rows }))
+                }
                 Err(e) => db_error(e),
             }
         }
@@ -292,8 +343,26 @@ pub async fn bolt_tokens(state: web::Data<AppState>, body: web::Bytes) -> HttpRe
             if !is_outpoint(&outpoint) {
                 return bad_request("outpoint must be <64 hex>.<vout>");
             }
+            if site.is_some() && matches!(repo.get(&outpoint), Ok(Some(r)) if r.token_type == IDENTITY_TYPE) {
+                return identity_refused();
+            }
             match repo.mark_spent(&outpoint, now_secs()) {
                 Ok(spent) => HttpResponse::Ok().json(serde_json::json!({ "ok": true, "spent": spent })),
+                Err(e) => db_error(e),
+            }
+        }
+        TokensRequest::Annotate { outpoint, wallet } => {
+            if site.is_some() {
+                return identity_refused();
+            }
+            if !is_outpoint(&outpoint) {
+                return bad_request("outpoint must be <64 hex>.<vout>");
+            }
+            if !wallet.is_object() || wallet.to_string().len() > 16 * 1024 {
+                return bad_request("wallet must be a JSON object (16 KB at most)");
+            }
+            match repo.annotate(&outpoint, &wallet, now_secs()) {
+                Ok(found) => HttpResponse::Ok().json(serde_json::json!({ "ok": true, "found": found })),
                 Err(e) => db_error(e),
             }
         }
@@ -381,6 +450,28 @@ mod tests {
     }
 
     #[test]
+    fn a_site_sees_every_token_but_identities_not_linked_to_it() {
+        let fungible = row();
+        let mut identity = row();
+        identity.token_type = "AuthBOLT".into();
+        identity.attributes = r#"{"wallet":{"apps":[{"domain":"peerloop.example","appPubKey":"02aa"}]}}"#.into();
+        let mut unlinked = identity.clone();
+        unlinked.attributes = r#"{"wallet":{"apps":[]}}"#.into();
+        let mut bare = identity.clone();
+        bare.attributes = "{}".into();
+
+        assert!(visible_to(&fungible, Some("anyone.example")), "other token types are unchanged");
+        assert!(visible_to(&identity, Some("peerloop.example")));
+        assert!(!visible_to(&identity, Some("evil.example")), "another site does not see it");
+        assert!(!visible_to(&identity, Some("peerloop.example.evil")), "the domain must match exactly");
+        assert!(!visible_to(&unlinked, Some("peerloop.example")));
+        assert!(!visible_to(&bare, Some("peerloop.example")));
+        for r in [&identity, &unlinked, &bare] {
+            assert!(visible_to(r, None), "Hodos's own UI sees every identity");
+        }
+    }
+
+    #[test]
     fn token_requests_parse_by_op() {
         let put: TokensRequest = serde_json::from_value(serde_json::json!({ "op": "put", "row": serde_json::to_value(row()).unwrap() })).unwrap();
         assert!(matches!(put, TokensRequest::Put { .. }));
@@ -389,5 +480,7 @@ mod tests {
         let spend: TokensRequest = serde_json::from_str(r#"{"op":"spend","outpoint":"x"}"#).unwrap();
         assert!(matches!(spend, TokensRequest::Spend { .. }));
         assert!(serde_json::from_str::<TokensRequest>(r#"{"op":"delete","outpoint":"x"}"#).is_err(), "there is no delete");
+        let annotate: TokensRequest = serde_json::from_str(r#"{"op":"annotate","outpoint":"x","wallet":{"apps":[]}}"#).unwrap();
+        assert!(matches!(annotate, TokensRequest::Annotate { .. }));
     }
 }

@@ -160,6 +160,46 @@ impl<'a> BoltTokenRepository<'a> {
         )?;
         Ok(n > 0)
     }
+
+    /// Every row, held and spent, for a backup.
+    pub fn all(&self) -> rusqlite::Result<Vec<BoltTokenRow>> {
+        let mut stmt = self.conn.prepare(&format!("SELECT {COLUMNS} FROM bolt_tokens ORDER BY created_at ASC, outpoint ASC"))?;
+        let rows = stmt.query_map([], Self::row)?.collect();
+        rows
+    }
+
+    /// Put back a row from a backup exactly as it was (status and timestamps included); a row the
+    /// wallet already has is left alone.
+    pub fn restore(&self, t: &BoltTokenRow) -> rusqlite::Result<()> {
+        self.conn.execute(
+            &format!(
+                "INSERT OR IGNORE INTO bolt_tokens ({COLUMNS})
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17)"
+            ),
+            rusqlite::params![
+                t.outpoint, t.token_type, t.issuer, t.owner_pkh, t.status, t.amount, t.attributes, t.beef,
+                t.anchor_txid, t.anchor_kind, t.anchor_network, t.anchor_proven, t.anchor_height,
+                t.anchor_merkle_root, t.provenance, t.created_at, t.updated_at,
+            ],
+        )?;
+        Ok(())
+    }
+
+    /// The wallet's own notes on a token (`attributes.wallet`: an AuthBOLT identity's keys and the
+    /// apps it is linked to). The only change to `attributes` after a row is first written, and
+    /// only the `wallet` key: the token data stays as stored. Hodos takes it from its own UI only
+    /// (`bolt::bolt_tokens`). False when the outpoint is unknown.
+    pub fn annotate(&self, outpoint: &str, wallet: &serde_json::Value, now: i64) -> CacheResult<bool> {
+        let Some(row) = self.get(outpoint)? else { return Ok(false) };
+        let mut attrs: serde_json::Map<String, serde_json::Value> =
+            serde_json::from_str(&row.attributes).unwrap_or_default();
+        attrs.insert("wallet".to_string(), wallet.clone());
+        let n = self.conn.execute(
+            "UPDATE bolt_tokens SET attributes = ?2, updated_at = ?3 WHERE outpoint = ?1",
+            rusqlite::params![outpoint, serde_json::Value::Object(attrs).to_string(), now],
+        )?;
+        Ok(n > 0)
+    }
 }
 
 #[cfg(test)]
@@ -192,6 +232,49 @@ mod tests {
             created_at: 0,
             updated_at: 0,
         }
+    }
+
+    #[test]
+    fn annotate_sets_the_wallets_notes_and_nothing_else() {
+        let conn = db();
+        let repo = BoltTokenRepository::new(&conn);
+        let a = format!("{}.0", "11".repeat(32));
+        let mut t = token(&a, None);
+        t.token_type = "AuthBOLT".to_string();
+        t.attributes = "{\"kind\":\"x\"}".to_string();
+        repo.put(&t, 10).unwrap();
+        let notes = serde_json::json!({ "issuerKeyId": "authbolt-1", "apps": [{ "domain": "peerloop.example" }] });
+        assert!(repo.annotate(&a, &notes, 20).unwrap());
+        let got = repo.get(&a).unwrap().unwrap();
+        let attrs: serde_json::Value = serde_json::from_str(&got.attributes).unwrap();
+        assert_eq!(attrs["wallet"], notes);
+        assert_eq!(attrs["kind"], "x", "the token's own attributes stay");
+        assert_eq!((got.beef.as_str(), got.issuer.as_str(), got.updated_at), (t.beef.as_str(), t.issuer.as_str(), 20));
+        assert!(!repo.annotate("nope", &notes, 30).unwrap(), "an unknown outpoint changes nothing");
+    }
+
+    #[test]
+    fn all_and_restore_carry_every_row_exactly_through_a_backup() {
+        let from = db();
+        let repo = BoltTokenRepository::new(&from);
+        let a = format!("{}.0", "11".repeat(32));
+        let b = format!("{}.1", "22".repeat(32));
+        let mut identity = token(&a, None);
+        identity.token_type = "AuthBOLT".to_string();
+        identity.attributes = r#"{"wallet":{"issuerKeyId":"authbolt-1","apps":[]}}"#.to_string();
+        repo.put(&identity, 10).unwrap();
+        repo.put(&token(&b, Some("5")), 20).unwrap();
+        repo.mark_spent(&b, 30).unwrap();
+        let saved = repo.all().unwrap();
+        assert_eq!(saved.len(), 2, "held and spent rows are both kept");
+
+        let to = db();
+        let back = BoltTokenRepository::new(&to);
+        for t in &saved {
+            back.restore(t).unwrap();
+            back.restore(t).unwrap(); // twice: a row already there is left alone
+        }
+        assert_eq!(back.all().unwrap(), saved, "every column, status and timestamp as it was");
     }
 
     #[test]

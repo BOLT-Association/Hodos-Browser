@@ -56,6 +56,9 @@ pub struct BackupPayload {
     pub domain_permissions: Vec<BackupDomainPermission>,
     #[serde(default)]
     pub cert_field_permissions: Vec<BackupCertFieldPermission>,
+    /// BOLT tokens (V28 `bolt_tokens`), held and spent. An AuthBOLT identity is an account at the
+    /// sites it is linked to, and its transactions cannot be rebuilt from the mnemonic.
+    pub bolt_tokens: Vec<crate::database::BoltTokenRow>,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -835,6 +838,8 @@ pub fn collect_payload(conn: &Connection, identity_key: &str, mnemonic: &str) ->
         rows
     };
 
+    let bolt_tokens = crate::database::BoltTokenRepository::new(conn).all()?;
+
     let payload = BackupPayload {
         version: 1,
         identity_key: identity_key.to_string(),
@@ -860,6 +865,7 @@ pub fn collect_payload(conn: &Connection, identity_key: &str, mnemonic: &str) ->
         block_headers,
         domain_permissions,
         cert_field_permissions,
+        bolt_tokens,
     };
 
     info!("   Collected: {} users, {} addresses, {} txs, {} outputs, {} certs",
@@ -1592,6 +1598,12 @@ fn import_entities(conn: &Connection, payload: &BackupPayload, target_wallet_id:
         }
     }
 
+    // 16b. bolt_tokens (no FKs): rows go back as they were, status and timestamps included
+    let tokens = crate::database::BoltTokenRepository::new(conn);
+    for t in &payload.bolt_tokens {
+        tokens.restore(t).map_err(|e| format!("Insert bolt_tokens: {}", e))?;
+    }
+
     // 17. settings (no FKs)
     for s in &payload.settings {
         conn.execute(
@@ -2163,6 +2175,7 @@ mod tests {
             block_headers: vec![],
             domain_permissions: vec![],
             cert_field_permissions: vec![],
+            bolt_tokens: vec![],
         };
 
         // Serialize to JSON, compress, encrypt
@@ -2241,6 +2254,7 @@ mod tests {
             block_headers: vec![],
             domain_permissions: vec![],
             cert_field_permissions: vec![],
+            bolt_tokens: vec![],
         };
 
         // Encrypt with correct key

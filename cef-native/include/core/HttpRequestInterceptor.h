@@ -331,6 +331,10 @@ void postIpcAuthTimeout(const std::string& requestId,
 // Phase 2.5 Commit 6 sub-step 6.d. After this lands AND 6.e closes the
 // approve/deny resume loop, the engine cascade fires from external dApp
 // traffic for the first time.
+// AuthBOLT: answer a page's held POST /bolt/request (the `bolt_result` IPC from Hodos's prompt,
+// or a timeout). False when no such request is waiting (already answered or timed out).
+bool AnswerBoltRequest(const std::string& key, bool ok, const std::string& payloadJson);
+
 void HandleIpcWalletCall(
     const std::string& requestId,
     const std::string& methodName,

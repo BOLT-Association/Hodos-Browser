@@ -3,6 +3,7 @@ import DomainPermissionForm from '../components/DomainPermissionForm';
 import { walletFetch } from '../services/walletApi';
 import type { DomainPermissionSettings } from '../components/DomainPermissionForm';
 import { HodosButton } from '../components/HodosButton';
+import { BoltIdentityPrompt, registerSilentPresenter } from '../components/BoltIdentityPrompt';
 import { prompt as promptTheme } from '../styles/hodosTheme';
 // beta.3 Phase 0.8 — the connect modal is a consent surface, so the rule about
 // WHOSE numbers each limit field carries lives in a pure module that is
@@ -344,6 +345,10 @@ const HodosBrowserHeader: React.FC = () => (
 
 const BRC100AuthOverlayRoot: React.FC = () => {
   const [notificationType, setNotificationType] = useState<string>('');
+  // AuthBOLT identity request ("bolt_request"): what the page asked, checked by C++ (BoltRequest.h).
+  const [boltRequest, setBoltRequest] = useState<{ appPubKey: string; data: string; purpose: string }>({ appPubKey: '', data: '', purpose: '' });
+  // Keep-alives are answered without a window (C++ calls window.boltSilent in this overlay).
+  useEffect(() => { registerSilentPresenter(); }, []);
   const [notificationDomain, setNotificationDomain] = useState<string>('');
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [showModifyLimits, setShowModifyLimits] = useState(false);
@@ -628,6 +633,8 @@ const BRC100AuthOverlayRoot: React.FC = () => {
     setSessionSpent(0);
     setRateLimit(10);
     setMaxTxPerSession(100);
+
+    setBoltRequest({ appPubKey: params.get('appPubKey') || '', data: params.get('data') || '', purpose: params.get('purpose') || '' });
 
     // Apply params
     setNotificationType(type);
@@ -2334,6 +2341,29 @@ const BRC100AuthOverlayRoot: React.FC = () => {
   // Fires when an external site calls getPublicKey({ identityKey: true }) and
   // the per-domain "Always allow" cache is empty. Locked copy: minimal +
   // neutral; gold privacy-perimeter framing (NOT red).
+  // ── AuthBOLT identity request: the person chooses or creates the identity a site sees ──
+  if (notificationType === 'bolt_request') {
+    return (
+      <div style={overlayBackdrop}>
+        <div style={privacyPerimeterCardStyle}>
+          <HodosWalletHeader />
+          <BoltIdentityPrompt
+            key={requestIdRef.current}
+            requestKey={requestIdRef.current}
+            domain={notificationDomain}
+            appPubKey={boltRequest.appPubKey}
+            data={boltRequest.data}
+            purpose={boltRequest.purpose}
+            onDone={() => {
+              setNotificationType('');
+              window.cefMessage?.send('overlay_close', []);
+            }}
+          />
+        </div>
+      </div>
+    );
+  }
+
   if (notificationType === 'identity_key_reveal') {
     return (
       <div style={overlayBackdrop}>

@@ -333,7 +333,7 @@ Migration runner: `connection.rs :: WalletDatabase::migrate`. Migration bodies: 
 | V25 | `settings.default_bundled_scope_grant` (default 1): user-level default for quiet mode on the connect screen. Behaviour-neutral |
 | V26 | **WS4** (owner-approved 2026-10-03). `header_chain` (`network`, `block_hash`, `height`, `header_hex`): candidate headers for the wallet's own verified header chain; a cache, every header is re-validated on load (`HeaderChain::from_stored`) |
 | V27 | **spv proofs** (owner-approved 2026-10-04). `pending_proofs`: merkle proofs held until the header chain can verify them. Deliberately **not** `proven_txs`: every reader of that table treats a row as a verified proof |
-| V28 | **BOLT** (owner-requested 2026-10-06). `bolt_tokens`: tokens held by this wallet, written by the page's `window.BOLT` handler through `POST /boltTokens` (`bolt.rs`, `BoltTokenRepository`). Additive. Append-and-retire: token data (`beef`, `type`, `issuer`, `amount`…) is written once, a spent row is marked `spent` and kept. ⚠️ Not in `backup.rs`: a recovered wallet has no BOLT tokens until that is added |
+| V28 | **BOLT** (owner-requested 2026-10-06). `bolt_tokens`: tokens held by this wallet, written by the page's `window.BOLT` handler through `POST /boltTokens` (`bolt.rs`, `BoltTokenRepository`). Additive. Append-and-retire: token data (`beef`, `type`, `issuer`, `amount`…) is written once, a spent row is marked `spent` and kept. In `backup.rs` since 2026-10-07 (`BackupPayload.bolt_tokens`, required; restored row for row by `BoltTokenRepository::restore`). `annotate` updates only `attributes.wallet` (an AuthBOLT identity's keys and app links) |
 
 ### Startup repair blocks (`WalletDatabase::migrate`, after V24)
 

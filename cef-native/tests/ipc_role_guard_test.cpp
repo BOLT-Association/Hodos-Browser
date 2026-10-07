@@ -47,6 +47,7 @@ const char* kFamily[] = {
     "approve_identity_key_reveal",
     "approve_key_linkage_reveal",
     "brc100_auth_response",
+    "bolt_result",  // an AuthBOLT presentation (or refusal) for the page that asked
 };
 
 // ---- Predicate: message classification ----
