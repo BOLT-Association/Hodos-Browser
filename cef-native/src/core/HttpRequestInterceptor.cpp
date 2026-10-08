@@ -2605,12 +2605,13 @@ void postIpcAuthTimeout(const std::string& requestId,
 // and the prompt answers with `bolt_result` (an approval-overlay-only message, IpcAuth.h). The
 // page's wallet_call is held here meanwhile and answered with the presentation, or a refusal.
 //
-// A keep-alive (`silent`) is not shown: it goes to the preloaded notification browser's
+// A keep-alive or a write (`silent`) is not shown: it goes to the preloaded notification browser's
 // `window.boltSilent`, which presents only for an app the person chose to stay signed in to and
-// otherwise answers NEEDS_PROMPT. The overlay is never made visible for it.
+// otherwise answers NEEDS_PROMPT. The overlay is never made visible for it, and a write is never
+// anything but silent (BoltRequest.h ValidateBoltSilence).
 //
 // ⛔ Every value that reaches the overlay is checked first (BoltRequest.h): lower-case hex and
-// the three purpose words only, so nothing a page sends can add a query parameter or reach script.
+// the four purpose words only, so nothing a page sends can add a query parameter or reach script.
 namespace {
 
 struct BoltPending {
@@ -2678,7 +2679,7 @@ static void HandleBoltRequest(const std::string& requestId,
         sendWalletResponseIpc(frame, requestId, false, BoltErrorJson("BOLT: the request is not JSON", ""));
         return;
     }
-    if (!hodos::ValidateBoltRequest(appPubKey, data, purpose, why)) {
+    if (!hodos::ValidateBoltRequest(appPubKey, data, purpose, why) || !hodos::ValidateBoltSilence(purpose, silent, why)) {
         sendWalletResponseIpc(frame, requestId, false, BoltErrorJson("BOLT: " + why, ""));
         return;
     }

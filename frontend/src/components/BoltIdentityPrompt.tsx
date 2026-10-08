@@ -53,9 +53,10 @@ function answer(key: string, ok: boolean, payload: unknown) {
 const short = (hex: string) => `${hex.slice(0, 8)}…${hex.slice(-6)}`;
 
 /**
- * Answer keep-alive requests with no window (C++ calls `window.boltSilent(json)` in the preloaded
+ * Answer keep-alives and writes with no window (C++ calls `window.boltSilent(json)` in the preloaded
  * notification browser). Presents only when the person chose to stay signed in to that app on that
- * site; otherwise answers NEEDS_PROMPT and the session simply lapses at its expiry.
+ * site; otherwise answers NEEDS_PROMPT: a keep-alive's session lapses at its expiry, and a write is
+ * not made. A write is one change the person makes in the app (tag 04), signed in passing.
  */
 export function registerSilentPresenter() {
   (window as any).boltSilent = async (argsJson: string) => {
@@ -66,7 +67,9 @@ export function registerSilentPresenter() {
       return;
     }
     try {
-      if (args.purpose !== 'refresh') throw Object.assign(new Error('only a keep-alive is answered without asking'), { code: 'NEEDS_PROMPT' });
+      if (args.purpose !== 'refresh' && args.purpose !== 'write') {
+        throw Object.assign(new Error('only a keep-alive or a write is answered without asking'), { code: 'NEEDS_PROMPT' });
+      }
       const shown = await (await identities()).refresh({ domain: args.domain, appPubKey: args.appPubKey, data: args.data });
       answer(args.key, true, { package: shown.package });
     } catch (e: any) {
