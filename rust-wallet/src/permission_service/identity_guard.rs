@@ -58,6 +58,22 @@ mod tests {
     }
 
     #[test]
+    fn the_invoice_name_is_normalised_so_the_identity_key_cannot_be_reached_by_a_collision() {
+        // The identity invoice is `2-authbolt identity-<keyId>`. A site that asks to sign under
+        // protocol name "authbolt identity-authbolt" with a crafted keyId would build the same
+        // invoice and so the same key. Normalising the name refuses the `-`, closing audit H1.
+        let site = TestRequest::default().insert_header((X_REQUESTING_DOMAIN, "peerloop.example")).to_http_request();
+        let collision = guarded_protocol_name(&site, "authbolt identity-authbolt");
+        assert_eq!(collision.err().expect("a hyphenated name is refused").status(), 400);
+        // Naming the identity protocol outright is refused for a site (403).
+        assert_eq!(guarded_protocol_name(&site, "authbolt identity").err().expect("refused").status(), 403);
+        // The wallet's own UI derives identity keys; a general protocol normalises to lower case.
+        let own = TestRequest::default().to_http_request();
+        assert_eq!(guarded_protocol_name(&own, "authbolt identity").ok().as_deref(), Some("authbolt identity"));
+        assert_eq!(guarded_protocol_name(&site, "Bolt  Token").ok().as_deref(), Some("bolt token"));
+    }
+
+    #[test]
     fn a_site_is_refused_and_the_wallet_ui_is_not() {
         let site = TestRequest::default().insert_header((X_REQUESTING_DOMAIN, "peerloop.example")).to_http_request();
         let refused = refuse_identity_protocol(&site, "authbolt identity").expect("a site is refused");
