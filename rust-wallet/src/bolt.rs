@@ -200,6 +200,22 @@ pub(crate) fn visible_to(row: &BoltTokenRow, site: Option<&str>) -> bool {
         .is_some_and(|apps| apps.iter().any(|a| a["domain"].as_str() == Some(site)))
 }
 
+/// A row as a site may see it: the wallet's own notes (`attributes.wallet` — the identity's key
+/// IDs and the sites it is linked to) are stripped for a site, so a linked site learns only that
+/// the identity exists, never its keys or its other sites (audit H2). Hodos's own UI (`None`) is
+/// shown the row unchanged.
+pub(crate) fn redacted_for_site(mut row: BoltTokenRow, site: Option<&str>) -> BoltTokenRow {
+    if site.is_none() {
+        return row;
+    }
+    if let Ok(serde_json::Value::Object(mut attrs)) = serde_json::from_str(&row.attributes) {
+        if attrs.remove("wallet").is_some() {
+            row.attributes = serde_json::Value::Object(attrs).to_string();
+        }
+    }
+    row
+}
+
 fn identity_refused() -> HttpResponse {
     HttpResponse::Forbidden().json(serde_json::json!({
         "error": "AuthBOLT identities are the wallet's own: a site cannot store, retire or annotate them",
@@ -320,7 +336,9 @@ pub async fn bolt_tokens(state: web::Data<AppState>, http_req: HttpRequest, body
             }
             match repo.get(&outpoint) {
                 Ok(row) => {
-                    let row = row.filter(|r| visible_to(r, site.as_deref()));
+                    let row = row
+                        .filter(|r| visible_to(r, site.as_deref()))
+                        .map(|r| redacted_for_site(r, site.as_deref()));
                     HttpResponse::Ok().json(serde_json::json!({ "row": row }))
                 }
                 Err(e) => db_error(e),
@@ -333,7 +351,11 @@ pub async fn bolt_tokens(state: web::Data<AppState>, http_req: HttpRequest, body
             }
             match repo.list(&status, issuer.as_deref(), token_type.as_deref()) {
                 Ok(rows) => {
-                    let rows: Vec<_> = rows.into_iter().filter(|r| visible_to(r, site.as_deref())).collect();
+                    let rows: Vec<_> = rows
+                        .into_iter()
+                        .filter(|r| visible_to(r, site.as_deref()))
+                        .map(|r| redacted_for_site(r, site.as_deref()))
+                        .collect();
                     HttpResponse::Ok().json(serde_json::json!({ "rows": rows }))
                 }
                 Err(e) => db_error(e),
