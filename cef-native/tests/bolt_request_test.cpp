@@ -75,3 +75,61 @@ TEST(BoltRequest, TheRefusalSaysWhy) {
     EXPECT_FALSE(hodos::ValidateBoltRequest(kApp, Data("02", "02" + std::string(64, 'c')), "signin", why));
     EXPECT_NE(why.find("app"), std::string::npos) << why;
 }
+
+// ---- POST /bolt/sign: holder-key signatures (ChainBrowsers docs/authbolt-registration.md, "After
+// registration"). The wallet builds the digest itself; the shell checks only the shape of what the
+// page sends, so nothing malformed reaches the prompt or the silent signer. NC: make
+// ValidateBoltSign return true unconditionally — every refusal below goes red.
+
+namespace {
+
+bool Sign(const std::string& kind, const std::string& payload, bool silent = true, const std::string& app = kApp) {
+    std::string why;
+    return hodos::ValidateBoltSign(kind, app, payload, silent, why);
+}
+
+const std::string kWrite = R"({"v":1,"kind":"message.post","target":"POST /api/channels/1/messages","body":{"text":"hi"},"at":1,"seq":1,"sid":"s"})";
+
+}  // namespace
+
+TEST(BoltSign, EachKindTakesItsOwnPayload) {
+    EXPECT_TRUE(Sign("signin", Data("02")));
+    EXPECT_TRUE(Sign("refresh", Data("03")));
+    EXPECT_TRUE(Sign("write", kWrite));
+    EXPECT_TRUE(Sign("write", kWrite, false)) << "a prompted-tier write goes to the prompt";
+    EXPECT_TRUE(Sign("rotate", ""));
+    EXPECT_TRUE(Sign("confirm", ""));
+    EXPECT_TRUE(Sign("recover", Data("02"), false));
+    EXPECT_FALSE(Sign("pay", "")) << "an unknown kind";
+    EXPECT_FALSE(Sign("Signin", Data("02"))) << "kind words are exact";
+    EXPECT_FALSE(Sign("signin", "")) << "a sign-in signs the challenge";
+    EXPECT_FALSE(Sign("signin", Data("02").replace(10, 1, "Z"))) << "the challenge is lower-case hex";
+    EXPECT_FALSE(Sign("signin", std::string(266, 'a'))) << "a challenge is at most 132 bytes";
+    EXPECT_FALSE(Sign("rotate", "x")) << "rotate and confirm carry nothing";
+    EXPECT_FALSE(Sign("confirm", Data("02")));
+    EXPECT_FALSE(Sign("signin", Data("02"), true, "04" + std::string(64, 'a'))) << "the app key";
+}
+
+TEST(BoltSign, AWriteIsAJsonObjectOfAtMost64KiB) {
+    EXPECT_FALSE(Sign("write", "")) << "empty";
+    EXPECT_FALSE(Sign("write", "[1,2]")) << "not an object";
+    EXPECT_FALSE(Sign("write", "{\"v\":1")) << "not JSON";
+    EXPECT_FALSE(Sign("write", R"({"v":1})")) << "names no kind";
+    std::string big = R"({"kind":"message.post","body":")" + std::string(64 * 1024, 'x') + "\"}";
+    EXPECT_FALSE(Sign("write", big)) << "over 64 KiB";
+}
+
+TEST(BoltSign, ARecoveryIsNeverSilent) {
+    EXPECT_FALSE(Sign("recover", Data("02"), true));
+}
+
+// Only an https main frame may ask (audit H3): `cefMessage` reaches every frame, so a subframe or a
+// plain-http page could otherwise send wallet_call itself. NC: make BoltFrameAllowed return true.
+TEST(BoltSign, OnlyAnHttpsMainFrameMayAsk) {
+    std::string why;
+    EXPECT_TRUE(hodos::BoltFrameAllowed(true, "https://app.lab:8443/peerloop/", why));
+    EXPECT_FALSE(hodos::BoltFrameAllowed(false, "https://app.lab:8443/peerloop/", why)) << "a subframe";
+    EXPECT_FALSE(hodos::BoltFrameAllowed(true, "http://app.lab:8443/", why)) << "plain http";
+    EXPECT_FALSE(hodos::BoltFrameAllowed(true, "data:text/html,https://x", why));
+    EXPECT_FALSE(hodos::BoltFrameAllowed(true, "", why));
+}
