@@ -13,6 +13,7 @@
 use actix_web::{HttpRequest, HttpResponse};
 
 use super::request_gate::X_REQUESTING_DOMAIN;
+use crate::crypto::brc43::normalize_protocol_id;
 
 /// The BRC-43 protocol AuthBOLT identity keys are derived under (ChainBrowsers packages/bolt
 /// `IDENTITY_PROTOCOL`).
@@ -40,6 +41,26 @@ pub fn refuse_identity_protocol(http_req: &HttpRequest, protocol_name: &str) -> 
         })));
     }
     None
+}
+
+/// The protocol name a BRC-43 invoice is built from: normalised (lower-cased, single spaces, and
+/// only letters, digits and spaces, as BRC-43 requires), then refused for a site that names the
+/// identity protocol. Normalising first is what closes the collision in audit H1: a name such as
+/// `authbolt identity-authbolt` would otherwise build the identity key's invoice, but the hyphen
+/// is not a legal BRC-43 character, so it is refused here before any key is derived. Every key
+/// operation (getPublicKey, createSignature, …) must resolve its name through this, so the derived
+/// key can never depend on an un-normalised name.
+pub fn guarded_protocol_name(http_req: &HttpRequest, name: &str) -> Result<String, HttpResponse> {
+    let normalized = normalize_protocol_id(name).map_err(|e| {
+        HttpResponse::BadRequest().json(serde_json::json!({
+            "error": e,
+            "status": "error",
+        }))
+    })?;
+    if let Some(refused) = refuse_identity_protocol(http_req, &normalized) {
+        return Err(refused);
+    }
+    Ok(normalized)
 }
 
 #[cfg(test)]

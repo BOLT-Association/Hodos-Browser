@@ -341,11 +341,12 @@ pub async fn get_public_key(
     let protocol_id_str = if let serde_json::Value::Array(arr) = protocol_id {
         if arr.len() == 2 {
             if let (Some(level), Some(name)) = (arr[0].as_u64(), arr[1].as_str()) {
-                // AuthBOLT identity keys are the wallet's own (permission_service::identity_guard).
-                if let Some(refused) = crate::permission_service::identity_guard::refuse_identity_protocol(&http_req, name) {
-                    return refused;
+                // Normalise the name and refuse the AuthBOLT identity protocol for a site, so the
+                // derived key cannot depend on an un-normalised name (permission_service::identity_guard).
+                match crate::permission_service::identity_guard::guarded_protocol_name(&http_req, name) {
+                    Ok(n) => format!("{}-{}", level, n),
+                    Err(resp) => return resp,
                 }
-                format!("{}-{}", level, name)
             } else {
                 return HttpResponse::BadRequest().json(serde_json::json!({
                     "error": "Invalid protocolID format: expected [number, string]"
@@ -3738,7 +3739,12 @@ pub async fn create_signature(
     let protocol_id_str = if let serde_json::Value::Array(arr) = &req.protocol_id {
         if arr.len() == 2 {
             if let (Some(level), Some(name)) = (arr[0].as_u64(), arr[1].as_str()) {
-                format!("{}-{}", level, name)
+                // Normalise the name and refuse the AuthBOLT identity protocol for a site, so a
+                // site cannot reach an identity key by a name that collides with its invoice (H1).
+                match crate::permission_service::identity_guard::guarded_protocol_name(&http_req, name) {
+                    Ok(n) => format!("{}-{}", level, n),
+                    Err(resp) => return resp,
+                }
             } else {
                 return HttpResponse::BadRequest().json(serde_json::json!({
                     "error": "Invalid protocolID format"
