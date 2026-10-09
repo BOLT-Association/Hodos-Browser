@@ -472,6 +472,24 @@ mod tests {
     }
 
     #[test]
+    fn a_site_is_not_shown_the_wallets_private_notes() {
+        // attributes.wallet holds the identity's key IDs and every site it is linked to. A site
+        // must not see it (audit H2); the wallet's own UI still does.
+        let mut identity = row();
+        identity.token_type = "AuthBOLT".into();
+        identity.attributes = r#"{"wallet":{"holderKeyId":"authbolt-abc","apps":[{"domain":"peerloop.example","appPubKey":"02aa"}]},"note":"keep"}"#.into();
+
+        let internal = redacted_for_site(identity.clone(), None);
+        assert!(internal.attributes.contains("holderKeyId"), "the wallet's own UI keeps its notes");
+
+        let shown = redacted_for_site(identity.clone(), Some("peerloop.example"));
+        assert!(!shown.attributes.contains("wallet"), "wallet notes stripped: {}", shown.attributes);
+        assert!(!shown.attributes.contains("holderKeyId"));
+        assert!(!shown.attributes.contains("peerloop.example"));
+        assert!(shown.attributes.contains("keep"), "other attributes stay: {}", shown.attributes);
+    }
+
+    #[test]
     fn token_requests_parse_by_op() {
         let put: TokensRequest = serde_json::from_value(serde_json::json!({ "op": "put", "row": serde_json::to_value(row()).unwrap() })).unwrap();
         assert!(matches!(put, TokensRequest::Put { .. }));
