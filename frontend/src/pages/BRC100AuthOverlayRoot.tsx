@@ -3,7 +3,7 @@ import DomainPermissionForm from '../components/DomainPermissionForm';
 import { walletFetch } from '../services/walletApi';
 import type { DomainPermissionSettings } from '../components/DomainPermissionForm';
 import { HodosButton } from '../components/HodosButton';
-import { BoltIdentityPrompt, registerSilentPresenter } from '../components/BoltIdentityPrompt';
+import { BoltIdentityPrompt, BoltSignPrompt, registerSilentPresenter } from '../components/BoltIdentityPrompt';
 import { prompt as promptTheme } from '../styles/hodosTheme';
 // beta.3 Phase 0.8 — the connect modal is a consent surface, so the rule about
 // WHOSE numbers each limit field carries lives in a pure module that is
@@ -2341,6 +2341,26 @@ const BRC100AuthOverlayRoot: React.FC = () => {
   // Fires when an external site calls getPublicKey({ identityKey: true }) and
   // the per-domain "Always allow" cache is empty. Locked copy: minimal +
   // neutral; gold privacy-perimeter framing (NOT red).
+  // ── AuthBOLT holder-key signature the wallet asks about (POST /bolt/sign, not silent) ──
+  if (notificationType === 'bolt_sign') {
+    return (
+      <div style={overlayBackdrop}>
+        <div style={privacyPerimeterCardStyle}>
+          <HodosWalletHeader />
+          <BoltSignPrompt
+            key={requestIdRef.current}
+            requestKey={requestIdRef.current}
+            domain={notificationDomain}
+            onDone={() => {
+              setNotificationType('');
+              window.cefMessage?.send('overlay_close', []);
+            }}
+          />
+        </div>
+      </div>
+    );
+  }
+
   // ── AuthBOLT identity request: the person chooses or creates the identity a site sees ──
   if (notificationType === 'bolt_request') {
     return (

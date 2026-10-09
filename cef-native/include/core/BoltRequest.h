@@ -14,6 +14,8 @@
 
 #include <string>
 
+#include <nlohmann/json.hpp>
+
 namespace hodos {
 
 inline bool IsLowerHex(const std::string& s) {
@@ -66,6 +68,76 @@ inline bool ValidateBoltRequest(const std::string& appPubKey, const std::string&
 inline bool ValidateBoltSilence(const std::string& purpose, bool silent, std::string& why) {
     if (purpose == "write" && !silent) {
         why = "a write is only ever signed silently, under the keep-signed-in grant";
+        return false;
+    }
+    return true;
+}
+
+// ---- POST /bolt/sign: holder-key signatures (ChainBrowsers docs/authbolt-registration.md, "After
+// registration"). An app that registered an identity knows its holder key, and the page then asks
+// the wallet to sign with it: `signin` / `refresh` (the app's challenge, lower-case hex), `write`
+// (the change as a JSON object naming its kind, at most 64 KiB), `rotate` / `confirm` (nothing: the
+// wallet moves the app's signing key itself) and `recover` (the challenge; issuer key; never
+// silent). The wallet builds the digest itself and decides what it signs silently; the shell only
+// checks the shape, so nothing malformed reaches the prompt or the silent signer.
+
+constexpr std::size_t kBoltSignMaxPayload = 64 * 1024;
+
+inline bool IsAppKey(const std::string& k) {
+    return k.size() == 66 && IsLowerHex(k) && (k.compare(0, 2, "02") == 0 || k.compare(0, 2, "03") == 0);
+}
+
+// True when the request may go on; otherwise false with the reason in `why`.
+inline bool ValidateBoltSign(const std::string& kind, const std::string& appPubKey,
+                             const std::string& payload, bool silent, std::string& why) {
+    if (!IsAppKey(appPubKey)) {
+        why = "the app key must be a 33-byte compressed public key (lower-case hex)";
+        return false;
+    }
+    if (kind == "signin" || kind == "refresh" || kind == "recover") {
+        if (payload.size() > 264 || !IsLowerHex(payload)) {
+            why = "a " + kind + " signs the app's challenge: lower-case hex, at most 132 bytes";
+            return false;
+        }
+        if (kind == "recover" && silent) {
+            why = "a recovery is never silent";
+            return false;
+        }
+        return true;
+    }
+    if (kind == "rotate" || kind == "confirm") {
+        if (!payload.empty()) {
+            why = "a " + kind + " carries nothing: the wallet chooses the key";
+            return false;
+        }
+        return true;
+    }
+    if (kind == "write") {
+        if (payload.empty() || payload.size() > kBoltSignMaxPayload) {
+            why = "a write is at most 64 KiB";
+            return false;
+        }
+        const nlohmann::json w = nlohmann::json::parse(payload, nullptr, false);
+        if (w.is_discarded() || !w.is_object() || !w.contains("kind") || !w["kind"].is_string()) {
+            why = "a write is the change as a JSON object naming its kind";
+            return false;
+        }
+        return true;
+    }
+    why = "kind must be signin, refresh, write, rotate, confirm or recover";
+    return false;
+}
+
+// Only an https main frame may ask for an identity or a signature (audit H3): `cefMessage`, the raw
+// IPC under the wallet bridge, reaches every frame, so a subframe or a plain-http page could
+// otherwise send the request itself. `frameUrl` is the asking frame's own URL.
+inline bool BoltFrameAllowed(bool isMainFrame, const std::string& frameUrl, std::string& why) {
+    if (!isMainFrame) {
+        why = "only the page itself may ask, not a frame inside it";
+        return false;
+    }
+    if (frameUrl.compare(0, 8, "https://") != 0) {
+        why = "only an https page may ask";
         return false;
     }
     return true;
