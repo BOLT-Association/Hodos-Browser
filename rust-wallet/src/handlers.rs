@@ -341,7 +341,12 @@ pub async fn get_public_key(
     let protocol_id_str = if let serde_json::Value::Array(arr) = protocol_id {
         if arr.len() == 2 {
             if let (Some(level), Some(name)) = (arr[0].as_u64(), arr[1].as_str()) {
-                format!("{}-{}", level, name)
+                // Normalise the name and refuse the AuthBOLT identity protocol for a site, so the
+                // derived key cannot depend on an un-normalised name (permission_service::identity_guard).
+                match crate::permission_service::identity_guard::guarded_protocol_name(&http_req, name) {
+                    Ok(n) => format!("{}-{}", level, n),
+                    Err(resp) => return resp,
+                }
             } else {
                 return HttpResponse::BadRequest().json(serde_json::json!({
                     "error": "Invalid protocolID format: expected [number, string]"
@@ -3734,7 +3739,12 @@ pub async fn create_signature(
     let protocol_id_str = if let serde_json::Value::Array(arr) = &req.protocol_id {
         if arr.len() == 2 {
             if let (Some(level), Some(name)) = (arr[0].as_u64(), arr[1].as_str()) {
-                format!("{}-{}", level, name)
+                // Normalise the name and refuse the AuthBOLT identity protocol for a site, so a
+                // site cannot reach an identity key by a name that collides with its invoice (H1).
+                match crate::permission_service::identity_guard::guarded_protocol_name(&http_req, name) {
+                    Ok(n) => format!("{}-{}", level, n),
+                    Err(resp) => return resp,
+                }
             } else {
                 return HttpResponse::BadRequest().json(serde_json::json!({
                     "error": "Invalid protocolID format"
@@ -10047,6 +10057,12 @@ pub fn cache_arc_merkle_proof(
         }
     };
 
+    // spv: a proven_txs row means "verified against our own headers"; don't store one that is not.
+    if let Err(e) = crate::cache_helpers::check_proof_before_storing(txid, &tsc) {
+        log::warn!("   ⚠️  Not caching ARC merklePath for {}: {}", txid, e);
+        return;
+    }
+
     let height = tsc["height"].as_u64().unwrap_or(0) as u32;
     let tx_index = tsc["index"].as_u64().unwrap_or(0);
 
@@ -13172,6 +13188,25 @@ pub async fn internalize_action(
     // ******************************************************************************
 
     if let Some(ref beef) = parsed_beef {
+        // WS4: with a verified header chain configured, every BUMP's merkle root must
+        // match the wallet's own chain (and each proven tx must be a leaf of its BUMP).
+        // "Cannot verify" (no header at that height yet) rejects: it is not a pass.
+        if beef.has_proofs() && crate::services::providers::chaintracks::configured_base_url().is_some() {
+            let verdict = crate::beef::verify_beef_bumps(beef, &|height, root| {
+                crate::header_sync::global()
+                    .ok_or_else(|| "header chain configured but not initialised".to_string())?
+                    .check_merkle_root(height, root)
+            });
+            if let Err(e) = verdict {
+                log::error!("   ❌ BEEF proofs failed header-chain verification: {}", e);
+                return HttpResponse::BadRequest().json(serde_json::json!({
+                    "status": "error",
+                    "code": "ERR_PROOF_NOT_VERIFIED",
+                    "description": format!("BEEF merkle proof failed verification against the header chain: {}", e)
+                }));
+            }
+        }
+
         // Validate ancestry
         if !beef.parent_transactions().is_empty() {
             log::info!("   🔍 Validating {} parent transaction(s)...", beef.parent_transactions().len());
@@ -13549,6 +13584,66 @@ pub async fn internalize_action(
         }
     }
 
+    // spv mode: keep every transaction the BEEF carried. There is no public indexer to fetch a
+    // parent from later, and spending an internalized output needs its parent's raw bytes (to
+    // build the Extended Format Arcade validates). This is the SPV model: parents travel in the
+    // BEEF; the wallet stores them. (Same cache the PeerPay path fills.)
+    if crate::chain_mode::is_spv() {
+        if let Some(ref beef) = parsed_beef {
+            let db = state.database.lock().unwrap();
+            let parent_tx_repo = crate::database::ParentTransactionRepository::new(db.connection());
+            for (tx_txid, tx_hex) in beef.txids_and_hex() {
+                if let Err(e) = parent_tx_repo.upsert(None, &tx_txid, &tx_hex) {
+                    log::warn!("   ⚠️  Could not cache BEEF tx {}: {}", tx_txid, e);
+                }
+            }
+        }
+    }
+
+    // spv + push: the subject tx is on the network but unproven, and Arcade only pushes events for
+    // txs submitted under a callback token. Re-submit it (Extended Format, idempotent) to subscribe
+    // this wallet's token. Best-effort and off the request path: the proof task polls regardless.
+    if crate::chain_mode::push_enabled() {
+        if let Some(ref beef) = parsed_beef {
+            if !beef.tx_has_proof(&txid) {
+                if let (Ok(ef), Some(provider)) = (
+                    beef.to_ef_hex(),
+                    crate::services::providers::ArcadeProvider::from_env(state.services.client.clone()),
+                ) {
+                    let short = txid[..txid.len().min(16)].to_string();
+                    tokio::spawn(async move {
+                        match provider.register_for_push(&ef).await {
+                            Ok(code) => log::info!("📡 Arcade push: subscribed token for {} ({})", short, code),
+                            Err(e) => log::warn!("📡 Arcade push: could not subscribe {}: {} (polling covers it)", short, e),
+                        }
+                    });
+                }
+            }
+        }
+    }
+
+    // spv mode: a BRC-42 output whose own transaction came with a BUMP has just been
+    // verified against the wallet's header chain (`verify_beef_bumps`, above), so that
+    // proof IS the confirmation. Mark it confirmed now. `store_derived_utxo` inserts
+    // `confirmed = 0` and leaves promotion to `TaskSyncPending`, which asks WhatsOnChain
+    // and is blocked in spv mode; without this the output could never be selected.
+    // A BEEF whose subject has no BUMP stays unconfirmed (nothing has proved it yet).
+    if crate::chain_mode::is_spv() && !derived_utxos.is_empty() {
+        if let Some(ref beef) = parsed_beef {
+            if beef.tx_has_proof(&txid) {
+                let db = state.database.lock().unwrap();
+                let output_repo = crate::database::OutputRepository::new(db.connection());
+                for (vout, _, _, _, _) in &derived_utxos {
+                    if let Err(e) = output_repo.mark_output_confirmed(&txid, *vout as i32) {
+                        log::warn!("   ⚠️  Could not mark {}:{} confirmed: {}", txid, vout, e);
+                    }
+                }
+                drop(db);
+                state.balance_cache.invalidate();
+            }
+        }
+    }
+
     // ============================================================
     // BRC-100 Basket Insertion: Store outputs with basket/tag assignments
     // ============================================================
@@ -13761,6 +13856,41 @@ pub async fn internalize_action(
                     "code": "ERR_STORAGE",
                     "description": format!("Database error: {}", e)
                 }));
+            }
+        }
+    }
+
+    // spv mode: the subject came with a BUMP that `verify_beef_bumps` already checked against the
+    // header chain. Keep it as the tx's proof now (re-checked by the same gate), so the wallet
+    // does not depend on Arcade still knowing a tx it did not process to keep it confirmed.
+    if crate::chain_mode::is_spv() {
+        if let Some(ref beef) = parsed_beef {
+            if let Some(bump_hex) = beef.bump_hex_for(&txid) {
+                cache_arc_merkle_proof(&state.database, &txid, &bump_hex);
+            }
+        }
+    }
+
+    // spv mode, zero-conf (default on; HODOS_ZERO_CONF=off disables): a received output whose tx is
+    // not mined is spendable once the network has seen it. The BEEF's ancestry was validated and its
+    // BUMPs verified above; here every tx in it without a BUMP must also be seen on Arcade with no
+    // conflict. Spendable == linked to its (incoming, unproven) transaction row, exactly how the
+    // wallet's own unproven change is spendable. See `zero_conf.rs`.
+    if crate::chain_mode::zero_conf_enabled() && !derived_utxos.is_empty() {
+        if let Some(ref beef) = parsed_beef {
+            if !beef.tx_has_proof(&txid)
+                && crate::zero_conf::beef_zero_conf_ok(&state.services, beef, std::time::Duration::from_secs(4)).await
+            {
+                let db = state.database.lock().unwrap();
+                let output_repo = crate::database::OutputRepository::new(db.connection());
+                match output_repo.link_received_outputs_for_zero_conf(&txid) {
+                    Ok(n) if n > 0 => {
+                        drop(db);
+                        state.balance_cache.invalidate();
+                    }
+                    Ok(_) => {}
+                    Err(e) => log::warn!("   ⚠️  zero-conf link failed for {}: {}", txid, e),
+                }
             }
         }
     }
@@ -14586,7 +14716,7 @@ async fn adopt_onchain_backup(
         "https://api.whatsonchain.com/v1/bsv/main/tx/{}/hex",
         chain_txid
     );
-    let raw_hex = match client.get(&tx_url).send().await {
+    let raw_hex = match crate::chain_mode::get(&client, &tx_url).send().await {
         Ok(resp) => {
             if !resp.status().is_success() {
                 log::warn!("   ⚠️  WoC returned status {} for tx {}", resp.status(), &chain_txid[..16.min(chain_txid.len())]);
@@ -14851,7 +14981,7 @@ pub async fn do_onchain_backup(
         );
 
         // Fetch all unspent marker UTXOs at the backup address
-        let onchain_markers: Vec<(String, i64)> = match client.get(&utxo_url).send().await {
+        let onchain_markers: Vec<(String, i64)> = match crate::chain_mode::get(&client, &utxo_url).send().await {
             Ok(resp) => {
                 let body: serde_json::Value = resp.json().await.unwrap_or_default();
                 let utxos = body.get("result").and_then(|r| r.as_array())
@@ -14961,7 +15091,7 @@ pub async fn do_onchain_backup(
             for (orphan_txid, _height) in &orphaned {
                 // Fetch the tx to get the marker output script (vout 1 = marker)
                 let tx_url = format!("https://api.whatsonchain.com/v1/bsv/main/tx/hash/{}", orphan_txid);
-                match client.get(&tx_url).send().await {
+                match crate::chain_mode::get(&client, &tx_url).send().await {
                     Ok(resp) if resp.status().is_success() => {
                         if let Ok(tx_data) = resp.json::<serde_json::Value>().await {
                             if let Some(vouts) = tx_data["vout"].as_array() {
@@ -16194,7 +16324,7 @@ async fn fetch_onchain_backup(
     );
     log::info!("   🔍 Querying marker UTXOs at backup address {}...", backup_address);
 
-    let resp = client.get(&utxo_url).send().await
+    let resp = crate::chain_mode::get(&client, &utxo_url).send().await
         .map_err(|e| format!("WhatsOnChain UTXO fetch failed: {}", e))?;
 
     if !resp.status().is_success() {
@@ -16237,7 +16367,7 @@ async fn fetch_onchain_backup(
         "https://api.whatsonchain.com/v1/bsv/main/tx/{}/hex",
         txid
     );
-    let tx_resp = client.get(&tx_url).send().await
+    let tx_resp = crate::chain_mode::get(&client, &tx_url).send().await
         .map_err(|e| format!("WhatsOnChain tx fetch failed: {}", e))?;
 
     if !tx_resp.status().is_success() {
@@ -18296,6 +18426,16 @@ pub struct GetHeaderForHeightRequest {
 pub async fn get_height(_body: web::Bytes) -> HttpResponse {
     log::info!("📋 /getHeight called");
 
+    // spv mode: the wallet's own verified header chain is the only source.
+    if crate::chain_mode::is_spv() {
+        return match crate::header_sync::global().and_then(|s| s.tip_height()) {
+            Some(height) => HttpResponse::Ok().json(serde_json::json!({ "height": height })),
+            None => HttpResponse::ServiceUnavailable().json(serde_json::json!({
+                "error": "header chain not synced yet"
+            })),
+        };
+    }
+
     // Fetch current blockchain height from WhatsOnChain API
     let url = "https://api.whatsonchain.com/v1/bsv/main/chain/info";
     let client = reqwest::Client::builder()
@@ -18303,7 +18443,7 @@ pub async fn get_height(_body: web::Bytes) -> HttpResponse {
         .build()
         .unwrap_or_else(|_| reqwest::Client::new());
 
-    match client.get(url).send().await {
+    match crate::chain_mode::get(&client, url).send().await {
         Ok(response) => {
             if !response.status().is_success() {
                 log::error!("   WhatsOnChain API returned status: {}", response.status());
@@ -18351,6 +18491,17 @@ pub async fn get_header_for_height(
     log::info!("📋 /getHeaderForHeight called");
     log::info!("   Height: {}", req.height);
 
+    // spv mode: answer only from the verified header chain. The block_headers cache
+    // below holds unverified third-party answers and is deliberately not consulted.
+    if crate::chain_mode::is_spv() {
+        return match crate::header_sync::global().and_then(|s| s.header_hex_at_height(req.height)) {
+            Some(header) => HttpResponse::Ok().json(serde_json::json!({ "header": header })),
+            None => HttpResponse::NotFound().json(serde_json::json!({
+                "error": format!("no verified header at height {}", req.height)
+            })),
+        };
+    }
+
     // Check database cache first
     let db = state.database.lock().unwrap();
     let block_header_repo = crate::database::BlockHeaderRepository::new(db.connection());
@@ -18381,7 +18532,7 @@ pub async fn get_header_for_height(
         .unwrap_or_else(|_| reqwest::Client::new());
 
     // Step 1: Get block hash from height
-    let block_hash = match client.get(&block_info_url).send().await {
+    let block_hash = match crate::chain_mode::get(&client, &block_info_url).send().await {
         Ok(response) => {
             if !response.status().is_success() {
                 log::error!("   WhatsOnChain API returned status: {}", response.status());
@@ -18422,7 +18573,7 @@ pub async fn get_header_for_height(
     // Step 2: Get block header by hash using /block/{hash}/header endpoint (as per ts-brc100)
     let block_header_url = format!("https://api.whatsonchain.com/v1/bsv/main/block/{}/header", block_hash);
 
-    match client.get(&block_header_url).send().await {
+    match crate::chain_mode::get(&client, &block_header_url).send().await {
         Ok(response) => {
             if !response.status().is_success() {
                 log::error!("   WhatsOnChain API returned status: {}", response.status());
@@ -19116,6 +19267,13 @@ pub async fn peerpay_send(
     body: web::Bytes,
 ) -> HttpResponse {
     log::info!("💸 /wallet/peerpay/send called");
+
+    if let Err(e) = crate::chain_mode::require_messagebox("PeerPay send (MessageBox)") {
+        return HttpResponse::ServiceUnavailable().json(serde_json::json!({
+            "success": false,
+            "error": e
+        }));
+    }
 
     let req: PeerpaySendRequest = match serde_json::from_slice(&body) {
         Ok(r) => r,

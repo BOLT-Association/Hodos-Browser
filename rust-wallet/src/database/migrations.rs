@@ -1386,3 +1386,86 @@ pub fn migrate_v24_to_v25(conn: &Connection) -> Result<()> {
     info!("   ✅ V25 migration applied (default_bundled_scope_grant)");
     Ok(())
 }
+
+/// V25 → V26 — WS4 verified header chain. Owner-approved 2026-10-03.
+///
+/// One additive table; nothing existing is altered. Holds raw 80-byte headers per
+/// network. Height, chainwork and the active chain are NOT stored: they are
+/// recomputed and every header re-validated on load (`HeaderChain::from_stored`),
+/// so this table is a cache of candidate headers, never an authority.
+///
+/// Idempotent: `CREATE TABLE IF NOT EXISTS`.
+pub fn migrate_v25_to_v26(conn: &Connection) -> Result<()> {
+    info!("   Creating header_chain table (V26)...");
+    conn.execute_batch(
+        "CREATE TABLE IF NOT EXISTS header_chain (
+            network TEXT NOT NULL,
+            block_hash TEXT NOT NULL,
+            height INTEGER NOT NULL,
+            header_hex TEXT NOT NULL,
+            created_at INTEGER NOT NULL,
+            PRIMARY KEY (network, block_hash)
+        );
+        CREATE INDEX IF NOT EXISTS idx_header_chain_height ON header_chain(network, height);",
+    )?;
+    info!("   ✅ V26 migration applied (header_chain)");
+    Ok(())
+}
+
+/// V26 → V27 — held (not yet verifiable) merkle proofs. Owner-approved 2026-10-04.
+///
+/// One additive table; nothing existing is altered. A proof Arcade supplies can arrive before the
+/// wallet's own header chain has its block. It is held here, **not** in `proven_txs` (every reader
+/// of `proven_txs` treats a row as a verified proof), until `pending_proofs::resolve_pending` has
+/// verified it, at which point it is stored through the normal path and the held row is deleted.
+/// Nothing but that resolver reads this table.
+///
+/// Idempotent: `CREATE TABLE IF NOT EXISTS`.
+pub fn migrate_v26_to_v27(conn: &Connection) -> Result<()> {
+    info!("   Creating pending_proofs table (V27)...");
+    conn.execute_batch(
+        "CREATE TABLE IF NOT EXISTS pending_proofs (
+            txid TEXT PRIMARY KEY,
+            height INTEGER NOT NULL,
+            bump_hex TEXT NOT NULL,
+            block_hash TEXT NOT NULL DEFAULT '',
+            source TEXT NOT NULL,
+            received_at INTEGER NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS idx_pending_proofs_received ON pending_proofs(received_at);",
+    )?;
+    info!("   ✅ V27 migration applied (pending_proofs)");
+    Ok(())
+}
+
+/// V28 (owner-requested 2026-10-06): BOLT tokens held by this wallet. One row per held token output;
+/// the Atomic BEEF is the source of truth and the other columns are generic indexes, so a new token
+/// type adds no column. Same columns as `TOKENS_SCHEMA` in ChainBrowsers `packages/bolt/src/store.js`.
+/// Additive: no existing table is touched.
+pub fn migrate_v27_to_v28(conn: &Connection) -> Result<()> {
+    conn.execute_batch(
+        "CREATE TABLE IF NOT EXISTS bolt_tokens (
+            outpoint           TEXT PRIMARY KEY,
+            type               TEXT NOT NULL,
+            issuer             TEXT NOT NULL,
+            owner_pkh          TEXT,
+            status             TEXT NOT NULL DEFAULT 'held',
+            amount             TEXT,
+            attributes         TEXT NOT NULL DEFAULT '{}',
+            beef               TEXT NOT NULL,
+            anchor_txid        TEXT,
+            anchor_kind        TEXT,
+            anchor_network     TEXT,
+            anchor_proven      INTEGER NOT NULL DEFAULT 0,
+            anchor_height      INTEGER,
+            anchor_merkle_root TEXT,
+            provenance         TEXT,
+            created_at         INTEGER NOT NULL,
+            updated_at         INTEGER NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS idx_bolt_tokens_issuer_type ON bolt_tokens(issuer, type, status);
+        CREATE INDEX IF NOT EXISTS idx_bolt_tokens_unproven ON bolt_tokens(anchor_proven);",
+    )?;
+    info!("   ✅ V28 migration applied (bolt_tokens)");
+    Ok(())
+}

@@ -127,6 +127,7 @@ const BULK_BATCH_SIZE: usize = 20;
 /// Returns Ok(vec) on success (empty vec = genuinely no UTXOs).
 /// Returns Err only if ALL providers failed (API down).
 pub async fn fetch_utxos_for_address(address: &str, address_index: i32) -> Result<Vec<UTXO>, String> {
+    crate::chain_mode::ensure_public("address UTXO lookup")?;
     log::info!("   Fetching UTXOs for address: {}", address);
 
     let client = reqwest::Client::builder()
@@ -159,6 +160,7 @@ pub async fn fetch_utxos_for_address(address: &str, address_index: i32) -> Resul
 /// unconfirmed UTXOs (unconfirmed have height=0). No GorillaPool fallback
 /// since GorillaPool doesn't expose unconfirmed.
 pub async fn fetch_utxos_single_address_with_unconfirmed(address: &str, address_index: i32) -> Result<Vec<UTXO>, String> {
+    crate::chain_mode::ensure_public("address UTXO lookup")?;
     let client = reqwest::Client::builder()
         .timeout(crate::services::CallClass::IndexerSync.timeout())
         .build()
@@ -170,7 +172,7 @@ pub async fn fetch_utxos_single_address_with_unconfirmed(address: &str, address_
 async fn fetch_utxos_woc(client: &reqwest::Client, address: &str, address_index: i32) -> Result<Vec<UTXO>, String> {
     let url = format!("https://api.whatsonchain.com/v1/bsv/main/address/{}/unspent/all", address);
 
-    let response = client.get(&url).send().await
+    let response = crate::chain_mode::get(&client, &url).send().await
         .map_err(|e| format!("WoC request failed: {}", e))?;
 
     let status = response.status();
@@ -228,7 +230,7 @@ async fn fetch_utxos_woc(client: &reqwest::Client, address: &str, address_index:
 async fn fetch_utxos_gorillapool(client: &reqwest::Client, address: &str, address_index: i32) -> Result<Vec<UTXO>, String> {
     let url = format!("https://ordinals.gorillapool.io/api/txos/address/{}/unspent", address);
 
-    let response = client.get(&url).send().await
+    let response = crate::chain_mode::get(&client, &url).send().await
         .map_err(|e| format!("GorillaPool request failed: {}", e))?;
 
     let status = response.status();
@@ -263,6 +265,7 @@ async fn fetch_utxos_gorillapool(client: &reqwest::Client, address: &str, addres
 /// API (new): https://api.whatsonchain.com/v1/bsv/main/address/{address}/confirmed/history
 /// API (old, deprecated): https://api.whatsonchain.com/v1/bsv/main/address/{address}/history
 pub async fn address_has_history(address: &str) -> Result<bool, String> {
+    crate::chain_mode::ensure_public("address UTXO lookup")?;
     let client = reqwest::Client::builder()
         .timeout(crate::services::CallClass::IndexerAsync.timeout())
         .build()
@@ -271,7 +274,7 @@ pub async fn address_has_history(address: &str) -> Result<bool, String> {
     // Try new WoC endpoint first: /address/{addr}/confirmed/history
     // Returns: {"address":"...","result":[{"tx_hash":"...","height":...}, ...],"error":""}
     let new_url = format!("https://api.whatsonchain.com/v1/bsv/main/address/{}/confirmed/history", address);
-    match client.get(&new_url).send().await {
+    match crate::chain_mode::get(&client, &new_url).send().await {
         Ok(resp) if resp.status().is_success() => {
             let body = resp.text().await.unwrap_or_default();
             // Parse the wrapped response — history is in the "result" array
@@ -296,7 +299,7 @@ pub async fn address_has_history(address: &str) -> Result<bool, String> {
 
     // Fallback: try legacy endpoint /address/{addr}/history
     let legacy_url = format!("https://api.whatsonchain.com/v1/bsv/main/address/{}/history", address);
-    match client.get(&legacy_url).send().await {
+    match crate::chain_mode::get(&client, &legacy_url).send().await {
         Ok(resp) if resp.status().is_success() => {
             let body = resp.text().await.unwrap_or_default();
             let has_history = body.trim() != "[]" && !body.trim().is_empty();
@@ -379,7 +382,7 @@ async fn fetch_bulk_chunk(
     initial_delay_ms: u64,
 ) -> Option<Vec<WhatsOnChainBulkItem>> {
     for attempt in 0..=max_retries {
-        let response = match client.post(url).json(body).send().await {
+        let response = match crate::chain_mode::post(&client, url).json(body).send().await {
             Ok(resp) => resp,
             Err(e) => {
                 if attempt < max_retries {
@@ -567,6 +570,7 @@ async fn fetch_utxos_bulk(addresses: &[crate::json_storage::AddressInfo]) -> Res
 /// Returns Err if NO addresses could be successfully checked (API is down).
 /// Returns Ok with empty vec only if addresses were checked and genuinely have no UTXOs.
 pub async fn fetch_all_utxos(addresses: &[crate::json_storage::AddressInfo]) -> Result<Vec<UTXO>, String> {
+    crate::chain_mode::ensure_public("address UTXO lookup")?;
     let (all_utxos, success_count) = fetch_utxos_bulk(addresses).await?;
 
     log::info!("📊 Total UTXOs across all addresses: {} ({} satoshis), {}/{} addresses checked successfully",

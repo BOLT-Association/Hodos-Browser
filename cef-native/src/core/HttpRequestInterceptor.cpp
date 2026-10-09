@@ -5,6 +5,7 @@
 #include "../../include/core/SyncHttpClient.h"
 #include "../../include/core/PortConfig.h"
 #include "../../include/core/JsStringEscape.h"  // escapeJsonForJs (D-h3 expirePrompt)
+#include "../../include/core/BoltRequest.h"     // AuthBOLT /bolt/request and /bolt/sign checks
 #include "include/wrapper/cef_helpers.h"
 #include "include/cef_urlrequest.h"
 #include "include/cef_request.h"
@@ -2594,6 +2595,192 @@ void postIpcAuthTimeout(const std::string& requestId,
     }, requestId, frame, errorJson), delayMs);
 }
 
+// ============================================================================
+// AuthBOLT identity requests (POST /bolt/request) — ChainBrowsers
+// docs/authbolt-registration.md
+// ============================================================================
+//
+// A page never presents an AuthBOLT identity itself. It asks; Hodos shows its own prompt (the
+// "bolt_request" type of BRC100AuthOverlayRoot), where the person chooses or creates the identity,
+// and the prompt answers with `bolt_result` (an approval-overlay-only message, IpcAuth.h). The
+// page's wallet_call is held here meanwhile and answered with the presentation, or a refusal.
+//
+// A keep-alive or a write (`silent`) is not shown: it goes to the preloaded notification browser's
+// `window.boltSilent`, which presents only for an app the person chose to stay signed in to and
+// otherwise answers NEEDS_PROMPT. The overlay is never made visible for it, and a write is never
+// anything but silent (BoltRequest.h ValidateBoltSilence).
+//
+// ⛔ Every value that reaches the overlay is checked first (BoltRequest.h): lower-case hex and
+// the four purpose words only, so nothing a page sends can add a query parameter or reach script.
+namespace {
+
+struct BoltPending {
+    CefRefPtr<CefFrame> frame;
+    std::string pageRequestId;
+};
+
+std::mutex g_boltMutex;
+std::map<std::string, BoltPending> g_boltPending;  // by the key the prompt answers with
+int g_boltNext = 0;
+
+constexpr int kBoltPromptTimeoutMs = 5 * 60 * 1000;   // a person choosing an identity
+constexpr int kBoltSilentTimeoutMs = 20 * 1000;       // a keep-alive, no person involved
+
+std::string BoltErrorJson(const std::string& message, const std::string& code) {
+    nlohmann::json j = {{"error", message}, {"status", "error"}};
+    if (!code.empty()) j["code"] = code;
+    return j.dump();
+}
+
+class BoltTimeoutTask : public CefTask {
+public:
+    BoltTimeoutTask(std::string key, std::string message, std::string code)
+        : key_(std::move(key)), message_(std::move(message)), code_(std::move(code)) {}
+    void Execute() override {
+        // A request already answered is no longer pending: this is then a no-op.
+        if (AnswerBoltRequest(key_, false, BoltErrorJson(message_, code_))) {
+            LOG_WARNING_HTTP("🪪 BOLT request " + key_ + " timed out: " + message_);
+        }
+    }
+private:
+    std::string key_, message_, code_;
+    IMPLEMENT_REFCOUNTING(BoltTimeoutTask);
+    DISALLOW_COPY_AND_ASSIGN(BoltTimeoutTask);
+};
+
+}  // namespace
+
+bool AnswerBoltRequest(const std::string& key, bool ok, const std::string& payloadJson) {
+    BoltPending p;
+    {
+        std::lock_guard<std::mutex> lock(g_boltMutex);
+        auto it = g_boltPending.find(key);
+        if (it == g_boltPending.end()) return false;
+        p = it->second;
+        g_boltPending.erase(it);
+    }
+    sendWalletResponseIpc(p.frame, p.pageRequestId, ok, payloadJson);
+    return true;
+}
+
+static void HandleBoltRequest(const std::string& requestId,
+                              const std::string& bodyJson,
+                              const std::string& origin,
+                              CefRefPtr<CefFrame> frame) {
+    std::string appPubKey, data, purpose, why;
+    bool silent = false;
+    try {
+        const nlohmann::json body = nlohmann::json::parse(bodyJson);
+        appPubKey = body.value("appPubKey", std::string());
+        data = body.value("data", std::string());
+        purpose = body.value("purpose", std::string());
+        silent = body.value("silent", false);
+    } catch (...) {
+        sendWalletResponseIpc(frame, requestId, false, BoltErrorJson("BOLT: the request is not JSON", ""));
+        return;
+    }
+    if (!hodos::ValidateBoltRequest(appPubKey, data, purpose, why) || !hodos::ValidateBoltSilence(purpose, silent, why)) {
+        sendWalletResponseIpc(frame, requestId, false, BoltErrorJson("BOLT: " + why, ""));
+        return;
+    }
+
+    std::string key;
+    {
+        std::lock_guard<std::mutex> lock(g_boltMutex);
+        key = "bolt-" + std::to_string(++g_boltNext);
+        g_boltPending[key] = BoltPending{frame, requestId};
+    }
+    LOG_INFO_HTTP("🪪 BOLT " + purpose + " request from " + origin + (silent ? " (keep-alive)" : "") + " as " + key);
+
+    if (silent) {
+        CefRefPtr<CefBrowser> overlay = SimpleHandler::GetNotificationBrowser();
+        if (!overlay || !overlay->GetMainFrame()) {
+            AnswerBoltRequest(key, false, BoltErrorJson("BOLT: NEEDS_PROMPT the wallet's prompt is not ready", "NEEDS_PROMPT"));
+            return;
+        }
+        nlohmann::json args = {{"key", key}, {"domain", origin}, {"appPubKey", appPubKey},
+                               {"data", data}, {"purpose", purpose}};
+        const std::string js = "if(window.boltSilent){window.boltSilent('" + escapeJsonForJs(args.dump()) +
+                               "')}else{window.cefMessage&&window.cefMessage.send('bolt_result',['" +
+                               escapeJsonForJs(key) + "',false,'" +
+                               escapeJsonForJs(BoltErrorJson("BOLT: NEEDS_PROMPT the wallet's prompt is not loaded", "NEEDS_PROMPT")) +
+                               "'])}";
+        overlay->GetMainFrame()->ExecuteJavaScript(js, "", 0);
+        CefPostDelayedTask(TID_UI, new BoltTimeoutTask(key, "BOLT: NEEDS_PROMPT the keep-alive got no answer", "NEEDS_PROMPT"),
+                           kBoltSilentTimeoutMs);
+        return;
+    }
+
+    const std::string extra = "&appPubKey=" + appPubKey + "&data=" + data + "&purpose=" + purpose;
+    CefPostTask(TID_UI, new CreateNotificationOverlayTask("bolt_request", origin, extra, key));
+    CefPostDelayedTask(TID_UI, new BoltTimeoutTask(key, "BOLT: the user declined (no answer in 5 minutes)", "DECLINED"),
+                       kBoltPromptTimeoutMs);
+}
+
+// Holder-key signatures (POST /bolt/sign) — ChainBrowsers docs/authbolt-registration.md, "After
+// registration". The page names a kind and a payload; the wallet builds the digest itself.
+//
+// Silent requests go to the preloaded notification browser's `window.boltSign`, which signs only
+// for an app the person chose to stay signed in to, and only what the app's published tiers call
+// silent; otherwise it answers NEEDS_PROMPT and the page asks again, not silent. A prompted request
+// hands its arguments to the same browser (`window.boltSignPrompt`) and then shows the prompt
+// ("bolt_sign"), which reads them by key: a write can be 64 KiB, so only the kind and the app key
+// travel in the overlay's URL. Nothing reaches either unless BoltRequest.h passed it.
+static void HandleBoltSign(const std::string& requestId,
+                           const std::string& bodyJson,
+                           const std::string& origin,
+                           CefRefPtr<CefFrame> frame) {
+    std::string kind, appPubKey, payload, why;
+    bool silent = false;
+    try {
+        const nlohmann::json body = nlohmann::json::parse(bodyJson);
+        kind = body.value("kind", std::string());
+        appPubKey = body.value("appPubKey", std::string());
+        payload = body.value("payload", std::string());
+        silent = body.value("silent", false);
+    } catch (...) {
+        sendWalletResponseIpc(frame, requestId, false, BoltErrorJson("BOLT: the request is not JSON", ""));
+        return;
+    }
+    if (!hodos::ValidateBoltSign(kind, appPubKey, payload, silent, why)) {
+        sendWalletResponseIpc(frame, requestId, false, BoltErrorJson("BOLT: " + why, ""));
+        return;
+    }
+    CefRefPtr<CefBrowser> overlay = SimpleHandler::GetNotificationBrowser();
+    if (!overlay || !overlay->GetMainFrame()) {
+        sendWalletResponseIpc(frame, requestId, false,
+                              BoltErrorJson("BOLT: NEEDS_PROMPT the wallet's prompt is not ready", "NEEDS_PROMPT"));
+        return;
+    }
+
+    std::string key;
+    {
+        std::lock_guard<std::mutex> lock(g_boltMutex);
+        key = "bolt-" + std::to_string(++g_boltNext);
+        g_boltPending[key] = BoltPending{frame, requestId};
+    }
+    LOG_INFO_HTTP("🪪 BOLT sign " + kind + " from " + origin + (silent ? " (silent)" : "") + " as " + key);
+
+    nlohmann::json args = {{"key", key}, {"domain", origin}, {"appPubKey", appPubKey},
+                           {"kind", kind}, {"payload", payload}, {"silent", silent}};
+    const std::string fn = silent ? "boltSign" : "boltSignPrompt";
+    const std::string js = "if(window." + fn + "){window." + fn + "('" + escapeJsonForJs(args.dump()) +
+                           "')}else{window.cefMessage&&window.cefMessage.send('bolt_result',['" +
+                           escapeJsonForJs(key) + "',false,'" +
+                           escapeJsonForJs(BoltErrorJson("BOLT: NEEDS_PROMPT the wallet's prompt is not loaded", "NEEDS_PROMPT")) +
+                           "'])}";
+    overlay->GetMainFrame()->ExecuteJavaScript(js, "", 0);
+    if (silent) {
+        CefPostDelayedTask(TID_UI, new BoltTimeoutTask(key, "BOLT: NEEDS_PROMPT the wallet got no answer", "NEEDS_PROMPT"),
+                           kBoltSilentTimeoutMs);
+        return;
+    }
+    const std::string extra = "&kind=" + kind + "&appPubKey=" + appPubKey;
+    CefPostTask(TID_UI, new CreateNotificationOverlayTask("bolt_sign", origin, extra, key));
+    CefPostDelayedTask(TID_UI, new BoltTimeoutTask(key, "BOLT: the user declined (no answer in 5 minutes)", "DECLINED"),
+                       kBoltPromptTimeoutMs);
+}
+
 // Phase 2.5 Commit 6 sub-step 6.d.A — top-level wallet_call IPC dispatch.
 // See header for design intent. Called from simple_handler.cpp's wallet_call
 // IPC handler in sub-step 6.d.B (which is when external dApp traffic first
@@ -2638,6 +2825,24 @@ void HandleIpcWalletCall(
                 "\"code\":\"NO_WALLET\",\"status\":\"error\"}");
             return;
         }
+    }
+
+    // AuthBOLT: answered by Hodos's own prompt (or, under the person's grant, its silent signer),
+    // never forwarded to the wallet by the page. The prompt is the consent, so it needs no domain
+    // trust first; only an https main frame may ask (BoltRequest.h, audit H3).
+    if (endpoint == "/bolt/request" || endpoint == "/bolt/sign") {
+        std::string why;
+        if (!capturedFrame) return;  // nobody to answer
+        if (!hodos::BoltFrameAllowed(capturedFrame->IsMain(), capturedFrame->GetURL().ToString(), why)) {
+            sendWalletResponseIpc(capturedFrame, requestId, false, BoltErrorJson("BOLT: " + why, ""));
+            return;
+        }
+        if (endpoint == "/bolt/request") {
+            HandleBoltRequest(requestId, bodyJson, origin, capturedFrame);
+        } else {
+            HandleBoltSign(requestId, bodyJson, origin, capturedFrame);
+        }
+        return;
     }
 
     // 3. Domain trust lookup.

@@ -53,7 +53,12 @@ struct PendingTxInfo {
 }
 
 /// Run the TaskCheckForProofs task
+/// One proof check at a time: the monitor's tick and the push driver (`task_push`) both call `run`.
+static RUN_LOCK: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
+
 pub async fn run(state: &web::Data<AppState>, client: &reqwest::Client) -> Result<(), String> {
+    let _one_at_a_time = RUN_LOCK.lock().await;
+    crate::arcade_push::set_proof_waiting(false);
     // Step 1: Get transactions needing proof
     let pending_txs: Vec<PendingTxInfo> = {
         let db = state.database.lock().map_err(|e| format!("DB lock: {}", e))?;
@@ -188,6 +193,7 @@ pub async fn run(state: &web::Data<AppState>, client: &reqwest::Client) -> Resul
                         let block_height = tx_status.block_height.unwrap_or(0) as u64;
                         info!("   ⛏️ {} MINED (block {})", txid, block_height);
 
+                        let mut proof_stored = false;
                         if let Some(ref merkle_path_hex) = tx_status.merkle_path_bump {
                             match create_proven_tx_from_arc(
                                 state, client, txid, merkle_path_hex, block_height,
@@ -195,11 +201,21 @@ pub async fn run(state: &web::Data<AppState>, client: &reqwest::Client) -> Resul
                             ).await {
                                 Ok(proven_tx_id) => {
                                     info!("   ✅ Created proven_txs {} for {}", proven_tx_id, txid);
+                                    proof_stored = true;
                                 }
                                 Err(e) => {
                                     warn!("   ⚠️ Failed to create proven_txs for {}: {}", txid, e);
                                 }
                             }
+                        }
+
+                        // spv mode: "confirmed" means a verified proof is stored. If it could not be
+                        // (header not synced yet, no BUMP from Arcade), stay pending and retry next
+                        // tick; marking it confirmed here would drop the tx from this task for good.
+                        if !should_mark_confirmed(crate::chain_mode::is_spv(), proof_stored) {
+                            info!("   ⏳ {} mined but no verified proof stored yet — will retry", txid);
+                            crate::arcade_push::set_proof_waiting(true);
+                            continue;
                         }
 
                         // Update transaction status
@@ -322,6 +338,12 @@ pub async fn run(state: &web::Data<AppState>, client: &reqwest::Client) -> Resul
                         // mempool), don't fail — it may still get mined. Only fail if
                         // WoC returns 404 (tx genuinely not found).
                         warn!("   ⚠️ {} DOUBLE_SPEND_ATTEMPTED — cross-verifying with WoC", &txid[..txid.len().min(16)]);
+                        // A received tx that Arcade now says conflicts is no longer safe to spend at
+                        // zero-conf: withdraw it (no-op for our own sends and for proven outputs).
+                        if let Ok(db) = state.database.lock() {
+                            let _ = crate::database::OutputRepository::new(db.connection()).unlink_received_outputs(txid);
+                        }
+                        state.balance_cache.invalidate();
                         match check_whatsonchain_confirmation(client, txid).await {
                             Ok(Some((confirmations, block_height))) => {
                                 if confirmations > 0 {
@@ -455,6 +477,13 @@ async fn try_whatsonchain_confirmation(
 }
 
 /// Mark a transaction as confirmed (completed)
+/// Whether a MINED transaction may be marked confirmed this tick. Outside spv mode the
+/// historical behaviour stands (confirmed even if the proof could not be stored); in spv mode
+/// a verified, stored proof is required.
+fn should_mark_confirmed(spv: bool, proof_stored: bool) -> bool {
+    !spv || proof_stored
+}
+
 fn mark_confirmed(state: &web::Data<AppState>, txid: &str, block_height: u32) {
     if let Ok(db) = state.database.lock() {
         let conn = db.connection();
@@ -575,21 +604,69 @@ async fn create_proven_tx_from_arc(
     let height = tsc_json["height"].as_u64().unwrap_or(block_height) as u32;
     let tx_index = tsc_json["index"].as_u64().unwrap_or(0);
 
-    // Verify merkle root against actual block header before storing
-    match crate::verify_tsc_proof_against_block(client, txid, &tsc_json).await {
-        Ok(true) => {
-            // Proof verified — safe to store
+    // Verify merkle root against actual block header before storing.
+    let check = crate::verify_tsc_proof_against_block(client, txid, &tsc_json)
+        .await
+        .map_err(|e| e.to_string());
+    let configured = crate::services::providers::chaintracks::configured_base_url().is_some();
+    let mut proof_verified = false;
+    match crate::pending_proofs::classify_proof(&check, configured) {
+        crate::pending_proofs::ProofDecision::StoreVerified => {
+            // Proof verified: safe to store.
+            proof_verified = true;
         }
-        Ok(false) => {
+        crate::pending_proofs::ProofDecision::RejectBad => {
             return Err(format!("ARC BUMP has wrong merkle root for {} at height {} — proof rejected", txid, height));
         }
-        Err(e) => {
-            // Can't verify — log warning but still store (better than no proof)
-            warn!("   ⚠️ Could not verify ARC proof against block header: {} — storing anyway", e);
+        crate::pending_proofs::ProofDecision::HoldPending => {
+            // The wallet's header chain cannot judge it yet (it has not reached that block). Keep the
+            // proof in `pending_proofs` (never in `proven_txs`): the next header sync verifies it
+            // locally and stores it through `store_proof`, with no re-fetch.
+            hold_proof(state, txid, height, merkle_path_hex, block_hash, "poll");
+            return Err(format!(
+                "proof for {} held pending, cannot verify yet: {}",
+                txid,
+                check.err().unwrap_or_default()
+            ));
+        }
+        crate::pending_proofs::ProofDecision::StoreUnverifiedLegacy => {
+            // No header chain configured (public mode): the historical behaviour.
+            warn!("   ⚠️ Could not verify ARC proof against block header: {} — storing anyway", check.err().unwrap_or_default());
         }
     }
 
-    let merkle_path_bytes = serde_json::to_vec(&tsc_json)
+    store_proof(state, txid, &tsc_json, height, tx_index, block_hash, proof_verified)
+}
+
+/// Keep a proof that cannot be verified yet in `pending_proofs` (V27). Best-effort: if this fails the
+/// poll simply fetches the proof again next tick.
+fn hold_proof(state: &web::Data<AppState>, txid: &str, height: u32, bump_hex: &str, block_hash: &str, source: &str) {
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_secs() as i64)
+        .unwrap_or(0);
+    if let Ok(db) = state.database.lock() {
+        match crate::database::PendingProofRepository::new(db.connection())
+            .upsert(txid, height, bump_hex, block_hash, source, now)
+        {
+            Ok(()) => info!("   📥 holding proof for {} (height {}) until the header chain can verify it", &txid[..txid.len().min(16)], height),
+            Err(e) => warn!("   ⚠️ could not hold proof for {}: {}", txid, e),
+        }
+    }
+}
+
+/// Store a proof that is already verified (or, in public mode, deliberately unverified): the single
+/// place a `proven_txs` row is created. Shared by the poll path and `resolve_held`.
+fn store_proof(
+    state: &web::Data<AppState>,
+    txid: &str,
+    tsc_json: &serde_json::Value,
+    height: u32,
+    tx_index: u64,
+    block_hash: &str,
+    proof_verified: bool,
+) -> Result<i64, String> {
+    let merkle_path_bytes = serde_json::to_vec(tsc_json)
         .map_err(|e| format!("Failed to serialize TSC: {}", e))?;
 
     let db = state.database.lock().map_err(|e| format!("DB lock: {}", e))?;
@@ -623,7 +700,79 @@ async fn create_proven_tx_from_arc(
         );
     }
 
+    // spv mode: a proof that verified against the wallet's own header chain is what makes an
+    // internalized output (stored unconfirmed) selectable. Public mode keeps its existing
+    // promotion (TaskSyncPending via WhatsOnChain).
+    if proof_verified && crate::chain_mode::is_spv() {
+        let promoted = crate::database::OutputRepository::new(conn)
+            .mark_tx_outputs_confirmed(txid)
+            .unwrap_or(0);
+        if promoted > 0 {
+            state.balance_cache.invalidate();
+        }
+    }
+
     Ok(proven_tx_id)
+}
+
+/// Held proofs older than this with no header to judge them are dropped (the poll will fetch a fresh
+/// one if the tx is still pending).
+const HELD_PROOF_MAX_AGE_SECS: i64 = 6 * 3600;
+
+/// Verify every held proof the header chain can now judge (spv mode). A verified one goes through
+/// `store_proof` (the same path as a polled proof), the tx is marked confirmed and its held row is
+/// removed; a wrong or stale one is dropped; the rest keep waiting. Called after each header sync.
+pub fn resolve_held(state: &web::Data<AppState>) {
+    let Some(svc) = crate::header_sync::global() else { return };
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_secs() as i64)
+        .unwrap_or(0);
+    let results = {
+        let Ok(db) = state.database.lock() else { return };
+        match crate::pending_proofs::resolve_pending(
+            db.connection(),
+            &|h, root| svc.check_merkle_root(h, root),
+            now,
+            HELD_PROOF_MAX_AGE_SECS,
+        ) {
+            Ok(r) => r,
+            Err(e) => {
+                warn!("   ⚠️ resolving held proofs failed: {}", e);
+                return;
+            }
+        }
+    };
+
+    let mut stored_any = false;
+    for r in results {
+        use crate::pending_proofs::Resolution;
+        match r {
+            Resolution::Verified { txid, height, block_hash, tsc } => {
+                let index = tsc["index"].as_u64().unwrap_or(0);
+                // The root was verified against our header at this height, so record that header's
+                // hash, not the one the push event claimed.
+                let block_hash = svc.block_hash_at_height(height).unwrap_or(block_hash);
+                match store_proof(state, &txid, &tsc, height, index, &block_hash, true) {
+                    Ok(id) => {
+                        if let Ok(db) = state.database.lock() {
+                            let _ = crate::pending_proofs::delete_held(db.connection(), &txid);
+                        }
+                        mark_confirmed(state, &txid, height);
+                        stored_any = true;
+                        info!("   ✅ held proof for {} verified once its header arrived — stored (proven_txs {}), no re-fetch", &txid[..txid.len().min(16)], id);
+                    }
+                    Err(e) => warn!("   ⚠️ held proof for {} verified but could not be stored: {} (kept, retrying)", txid, e),
+                }
+            }
+            Resolution::Bad { txid, reason } => warn!("   ❌ held proof for {} rejected: {}", &txid[..txid.len().min(16)], reason),
+            Resolution::Expired { txid } => warn!("   ⌛ held proof for {} expired without a header; the poll will re-fetch", &txid[..txid.len().min(16)]),
+            Resolution::AlreadyProven { .. } | Resolution::StillWaiting { .. } | Resolution::TxFailed { .. } => {}
+        }
+    }
+    if stored_any {
+        state.balance_cache.invalidate();
+    }
 }
 
 /// Check WhatsOnChain for transaction confirmation status
@@ -633,7 +782,7 @@ async fn check_whatsonchain_confirmation(
 ) -> Result<Option<(u32, Option<u32>)>, String> {
     let url = format!("https://api.whatsonchain.com/v1/bsv/main/tx/hash/{}", txid);
 
-    let response = client.get(&url)
+    let response = crate::chain_mode::get(&client, &url)
         .timeout(Duration::from_secs(15))
         .send()
         .await
@@ -668,7 +817,7 @@ async fn fetch_and_store_woc_proof(
 ) -> Result<i64, String> {
     let url = format!("https://api.whatsonchain.com/v1/bsv/main/tx/{}/proof/tsc", txid);
 
-    let response = client.get(&url)
+    let response = crate::chain_mode::get(&client, &url)
         .timeout(Duration::from_secs(15))
         .send()
         .await
@@ -786,7 +935,34 @@ enum OracleVerdict {
     Inconclusive(String),
 }
 
+/// Map Arcade's answer onto the oracle verdict (spv mode: Arcade is the only oracle).
+/// `NotFound` is authoritative because every tx the wallet broadcasts goes through
+/// Arcade; transport/other errors are no signal.
+fn verdict_from_arcade(r: Result<crate::services::TxStatus, crate::services::IndexerError>) -> OracleVerdict {
+    use crate::services::{IndexerError, TxState};
+    match r {
+        Ok(s) => match s.state {
+            TxState::Mined => OracleVerdict::Present { any_confirmed: true },
+            TxState::InMempool => OracleVerdict::Present { any_confirmed: false },
+            TxState::Rejected => OracleVerdict::AllNotFound,
+            TxState::DoubleSpendAttempted | TxState::Unknown => OracleVerdict::Inconclusive(format!(
+                "arcade: {:?} ({:?})",
+                s.state, s.raw_provider_status
+            )),
+        },
+        Err(IndexerError::NotFound) => OracleVerdict::AllNotFound,
+        Err(e) => OracleVerdict::Inconclusive(format!("arcade: {}", e)),
+    }
+}
+
 async fn oracle_quorum_check(client: &reqwest::Client, txid: &str) -> OracleVerdict {
+    if crate::chain_mode::is_spv() {
+        use crate::services::IndexerProvider;
+        return match crate::services::providers::ArcadeProvider::from_env(client.clone()) {
+            Some(p) => verdict_from_arcade(p.tx_status(txid).await),
+            None => OracleVerdict::Inconclusive("arcade not configured".to_string()),
+        };
+    }
     let (woc, jb, bt) = tokio::join!(
         query_woc_txid(client, txid),
         query_junglebus_txid(client, txid),
@@ -825,7 +1001,7 @@ async fn oracle_quorum_check(client: &reqwest::Client, txid: &str) -> OracleVerd
 
 async fn query_woc_txid(client: &reqwest::Client, txid: &str) -> OracleStatus {
     let url = format!("https://api.whatsonchain.com/v1/bsv/main/tx/hash/{}", txid);
-    match client.get(&url).timeout(Duration::from_secs(10)).send().await {
+    match crate::chain_mode::get(&client, &url).timeout(Duration::from_secs(10)).send().await {
         Ok(resp) => {
             let code = resp.status().as_u16();
             if code == 404 { return OracleStatus::NotFound; }
@@ -843,7 +1019,7 @@ async fn query_woc_txid(client: &reqwest::Client, txid: &str) -> OracleStatus {
 
 async fn query_junglebus_txid(client: &reqwest::Client, txid: &str) -> OracleStatus {
     let url = format!("https://junglebus.gorillapool.io/v1/transaction/get/{}", txid);
-    match client.get(&url).timeout(Duration::from_secs(10)).send().await {
+    match crate::chain_mode::get(&client, &url).timeout(Duration::from_secs(10)).send().await {
         Ok(resp) => {
             let code = resp.status().as_u16();
             if code == 404 { return OracleStatus::NotFound; }
@@ -867,7 +1043,7 @@ async fn query_junglebus_txid(client: &reqwest::Client, txid: &str) -> OracleSta
 
 async fn query_bitails_txid(client: &reqwest::Client, txid: &str) -> OracleStatus {
     let url = format!("https://api.bitails.io/tx/{}", txid);
-    match client.get(&url).timeout(Duration::from_secs(10)).send().await {
+    match crate::chain_mode::get(&client, &url).timeout(Duration::from_secs(10)).send().await {
         Ok(resp) => {
             let code = resp.status().as_u16();
             if code == 404 { return OracleStatus::NotFound; }
@@ -885,5 +1061,45 @@ async fn query_bitails_txid(client: &reqwest::Client, txid: &str) -> OracleStatu
             }
         }
         Err(e) => OracleStatus::Error(format!("transport:{}", e)),
+    }
+}
+
+#[cfg(test)]
+mod spv_oracle_tests {
+    use super::*;
+
+    #[test]
+    fn spv_mode_needs_a_stored_proof_to_confirm_public_mode_keeps_its_behaviour() {
+        assert!(should_mark_confirmed(false, false), "public mode: unchanged");
+        assert!(should_mark_confirmed(false, true));
+        assert!(should_mark_confirmed(true, true));
+        assert!(!should_mark_confirmed(true, false), "spv: no verified proof, no confirmation");
+    }
+    use crate::services::{IndexerError, TxState, TxStatus};
+
+    fn st(state: TxState) -> Result<TxStatus, IndexerError> {
+        Ok(TxStatus {
+            txid: "ab".into(),
+            state,
+            block_height: None,
+            block_hash: None,
+            merkle_path_bump: None,
+            raw_provider_status: None,
+        })
+    }
+
+    #[test]
+    fn arcade_answers_map_to_oracle_verdicts() {
+        assert!(matches!(verdict_from_arcade(st(TxState::Mined)), OracleVerdict::Present { any_confirmed: true }));
+        assert!(matches!(verdict_from_arcade(st(TxState::InMempool)), OracleVerdict::Present { any_confirmed: false }));
+        assert!(matches!(verdict_from_arcade(st(TxState::Rejected)), OracleVerdict::AllNotFound));
+        assert!(matches!(verdict_from_arcade(Err(IndexerError::NotFound)), OracleVerdict::AllNotFound));
+    }
+
+    #[test]
+    fn ambiguous_or_failed_arcade_answers_are_inconclusive_never_a_failure_verdict() {
+        assert!(matches!(verdict_from_arcade(st(TxState::DoubleSpendAttempted)), OracleVerdict::Inconclusive(_)));
+        assert!(matches!(verdict_from_arcade(st(TxState::Unknown)), OracleVerdict::Inconclusive(_)));
+        assert!(matches!(verdict_from_arcade(Err(IndexerError::Transport("down".into()))), OracleVerdict::Inconclusive(_)));
     }
 }

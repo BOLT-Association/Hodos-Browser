@@ -559,7 +559,7 @@ async fn check_stale_unconfirmed(state: &web::Data<AppState>) -> Result<(), Stri
 
     for txid in &unique_txids {
         let url = format!("https://api.whatsonchain.com/v1/bsv/main/tx/hash/{}", txid);
-        match client.get(&url).send().await {
+        match crate::chain_mode::get(&client, &url).send().await {
             Ok(resp) if resp.status().is_success() => {
                 match resp.json::<serde_json::Value>().await {
                     Ok(body) => {

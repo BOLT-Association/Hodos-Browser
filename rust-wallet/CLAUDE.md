@@ -27,6 +27,8 @@ cargo check              # Fast type-check without building
 
 **Dev/prod guard** (`main.rs :: enforce_dev_safeguard`, runs first in `main()`): a dev-build path without `HODOS_DEV=1` aborts; a stray `HODOS_DEV=1` on a non-dev-build binary is scrubbed and forced to prod.
 
+**Dev storage override**: with `HODOS_DEV=1`, `HODOS_DATA_DIR=<dir>` relocates the whole data root (wallet DB + logs; `main.rs :: data_root`). Used for throwaway wallets, e.g. the spv-mode runs in `ChainBrowsers/docs/hodos-spv.md`. Ignored without `HODOS_DEV=1`.
+
 **Dev storage**: `%APPDATA%/HodosBrowserDev/wallet/wallet.db`
 **Production storage**: `%APPDATA%/HodosBrowser/wallet/wallet.db`
 
@@ -95,7 +97,7 @@ cargo check              # Fast type-check without building
 | `src/identity_resolver.rs` | Identity resolution via BSV Overlay Services (BRC-52 certificates) |
 | `src/overlay/mod.rs` | SHIP-discovery + overlay submit/lookup for `tm_identity`: `submit_to_identity_overlay`, `submit_to_topic`, `lookup_published_certificate`, `lookup_certificates_by_identity_key`, `OverlayCertificateOutput`. Public API takes `&Arc<ShipDiscoveryCache>`, not `&AppState`. |
 | `src/overlay/ship_cache.rs` | `ShipDiscoveryCache` — SWR cache for SHIP host discovery (fresh < 5 min / stale 5–30 min spawns bg refresh / very-stale ≥ 30 min blocks). No-poison invariant: empty fetch results never overwrite or store. 9 unit tests. |
-| `src/services/` | `WalletServices` facade: `CallClass` per-call-class timeouts, `ProviderCollection`, and 7 providers in `providers/` (`whatsonchain`, `arc_gorillapool`, `arc_taal`, `gorillapool_mapi`, `gorillapool_ordinals`, `junglebus`, `bitails`) |
+| `src/services/` | `WalletServices` facade: `CallClass` per-call-class timeouts, `ProviderCollection`, and 9 providers in `providers/` (`whatsonchain`, `arcade`, `chaintracks`, `arc_gorillapool`, `arc_taal`, `gorillapool_mapi`, `gorillapool_ordinals`, `junglebus`, `bitails`) |
 | `src/arc_status.rs` | Centralized ARC miner response status classification (txStatus ladder) |
 | `src/beef.rs` | BEEF parser: `tsc_proof_to_bump`, `parse_bump_hex_to_tsc`, `compute_merkle_root_from_tsc`, `validate_beef_v1_hex`, `validate_beef_ancestry`, `read_node_offset` |
 | `src/beef_helpers.rs` | Recursive BEEF building with ancestry chain and proof fetching |

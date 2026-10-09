@@ -109,7 +109,7 @@ pub async fn run(state: &web::Data<AppState>, client: &reqwest::Client) -> Resul
             Err(_) => {
                 // Step 3: Fallback to WhatsOnChain
                 let url = format!("https://api.whatsonchain.com/v1/bsv/main/tx/hash/{}", txid);
-                if let Ok(response) = client.get(&url).timeout(Duration::from_secs(15)).send().await {
+                if let Ok(response) = crate::chain_mode::get(&client, &url).timeout(Duration::from_secs(15)).send().await {
                     if response.status().is_success() {
                         if let Ok(json) = response.json::<serde_json::Value>().await {
                             let confirmations = json["confirmations"].as_u64().unwrap_or(0);
@@ -119,7 +119,7 @@ pub async fn run(state: &web::Data<AppState>, client: &reqwest::Client) -> Resul
                                 // Fetch proof and recover
                                 let block_height = json["blockheight"].as_u64().map(|h| h as u32);
                                 let proof_url = format!("https://api.whatsonchain.com/v1/bsv/main/tx/{}/proof/tsc", txid);
-                                if let Ok(proof_resp) = client.get(&proof_url).timeout(Duration::from_secs(15)).send().await {
+                                if let Ok(proof_resp) = crate::chain_mode::get(&client, &proof_url).timeout(Duration::from_secs(15)).send().await {
                                     if let Ok(tsc_json) = proof_resp.json::<serde_json::Value>().await {
                                         let height = tsc_json["height"].as_u64()
                                             .or_else(|| block_height.map(|h| h as u64))
@@ -293,6 +293,9 @@ fn create_proven_tx_and_recover(
 
     let merkle_path_bytes = serde_json::to_vec(&tsc_json)
         .map_err(|e| format!("Serialize TSC: {}", e))?;
+
+    // spv: a `proven_txs` row means "verified against our own headers", so check before storing.
+    crate::cache_helpers::check_proof_before_storing(txid, &tsc_json)?;
 
     let proven_tx_id = {
         let db = state.database.lock().map_err(|e| format!("DB lock: {}", e))?;

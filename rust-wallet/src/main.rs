@@ -34,6 +34,14 @@ mod overlay;  // BSV Overlay Services client for certificate publish/unpublish
 mod services;  // Phase 1.6d.B: WalletServices facade — IndexerProvider trait + provider chains
 mod permission_service;  // Phase 2.6-A.5: wrapper around hodos_permission_engine pure crate (dormant in A.5; wired into AppState in A.6)
 mod manifest;  // Phase 2.6-G: Rust port of C++ ManifestFetcher (fetch + lenient parse of .well-known/wallet-manifest.json)
+mod chain_mode;
+mod pending_proofs;  // spv mode: proofs held until the header chain can verify them (V27 pending_proofs)
+mod zero_conf;  // spv mode: received outputs spendable once seen on the network (HODOS_ZERO_CONF)
+mod bolt;  // window.BOLT rails: /boltBroadcast (network verdict) + /boltTokens (V28 bolt_tokens)
+mod arcade_push;  // spv mode: Arcade SSE wake-up for the proof task (polling stays the safety net)  // HODOS_CHAIN_MODE: public | spv (Arcade + verified headers only)
+mod tip_stream;  // spv mode: chaintracks tip stream, a wake-up for the header sync (the 30 s sync stays)
+mod header_chain;
+mod header_sync;  // WS4: header sync + process-wide HeaderService  // Wallet-Hardening WS4: verified header chain (PoW, linkage, most-work, reorg)
 mod reconcile;  // Wallet-Hardening WS1: spent-input reconcile primitives (c1 check_outpoint_spent; c2/c3 dormant)
 
 // Re-export for monitor tasks (avoids rust-analyzer resolution issues when only lib is checked)
@@ -336,6 +344,16 @@ pub fn wallet_port() -> u16 {
 /// Windows dev: `%APPDATA%\HodosBrowserDev`, macOS: `~/Library/Application Support/HodosBrowser`.
 /// Subdirs `wallet/` (db) and `logs/` (rotating log files) hang off this root.
 fn data_root() -> PathBuf {
+    // Dev-only: HODOS_DATA_DIR relocates the whole data root (wallet DB + logs) so a run
+    // against a local chain can use a throwaway wallet. Honoured only with HODOS_DEV=1
+    // (which the dev safeguard scrubs on non-dev binaries), never in an installed build.
+    if std::env::var("HODOS_DEV").as_deref() == Ok("1") {
+        if let Ok(dir) = std::env::var("HODOS_DATA_DIR") {
+            if !dir.trim().is_empty() {
+                return PathBuf::from(dir);
+            }
+        }
+    }
     dirs::data_dir()
         .unwrap_or_else(|| match std::env::var("APPDATA") {
             Ok(appdata) => PathBuf::from(appdata),
@@ -517,6 +535,12 @@ async fn main() -> std::io::Result<()> {
     // mis-launched dev build (HODOS_DEV unset) bails via eprintln! before we
     // touch the production data directory.
     enforce_dev_safeguard();
+
+    // HODOS_CHAIN_MODE must be valid (and complete, in spv mode) before anything starts.
+    if let Err(e) = chain_mode::validate_startup() {
+        eprintln!("❌ {}", e);
+        return Err(std::io::Error::new(std::io::ErrorKind::InvalidInput, e));
+    }
 
     // Initialize logging: console + rotating file in <data_root>/logs/.
     // Held for the process lifetime (drop = logging stops). Flushed explicitly in
@@ -861,6 +885,27 @@ async fn main() -> std::io::Result<()> {
         }
     }
 
+    // WS4: verified header chain. Built synchronously here, before any proof check can
+    // run, so "chaintracks configured" can never fall through to the unverified path.
+    // Stored headers are re-validated on load (storage is a cache, not an authority).
+    if services::providers::chaintracks::configured_base_url().is_some() {
+        let params = header_chain::Params::regtest();
+        let stored = {
+            let db = database.lock().unwrap();
+            database::HeaderChainRepository::new(db.connection()).load(params.name).unwrap_or_default()
+        };
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_secs() as u32)
+            .unwrap_or(0);
+        let (chain, rejected) = header_chain::HeaderChain::from_stored(params, stored, now);
+        log::info!(
+            "✅ Header chain (regtest): {} stored header(s), tip {:?}, {} rejected on reload",
+            chain.len(), chain.tip_height(), rejected
+        );
+        header_sync::init(chain);
+    }
+
     // Initialize fee rate cache (fetches from ARC /v1/policy)
     let fee_rate_cache = Arc::new(fee_rate_cache::FeeRateCache::new());
     log::info!("✅ Fee rate cache initialized (ARC policy, 1-hour TTL)");
@@ -1043,7 +1088,7 @@ async fn main() -> std::io::Result<()> {
                     checked_txids.insert(txid.clone());
 
                     let url = format!("https://api.whatsonchain.com/v1/bsv/main/tx/hash/{}", txid);
-                    match client.get(&url).send().await {
+                    match crate::chain_mode::get(&client, &url).send().await {
                         Ok(resp) if resp.status().as_u16() == 404 => {
                             log::warn!(
                                 "   🔴 Phantom output detected: tx {} not found on WoC (404)",
@@ -1351,6 +1396,10 @@ async fn main() -> std::io::Result<()> {
             // BRC-121 Simple HTTP 402 Payment
             .route("/wallet/pay402", web::post().to(handlers::pay_402))
             .route("/wallet/broadcast-nosend", web::post().to(handlers::broadcast_nosend))
+
+            // window.BOLT rails (the token logic runs in the page; see bolt.rs)
+            .route("/boltBroadcast", web::post().to(bolt::bolt_broadcast))
+            .route("/boltTokens", web::post().to(bolt::bolt_tokens))
             // P11-11-A4 — the other half of the pair: the BRC-121 retry calls this when
             // the server definitively refuses, so the dead payment does not keep a
             // spendable phantom output and a reserved input until a sweeper notices.

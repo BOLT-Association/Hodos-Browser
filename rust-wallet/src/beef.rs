@@ -285,6 +285,38 @@ impl Beef {
         !self.bumps.is_empty()
     }
 
+    /// `(txid display hex, raw tx hex)` for every transaction in this BEEF, parents first.
+    pub fn txids_and_hex(&self) -> Vec<(String, String)> {
+        use sha2::{Digest, Sha256};
+        self.transactions
+            .iter()
+            .map(|tx| {
+                let txid: String = Sha256::digest(Sha256::digest(tx)).iter().rev().map(|b| format!("{:02x}", b)).collect();
+                (txid, hex::encode(tx))
+            })
+            .collect()
+    }
+
+    /// Does the transaction with this txid (display hex) carry its own BUMP in this BEEF?
+    /// The BUMP (hex) this BEEF carries for `txid`, if any: what a verified incoming payment
+    /// can be stored as, without asking an indexer for it again.
+    pub fn bump_hex_for(&self, txid: &str) -> Option<String> {
+        let bump = self
+            .find_txid(txid)
+            .and_then(|i| self.tx_to_bump.get(i).copied().flatten())
+            .and_then(|b| self.bumps.get(b))?;
+        let mut bytes = Vec::new();
+        write_bump(&mut bytes, bump).ok()?;
+        Some(hex::encode(bytes))
+    }
+
+    pub fn tx_has_proof(&self, txid: &str) -> bool {
+        self.find_txid(txid)
+            .and_then(|i| self.tx_to_bump.get(i).copied().flatten())
+            .map(|b| b < self.bumps.len())
+            .unwrap_or(false)
+    }
+
     /// Create a new empty BEEF structure
     pub fn new() -> Self {
         Beef {
@@ -706,7 +738,19 @@ impl Beef {
     /// Returns the EF hex string, or Err if source data cannot be found for any input.
     pub fn to_ef_hex(&self) -> Result<String, String> {
         // The main (subject) transaction is always the last in the BEEF
-        let main_tx_bytes = self.transactions.last()
+        let idx = self.transactions.len().checked_sub(1).ok_or("BEEF has no transactions")?;
+        self.to_ef_hex_at(idx)
+    }
+
+    /// Extended Format for the transaction with this (display-hex) txid, e.g. the subject of an
+    /// Atomic BEEF, which need not be the last transaction in the bundle.
+    pub fn to_ef_hex_for(&self, txid: &str) -> Result<String, String> {
+        let idx = self.find_txid(txid).ok_or_else(|| format!("transaction {} is not in the BEEF", txid))?;
+        self.to_ef_hex_at(idx)
+    }
+
+    fn to_ef_hex_at(&self, idx: usize) -> Result<String, String> {
+        let main_tx_bytes = self.transactions.get(idx)
             .ok_or("BEEF has no transactions")?;
 
         // Parse the main transaction to extract its structure
@@ -1221,6 +1265,245 @@ pub fn read_node_offset(node: &[u8]) -> Result<(u64, usize), String> {
 }
 
 /// Log the structure of a MerkleProof for debugging
+/// Merkle root (display-order hex) computed from **every** txid leaf in a BUMP.
+/// A well-formed BUMP yields the same root from each; callers must compare them.
+fn bump_roots_from_all_txid_leaves(proof: &MerkleProof) -> Result<Vec<String>, String> {
+    if proof.levels.is_empty() {
+        return Err("BUMP has no levels".to_string());
+    }
+    let mut roots = Vec::new();
+    for node in &proof.levels[0] {
+        let (_, vl) = read_node_offset(node)?;
+        let flag = if node.len() > vl { node[vl] } else { 0 };
+        if flag & 0x02 != 0 && node.len() >= vl + 33 {
+            let mut root = compute_root_from_bump(proof, &node[vl + 1..vl + 33])?;
+            root.reverse();
+            roots.push(hex::encode(root));
+        }
+    }
+    if roots.is_empty() {
+        return Err("BUMP has no txid leaf".to_string());
+    }
+    Ok(roots)
+}
+
+/// Verify every BUMP in a BEEF against a header source (WS4).
+///
+/// For each BUMP: all of its txid leaves must compute the same merkle root, and that
+/// root must pass `check(block_height, root_hex)`. For each transaction that claims a
+/// BUMP, its own txid must be one of that BUMP's txid leaves, otherwise the BUMP
+/// proves nothing about it. `check` returns `Ok(true)` (matches the verified chain),
+/// `Ok(false)` (does not), or `Err` (cannot say); `Err` and `Ok(false)` both reject.
+pub fn verify_beef_bumps(
+    beef: &Beef,
+    check: &dyn Fn(u32, &str) -> Result<bool, String>,
+) -> Result<(), String> {
+    use sha2::{Digest, Sha256};
+
+    let mut bump_roots: Vec<String> = Vec::with_capacity(beef.bumps.len());
+    for (i, bump) in beef.bumps.iter().enumerate() {
+        let roots = bump_roots_from_all_txid_leaves(bump).map_err(|e| format!("BUMP {}: {}", i, e))?;
+        if roots.iter().any(|r| r != &roots[0]) {
+            return Err(format!("BUMP {} txid leaves compute different merkle roots", i));
+        }
+        match check(bump.block_height, &roots[0]) {
+            Ok(true) => {}
+            Ok(false) => {
+                return Err(format!(
+                    "BUMP {} root {} does not match the verified header at height {}",
+                    i, roots[0], bump.block_height
+                ))
+            }
+            Err(e) => return Err(format!("BUMP {} cannot be verified: {}", i, e)),
+        }
+        bump_roots.push(roots[0].clone());
+    }
+
+    for (tx_idx, bump_idx) in beef.tx_to_bump.iter().enumerate() {
+        let Some(bi) = bump_idx else { continue };
+        let bump = beef
+            .bumps
+            .get(*bi)
+            .ok_or_else(|| format!("transaction {} references missing BUMP {}", tx_idx, bi))?;
+        let tx = beef
+            .transactions
+            .get(tx_idx)
+            .ok_or_else(|| format!("BUMP maps to missing transaction {}", tx_idx))?;
+        let txid_natural = Sha256::digest(Sha256::digest(tx));
+        let mut found = false;
+        for node in &bump.levels[0] {
+            let (_, vl) = read_node_offset(node)?;
+            let flag = if node.len() > vl { node[vl] } else { 0 };
+            if flag & 0x02 != 0 && node.len() >= vl + 33 && node[vl + 1..vl + 33] == txid_natural[..] {
+                found = true;
+                break;
+            }
+        }
+        if !found {
+            return Err(format!("transaction {} is not a txid leaf of its BUMP {}", tx_idx, bi));
+        }
+    }
+    Ok(())
+}
+
+#[cfg(test)]
+mod verify_bumps_tests {
+    use super::*;
+    use sha2::{Digest, Sha256};
+
+    fn dsha(b: &[u8]) -> Vec<u8> {
+        Sha256::digest(Sha256::digest(b)).to_vec()
+    }
+
+    /// Two-tx block: our tx at offset 0, a sibling at offset 1.
+    fn fixture() -> (Beef, String) {
+        let tx = vec![1u8, 2, 3, 4, 5];
+        let txid = dsha(&tx);
+        let sibling = vec![9u8; 32];
+        let mut leaf0 = vec![0u8, 0x02];
+        leaf0.extend_from_slice(&txid);
+        let mut leaf1 = vec![1u8, 0x00];
+        leaf1.extend_from_slice(&sibling);
+        let mut root = dsha(&[txid.clone(), sibling].concat());
+        root.reverse();
+        let beef = Beef {
+            version: BEEF_V1_MARKER,
+            bumps: vec![MerkleProof { block_height: 7, tree_height: 1, levels: vec![vec![leaf0, leaf1]] }],
+            transactions: vec![tx],
+            tx_to_bump: vec![Some(0)],
+        };
+        (beef, hex::encode(root))
+    }
+
+    #[test]
+    fn txids_and_hex_lists_every_tx_with_its_real_txid() {
+        let (b, _) = fixture();
+        let listed = b.txids_and_hex();
+        assert_eq!(listed.len(), 1);
+        let expect: String = dsha(&b.transactions[0]).iter().rev().map(|x| format!("{:02x}", x)).collect();
+        assert_eq!(listed[0].0, expect);
+        assert_eq!(listed[0].1, hex::encode(&b.transactions[0]));
+    }
+
+    #[test]
+    fn tx_has_proof_only_for_a_tx_that_carries_its_own_bump() {
+        let (mut b, _) = fixture();
+        let txid: String = dsha(&b.transactions[0]).iter().rev().map(|x| format!("{:02x}", x)).collect();
+        assert!(b.tx_has_proof(&txid));
+        assert!(!b.tx_has_proof(&"00".repeat(32)), "unknown txid");
+        b.tx_to_bump[0] = None;
+        assert!(!b.tx_has_proof(&txid), "no BUMP mapped to it");
+        b.tx_to_bump[0] = Some(7);
+        assert!(!b.tx_has_proof(&txid), "dangling BUMP index");
+    }
+
+    #[test]
+    fn a_txs_own_bump_round_trips_to_a_proof_with_the_same_root() {
+        let (b, root) = fixture();
+        let txid: String = dsha(&b.transactions[0]).iter().rev().map(|x| format!("{:02x}", x)).collect();
+        let hexed = b.bump_hex_for(&txid).expect("tx carries a BUMP");
+        let tsc = parse_bump_hex_to_tsc(&hexed).unwrap();
+        assert_eq!(tsc["height"].as_u64(), Some(7));
+        let nodes = tsc["nodes"].as_array().cloned().unwrap();
+        let index = tsc["index"].as_u64().unwrap_or(0);
+        assert_eq!(compute_merkle_root_from_tsc(&txid, 7, index, &nodes).unwrap(), root);
+        assert_eq!(b.bump_hex_for(&"00".repeat(32)), None, "unknown txid");
+        let mut c = b.clone();
+        c.tx_to_bump[0] = None;
+        assert_eq!(c.bump_hex_for(&txid), None, "no BUMP mapped to it");
+    }
+
+    #[test]
+    fn accepts_matching_root_at_the_claimed_height() {
+        let (b, root) = fixture();
+        let r = verify_beef_bumps(&b, &|h, got| {
+            assert_eq!(h, 7);
+            Ok(got == root)
+        });
+        assert_eq!(r, Ok(()));
+    }
+
+    #[test]
+    fn rejects_root_that_differs_from_the_chain() {
+        let (b, _) = fixture();
+        let r = verify_beef_bumps(&b, &|_, _| Ok(false));
+        assert!(r.unwrap_err().contains("does not match"));
+    }
+
+    #[test]
+    fn unknown_header_is_a_rejection_not_a_pass() {
+        let (b, _) = fixture();
+        let r = verify_beef_bumps(&b, &|_, _| Err("no header".into()));
+        assert!(r.unwrap_err().contains("cannot be verified"));
+    }
+
+    #[test]
+    fn bump_that_does_not_cover_its_transaction_is_rejected() {
+        let (mut b, root) = fixture();
+        b.transactions[0] = vec![6u8, 6, 6]; // different tx, same (valid-looking) BUMP
+        let r = verify_beef_bumps(&b, &|_, got| Ok(got == root));
+        assert!(r.unwrap_err().contains("not a txid leaf"));
+    }
+
+    #[test]
+    fn duplicate_nodes_pointing_at_each_other_are_an_error_not_a_stack_overflow() {
+        // Level 1 holds two "duplicate" nodes at offsets 0 and 1. Each says "use my sibling's
+        // hash", so resolving either one used to recurse into the other forever.
+        let (mut b, _) = fixture();
+        let tx_leaf = b.bumps[0].levels[0][0].clone();
+        let sib = b.bumps[0].levels[0][1].clone();
+        b.bumps[0] = MerkleProof {
+            block_height: 7,
+            tree_height: 2,
+            levels: vec![vec![tx_leaf, sib], vec![vec![0u8, 0x01], vec![1u8, 0x01]]],
+        };
+        let r = verify_beef_bumps(&b, &|_, _| Ok(true));
+        assert!(r.is_err(), "must reject, not overflow the stack: {:?}", r);
+    }
+
+    #[test]
+    fn a_single_duplicate_node_still_resolves_to_its_siblings_hash() {
+        // Odd-width level: the node at level 1 offset 1 is a duplicate of offset 0, which is
+        // not listed and is computed from level 0. Root = H(h01 || h01).
+        let (mut b, _) = fixture();
+        let tx_leaf = b.bumps[0].levels[0][0].clone();
+        let sib = b.bumps[0].levels[0][1].clone();
+        let h01 = dsha(&[tx_leaf[2..34].to_vec(), sib[2..34].to_vec()].concat());
+        let mut root = dsha(&[h01.clone(), h01].concat());
+        root.reverse();
+        let root = hex::encode(root);
+        b.bumps[0] = MerkleProof {
+            block_height: 7,
+            tree_height: 2,
+            levels: vec![vec![tx_leaf, sib], vec![vec![1u8, 0x01]]],
+        };
+        assert_eq!(verify_beef_bumps(&b, &|_, got| Ok(got == root)), Ok(()));
+    }
+
+    #[test]
+    fn inconsistent_txid_leaves_are_rejected() {
+        // Four leaves (two pairs) plus an explicit level-1 node that disagrees with what
+        // leaves 2/3 compute: the root from leaf 0 and the root from leaf 2 differ.
+        let (mut b, _) = fixture();
+        let leaf = |off: u8, flags: u8, byte: u8| {
+            let mut n = vec![off, flags];
+            n.extend_from_slice(&[byte; 32]);
+            n
+        };
+        let tx_leaf = b.bumps[0].levels[0][0].clone();
+        b.bumps[0] = MerkleProof {
+            block_height: 7,
+            tree_height: 2,
+            levels: vec![
+                vec![tx_leaf, leaf(1, 0x00, 9), leaf(2, 0x02, 7), leaf(3, 0x00, 8)],
+                vec![leaf(1, 0x00, 5)],
+            ],
+        };
+        let r = verify_beef_bumps(&b, &|_, _| Ok(true));
+        assert!(r.unwrap_err().contains("different merkle roots"));
+    }
+}
+
 fn log_bump_structure(proof: &MerkleProof) {
     log::info!("      blockHeight={}, treeHeight={}, levels={}", proof.block_height, proof.tree_height, proof.levels.len());
     for (level, nodes) in proof.levels.iter().enumerate() {
@@ -1304,6 +1587,18 @@ fn compute_root_from_bump(proof: &MerkleProof, txid_natural: &[u8]) -> Result<Ve
 /// Find a node's hash at a given level and offset, or compute it recursively from children.
 /// Matches the TS SDK's findOrComputeLeaf method.
 fn find_or_compute_node(proof: &MerkleProof, level: usize, offset: u64) -> Result<Vec<u8>, String> {
+    find_or_compute_node_inner(proof, level, offset, false)
+}
+
+/// `via_duplicate` is true when we got here by following a duplicate flag: that target must
+/// carry a real hash. Without this a BUMP with duplicate nodes at both `2k` and `2k+1` sent
+/// the lookup back and forth until the stack overflowed (the BUMP comes from untrusted BEEFs).
+fn find_or_compute_node_inner(
+    proof: &MerkleProof,
+    level: usize,
+    offset: u64,
+    via_duplicate: bool,
+) -> Result<Vec<u8>, String> {
     use sha2::{Sha256, Digest};
 
     // Check if node exists at this level
@@ -1313,9 +1608,15 @@ fn find_or_compute_node(proof: &MerkleProof, level: usize, offset: u64) -> Resul
             if node_offset == offset {
                 let flag = if node.len() > vl { node[vl] } else { 0 };
                 if flag & 0x01 != 0 {
+                    if via_duplicate {
+                        return Err(format!(
+                            "Malformed BUMP: duplicate node at level {} offset {} points at another duplicate",
+                            level, offset
+                        ));
+                    }
                     // Duplicate — find sibling (offset ^ 1) and use its hash
                     let sibling_offset = offset ^ 1;
-                    return find_or_compute_node(proof, level, sibling_offset);
+                    return find_or_compute_node_inner(proof, level, sibling_offset, true);
                 }
                 // Regular hash or txid — extract 32-byte hash
                 if node.len() >= vl + 1 + 32 {

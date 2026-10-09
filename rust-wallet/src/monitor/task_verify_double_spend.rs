@@ -100,7 +100,10 @@ pub async fn run(state: &web::Data<AppState>, client: &reqwest::Client) -> Resul
         let oldest_updated = inputs.iter().map(|(_, _, _, _, ts)| *ts).min().unwrap_or(now);
         let age_secs = now - oldest_updated;
 
-        if age_secs > ESCALATION_CONFIRM_SECS {
+        // In spv mode there is no per-input spent check (Arcade has no outspend), so the
+        // "confirm regardless after N hours" escalation would mark coins lost with no
+        // verification at all. Skip it there; suspected outputs stay suspected.
+        if age_secs > ESCALATION_CONFIRM_SECS && !crate::chain_mode::is_spv() {
             // Past final escalation — promote all to confirmed.
             warn!("   ⏰ {} suspected for {}h — promoting to confirmed double-spend",
                 short_txid, age_secs / 3600);
@@ -116,7 +119,11 @@ pub async fn run(state: &web::Data<AppState>, client: &reqwest::Client) -> Resul
         }
 
         // Step 1: Check our txid on WoC (up to 3 retries, 1s waits).
-        let status = check_our_txid_on_woc(client, our_txid).await;
+        let status = if crate::chain_mode::is_spv() {
+            check_our_txid_on_arcade(client, our_txid).await
+        } else {
+            check_our_txid_on_woc(client, our_txid).await
+        };
         tokio::time::sleep(Duration::from_millis(WOC_CALL_DELAY_MS)).await;
 
         match status {
@@ -131,6 +138,14 @@ pub async fn run(state: &web::Data<AppState>, client: &reqwest::Client) -> Resul
                 info!("   ✅ {} is in MEMPOOL — false alarm! Recovering", short_txid);
                 handle_false_alarm_mempool(state, our_txid, inputs);
                 false_alarms += inputs.len();
+            }
+            TxidStatus::Unknown if crate::chain_mode::is_spv() => {
+                // Arcade says our tx is rejected/unknown/conflicting, but cannot say which
+                // inputs (if any) another tx spent. Marking coins lost or restoring them
+                // would both be guesses, so leave them suspected and say so.
+                warn!("   ⚠️ {} not live on Arcade; {} input(s) stay suspected (spv mode has no per-input spent check)",
+                    short_txid, inputs.len());
+                continue;
             }
             TxidStatus::Unknown => {
                 // Our tx genuinely failed. Verify each input individually.
@@ -193,6 +208,29 @@ pub async fn run(state: &web::Data<AppState>, client: &reqwest::Client) -> Resul
     Ok(())
 }
 
+/// Map Arcade's answer onto `TxidStatus`. Rejected, conflicting and never-seen all read as
+/// `Unknown` (our tx is not live); transport errors are `Error`, never a verdict.
+fn txid_status_from_arcade(r: Result<crate::services::TxStatus, crate::services::IndexerError>) -> TxidStatus {
+    use crate::services::{IndexerError, TxState};
+    match r {
+        Ok(s) => match s.state {
+            TxState::Mined => TxidStatus::Mined { confirmations: 1 }, // Arcade gives no count
+            TxState::InMempool => TxidStatus::InMempool,
+            TxState::Rejected | TxState::DoubleSpendAttempted | TxState::Unknown => TxidStatus::Unknown,
+        },
+        Err(IndexerError::NotFound) => TxidStatus::Unknown,
+        Err(e) => TxidStatus::Error(e.to_string()),
+    }
+}
+
+async fn check_our_txid_on_arcade(client: &reqwest::Client, txid: &str) -> TxidStatus {
+    use crate::services::IndexerProvider;
+    match crate::services::providers::ArcadeProvider::from_env(client.clone()) {
+        Some(p) => txid_status_from_arcade(p.tx_status(txid).await),
+        None => TxidStatus::Error("arcade not configured".to_string()),
+    }
+}
+
 /// Check if our txid is known on the network via WhatsOnChain.
 /// Retries up to TXID_CHECK_RETRIES times with 1s waits between attempts.
 async fn check_our_txid_on_woc(client: &reqwest::Client, txid: &str) -> TxidStatus {
@@ -203,7 +241,7 @@ async fn check_our_txid_on_woc(client: &reqwest::Client, txid: &str) -> TxidStat
             tokio::time::sleep(Duration::from_secs(1)).await;
         }
 
-        match client.get(&url).send().await {
+        match crate::chain_mode::get(&client, &url).send().await {
             Ok(resp) => {
                 let status_code = resp.status().as_u16();
                 if status_code == 404 {
@@ -247,7 +285,7 @@ async fn check_output_spent(
         txid, vout
     );
 
-    let resp = client.get(&url).send().await
+    let resp = crate::chain_mode::get(&client, &url).send().await
         .map_err(|e| format!("HTTP error: {}", e))?;
 
     let status_code = resp.status().as_u16();
@@ -334,4 +372,36 @@ fn handle_false_alarm_mempool(
     // Same logic as mined — the difference is just that there's no proof yet.
     // TaskCheckForProofs will handle proof acquisition.
     handle_false_alarm_mined(state, our_txid, inputs);
+}
+
+#[cfg(test)]
+mod spv_tests {
+    use super::*;
+    use crate::services::{IndexerError, TxState, TxStatus};
+
+    fn st(state: TxState) -> Result<TxStatus, IndexerError> {
+        Ok(TxStatus {
+            txid: "ab".into(),
+            state,
+            block_height: None,
+            block_hash: None,
+            merkle_path_bump: None,
+            raw_provider_status: None,
+        })
+    }
+
+    #[test]
+    fn live_txs_are_false_alarms_and_everything_else_is_not_live() {
+        assert!(matches!(txid_status_from_arcade(st(TxState::Mined)), TxidStatus::Mined { .. }));
+        assert!(matches!(txid_status_from_arcade(st(TxState::InMempool)), TxidStatus::InMempool));
+        for s in [TxState::Rejected, TxState::DoubleSpendAttempted, TxState::Unknown] {
+            assert!(matches!(txid_status_from_arcade(st(s)), TxidStatus::Unknown));
+        }
+        assert!(matches!(txid_status_from_arcade(Err(IndexerError::NotFound)), TxidStatus::Unknown));
+    }
+
+    #[test]
+    fn an_outage_is_an_error_not_a_verdict() {
+        assert!(matches!(txid_status_from_arcade(Err(IndexerError::Transport("x".into()))), TxidStatus::Error(_)));
+    }
 }
