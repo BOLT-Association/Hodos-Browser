@@ -35,12 +35,13 @@ rotate/reissue screens; the coin relay), `bolt-identity.d.ts`, the regenerated `
 ## §2 — 📏 Windows results (do NOT inherit them for macOS)
 
 - `hodos_tests` **400 passed, 1 skipped** (the existing `UpdateStagerRig`; 399 at the first commit). **Negative control:** the holder-count check and the reissue-never-silent check removed from `BoltRequest.h` → 3 BOLT tests red; restored → green. `bolt_fund` missing from the family → 2 role-gate tests red.
-- The shell's changed files compile (VS 2022, CEF 150). The live run comes with ChainBrowsers step 6 (`tests/authbolt/peerloop.live.mjs`, on-chain).
+- `ValidateBoltSignHolder` forced to `true` → `BoltSign.TheExpectedHolderIsACountAndAHash` red; restored → green.
+- Shell builds (VS 2022, CEF 150). Live, Windows dev build in spv mode on the regtest stack, throwaway data dir: ChainBrowsers `node tests/authbolt/peerloop.live.mjs` **PASS** on chain: registration (the token moved to holder 1, the app's funding wallet paying through the page), holder-key sign-in, a rotation the server asked for (holder 2), a reissue (holder 3), and an unposted move recovered by signing with the holder the server names. Its negative controls `NC_NO_VERIFIER=1` and `NC_NO_FUND=1` fail at registration.
 
 ## §3 — 🍎 Asks (no owner time needed)
 
 1. **Build** the shell and `hodos_tests`; report any clang warning in `HttpRequestInterceptor.cpp` around `ForwardBoltFund` / `HandleBoltFundResult` (`nlohmann::json::parse(…, nullptr, false)`, `CefFrame::GetIdentifier()` compared as strings, `escapeJsonForJs`).
-2. Nothing else until the Windows live run is reported here.
+2. The prompt's coin relay (`bolt_fund` → page → `/bolt/fund-result`) runs in the notification overlay: on macOS, please check one registration end to end when you next have the stack up (W-07a §3.2's setup), and that the overlay stays hidden during a silent rotation.
 
 ---
 
