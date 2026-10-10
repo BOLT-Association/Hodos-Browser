@@ -110,7 +110,7 @@ pub fn resolve_pending(
         }
 
         // Decode the BUMP and compute the merkle root it claims for this tx.
-        let mut tsc = match crate::beef::parse_bump_hex_to_tsc(&p.bump_hex) {
+        let mut tsc = match crate::beef::parse_bump_hex_to_tsc_for(&p.bump_hex, &txid) {
             Ok(t) => t,
             Err(e) => {
                 drop_row("unparseable BUMP");

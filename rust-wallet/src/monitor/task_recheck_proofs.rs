@@ -148,7 +148,7 @@ pub async fn run(state: &web::Data<AppState>) -> Result<(), String> {
             continue;
         };
 
-        let mut tsc = match crate::beef::parse_bump_hex_to_tsc(&bump_hex) {
+        let mut tsc = match crate::beef::parse_bump_hex_to_tsc_for(&bump_hex, &o.txid) {
             Ok(t) => t,
             Err(e) => {
                 warn!("   ⚠️ {} new BUMP unparseable: {}", short, e);
@@ -350,7 +350,7 @@ mod tests {
                     let s = arcade.tx_status(txid).await.expect("status");
                     if s.state == crate::services::TxState::Mined {
                         if let Some(b) = s.merkle_path_bump {
-                            let mut tsc = crate::beef::parse_bump_hex_to_tsc(&b).unwrap();
+                            let mut tsc = crate::beef::parse_bump_hex_to_tsc_for(&b, &txid).unwrap();
                             tsc["height"] = serde_json::json!(s.block_height.unwrap());
                             return (tsc, s.block_hash);
                         }
@@ -415,7 +415,7 @@ mod tests {
             sync_once(&svc.chain, &src, now() + 20, &mut |_| {}).await.expect("sync");
             let s = arcade.tx_status(&txid).await.unwrap();
             let (true, Some(b)) = (s.state == crate::services::TxState::Mined, s.merkle_path_bump.clone()) else { continue };
-            let mut t = crate::beef::parse_bump_hex_to_tsc(&b).unwrap();
+            let mut t = crate::beef::parse_bump_hex_to_tsc_for(&b, &txid).unwrap();
             t["height"] = serde_json::json!(s.block_height.unwrap());
             match crate::verify_tsc_proof_against_block(&http, &txid, &t).await {
                 Ok(true) => { accepted = Some((t, s.block_hash)); break; }
