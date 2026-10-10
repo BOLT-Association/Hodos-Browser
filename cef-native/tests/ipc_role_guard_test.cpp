@@ -48,6 +48,7 @@ const char* kFamily[] = {
     "approve_key_linkage_reveal",
     "brc100_auth_response",
     "bolt_result",  // an AuthBOLT presentation (or refusal) for the page that asked
+    "bolt_fund",    // the wallet asks the page that asked for a coin (runs that page's fund callback)
 };
 
 // ---- Predicate: message classification ----
