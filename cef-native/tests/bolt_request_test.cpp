@@ -121,6 +121,17 @@ TEST(BoltSign, AMoveIsCountedDataForThisApp) {
     EXPECT_FALSE(Sign("reissue", Counted("05", "00000002"), false)) << "a rotation's tag";
 }
 
+// A resume hands the app a rotation it never received: the app's rotation data for that count, checked
+// like a rotation's (the wallet signs and pays nothing for it).
+TEST(BoltSign, AResumeNamesTheAppsRotationForACount) {
+    EXPECT_TRUE(Sign("resume", Counted("05", "00000002")));
+    EXPECT_TRUE(Sign("resume", Counted("05", "00000002"), false));
+    EXPECT_FALSE(Sign("resume", Counted("06", "00000002"))) << "a reissue's tag";
+    EXPECT_FALSE(Sign("resume", Counted("05", "00000000"))) << "count 0";
+    EXPECT_FALSE(Sign("resume", Counted("05", "00000002", "02" + std::string(64, 'c')))) << "another app";
+    EXPECT_FALSE(Sign("resume", "")) << "no data";
+}
+
 TEST(BoltSign, AWriteIsAJsonObjectOfAtMost64KiB) {
     EXPECT_FALSE(Sign("write", "")) << "empty";
     EXPECT_FALSE(Sign("write", "[1,2]")) << "not an object";
