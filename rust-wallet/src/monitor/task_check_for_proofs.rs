@@ -126,8 +126,9 @@ pub async fn run(state: &web::Data<AppState>, client: &reqwest::Client) -> Resul
             let mins = (tx_info.age_secs % 3600) / 60;
             warn!("   ⏰ {} exceeded timeout ({}h{}m) — final oracle check",
                   &txid[..txid.len().min(16)], hours, mins);
-            match oracle_quorum_check(client, txid).await {
-                OracleVerdict::Present { any_confirmed: true } => {
+            let verdict = oracle_quorum_check(client, txid).await;
+            match (timeout_action(&verdict, crate::chain_mode::is_spv()), &verdict) {
+                (TimeoutAction::Confirm, _) => {
                     if let Some(count) = try_whatsonchain_confirmation(state, client, txid).await {
                         confirmed_count += count;
                     } else {
@@ -135,20 +136,24 @@ pub async fn run(state: &web::Data<AppState>, client: &reqwest::Client) -> Resul
                               &txid[..txid.len().min(16)]);
                     }
                 }
-                OracleVerdict::Present { any_confirmed: false } => {
+                (TimeoutAction::Retry, OracleVerdict::Inconclusive(reasons)) => {
+                    warn!("   ⏳ {} timed out but Arcade gave no answer ({}) — not failing it, retrying next tick",
+                          &txid[..txid.len().min(16)], reasons);
+                }
+                (_, OracleVerdict::Present { any_confirmed: false }) => {
                     // In someone's mempool but past timeout — still fail
                     warn!("   ❌ {} in mempool but past timeout — marking failed",
                           &txid[..txid.len().min(16)]);
                     mark_failed(state, txid);
                 }
-                OracleVerdict::AllNotFound => {
+                (_, OracleVerdict::AllNotFound) => {
                     warn!("   ❌ {} timed out and not found on any oracle — marking failed",
                           &txid[..txid.len().min(16)]);
                     mark_failed(state, txid);
                 }
-                OracleVerdict::Inconclusive(reasons) => {
-                    warn!("   ⚠️ {} timed out but oracle quorum inconclusive ({}) — forcing failure",
-                          &txid[..txid.len().min(16)], reasons);
+                (_, verdict) => {
+                    warn!("   ⚠️ {} timed out but oracle quorum inconclusive ({:?}) — forcing failure",
+                          &txid[..txid.len().min(16)], verdict);
                     mark_failed(state, txid);
                 }
             }
@@ -935,6 +940,30 @@ enum OracleVerdict {
     Inconclusive(String),
 }
 
+/// What the final oracle check does with a tx past its timeout.
+#[derive(Debug, PartialEq)]
+enum TimeoutAction {
+    /// An oracle saw it mined: fetch and store the proof.
+    Confirm,
+    /// Fail it (ghost outputs deleted, inputs restored).
+    Fail,
+    /// No signal either way: ask again next tick.
+    Retry,
+}
+
+/// The final check's decision. In spv mode Arcade is the only oracle, so an error from it (outage,
+/// 5xx) proves nothing: the tx may be mined, and failing it would restore inputs it already spent
+/// (ChainBrowsers docs/issues/hodos-spv-outage-fails-mined-txs.md). Public mode keeps its forced
+/// failure on an inconclusive three-oracle answer.
+fn timeout_action(verdict: &OracleVerdict, spv: bool) -> TimeoutAction {
+    match verdict {
+        OracleVerdict::Present { any_confirmed: true } => TimeoutAction::Confirm,
+        OracleVerdict::Present { any_confirmed: false } | OracleVerdict::AllNotFound => TimeoutAction::Fail,
+        OracleVerdict::Inconclusive(_) if spv => TimeoutAction::Retry,
+        OracleVerdict::Inconclusive(_) => TimeoutAction::Fail,
+    }
+}
+
 /// Map Arcade's answer onto the oracle verdict (spv mode: Arcade is the only oracle).
 /// `NotFound` is authoritative because every tx the wallet broadcasts goes through
 /// Arcade; transport/other errors are no signal.
@@ -1086,6 +1115,20 @@ mod spv_oracle_tests {
             merkle_path_bump: None,
             raw_provider_status: None,
         })
+    }
+
+    /// ChainBrowsers docs/issues/hodos-spv-outage-fails-mined-txs.md: in spv mode Arcade is the only
+    /// oracle, so an error from it says nothing about the tx; past the timeout the wallet must keep
+    /// asking, not fail its own (possibly mined) tx and restore its inputs. Public mode is unchanged.
+    #[test]
+    fn past_the_timeout_an_unreachable_arcade_is_retried_in_spv_mode_never_failed() {
+        let inconclusive = OracleVerdict::Inconclusive("arcade: transport".into());
+        assert_eq!(timeout_action(&inconclusive, true), TimeoutAction::Retry);
+        assert_eq!(timeout_action(&inconclusive, false), TimeoutAction::Fail, "public mode: unchanged");
+        assert_eq!(timeout_action(&OracleVerdict::AllNotFound, true), TimeoutAction::Fail, "a 404 or REJECTED still fails");
+        assert_eq!(timeout_action(&OracleVerdict::Present { any_confirmed: false }, true), TimeoutAction::Fail);
+        assert_eq!(timeout_action(&OracleVerdict::Present { any_confirmed: true }, true), TimeoutAction::Confirm);
+        assert_eq!(timeout_action(&OracleVerdict::Present { any_confirmed: true }, false), TimeoutAction::Confirm);
     }
 
     #[test]
