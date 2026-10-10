@@ -356,6 +356,7 @@ const SIGN_TITLES: Record<SignKind, string> = {
   write: 'Approve a change',
   rotate: 'Change your signing key',
   reissue: 'Recover your account',
+  resume: 'Finish changing your signing key',
 };
 
 const moves = (kind: SignKind) => kind === 'rotate' || kind === 'reissue';
@@ -452,6 +453,12 @@ export const BoltSignPrompt: React.FC<{ requestKey: string; domain: string; onDo
           </pre>
         </div>
       )}
+      {args.kind === 'resume' && (
+        <p style={{ margin: '0 0 12px', fontSize: '14px', color: COLORS.text, lineHeight: 1.6 }}>
+          This wallet already moved your account on {domain} to a new signing key, but {domain} never
+          received it. Send it the move it asked for. Nothing is signed or spent.
+        </p>
+      )}
       {args.kind === 'reissue' && (
         <p style={{ margin: '0 0 12px', fontSize: '14px', color: COLORS.text, lineHeight: 1.6 }}>
           {domain} asks you to recover your account: your identity key makes a new identity token and
@@ -496,7 +503,7 @@ export const BoltSignPrompt: React.FC<{ requestKey: string; domain: string; onDo
       <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
         <HodosButton variant="secondary" onClick={decline} disabled={!!busy}>Decline</HodosButton>
         <HodosButton variant="primary" onClick={approve} disabled={!!busy || !choice}>
-          {args.kind === 'write' ? 'Sign this change' : args.kind === 'reissue' ? 'Recover' : args.kind === 'rotate' ? 'Change key' : 'Sign'}
+          {args.kind === 'write' ? 'Sign this change' : args.kind === 'reissue' ? 'Recover' : args.kind === 'rotate' ? 'Change key' : args.kind === 'resume' ? 'Send it' : 'Sign'}
         </HodosButton>
       </div>
     </div>

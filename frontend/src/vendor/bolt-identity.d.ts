@@ -29,7 +29,7 @@ export interface Presentation {
 }
 
 /** What the page's /bolt/sign asks: a holder-key signature, or a move of the identity token. */
-export type SignKind = 'signin' | 'refresh' | 'write' | 'rotate' | 'reissue';
+export type SignKind = 'signin' | 'refresh' | 'write' | 'rotate' | 'reissue' | 'resume';
 
 export interface SignAnswer {
   identity?: string;

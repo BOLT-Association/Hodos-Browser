@@ -99,12 +99,13 @@ inline bool ValidateBoltSign(const std::string& kind, const std::string& appPubK
         }
         return true;
     }
-    if (kind == "rotate" || kind == "reissue") {
+    if (kind == "rotate" || kind == "reissue" || kind == "resume") {
         if (kind == "reissue" && silent) {
             why = "a reissue is never silent";
             return false;
         }
-        return ValidateCountedData(kind == "rotate" ? "05" : "06", appPubKey, payload, why);
+        // A resume hands the app a rotation it never received: the app's rotation data for that count.
+        return ValidateCountedData(kind == "reissue" ? "06" : "05", appPubKey, payload, why);
     }
     if (kind == "write") {
         if (payload.empty() || payload.size() > kBoltSignMaxPayload) {
@@ -118,7 +119,7 @@ inline bool ValidateBoltSign(const std::string& kind, const std::string& appPubK
         }
         return true;
     }
-    why = "kind must be signin, refresh, write, rotate or reissue";
+    why = "kind must be signin, refresh, write, rotate, reissue or resume";
     return false;
 }
 
