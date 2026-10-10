@@ -7,6 +7,8 @@ export interface IdentityApp {
   keepSignedIn: boolean;
   /** The name the app accepted for this identity (the app's text, reported after a sign-in). */
   label?: string;
+  /** When this identity was last used with this app (ms); `forApp` lists the last used first. */
+  lastUsedAt?: number;
   linkedAt: number;
 }
 
