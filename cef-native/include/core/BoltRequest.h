@@ -150,6 +150,46 @@ inline bool ValidateBoltSignHolder(const std::string& kind, const nlohmann::json
     return true;
 }
 
+// The name an app accepted for one of its identities (POST /bolt/label): the app's key, the identity
+// (its issuer key) and 1 to 64 characters of UTF-8 text with no control characters. False with the
+// reason in `why`.
+inline bool ValidateBoltLabel(const std::string& appPubKey, const std::string& identity, const std::string& name,
+                              std::string& why) {
+    if (!IsAppKey(appPubKey)) {
+        why = "the app key must be a 33-byte compressed public key (lower-case hex)";
+        return false;
+    }
+    if (!IsAppKey(identity)) {
+        why = "the identity is its issuer key: 33 bytes, compressed, lower-case hex";
+        return false;
+    }
+    std::size_t chars = 0;
+    for (std::size_t i = 0; i < name.size(); ++chars) {
+        const unsigned char c = static_cast<unsigned char>(name[i]);
+        const std::size_t len = c < 0x80 ? 1 : (c >> 5) == 0x6 ? 2 : (c >> 4) == 0xe ? 3 : (c >> 3) == 0x1e ? 4 : 0;
+        if (len == 0 || i + len > name.size()) {
+            why = "a name is UTF-8 text";
+            return false;
+        }
+        for (std::size_t k = 1; k < len; ++k) {
+            if ((static_cast<unsigned char>(name[i + k]) >> 6) != 0x2) {
+                why = "a name is UTF-8 text";
+                return false;
+            }
+        }
+        if (len == 1 && (c < 0x20 || c == 0x7f)) {
+            why = "a name has no control characters";
+            return false;
+        }
+        i += len;
+    }
+    if (chars < 1 || chars > 64) {
+        why = "a name is 1 to 64 characters";
+        return false;
+    }
+    return true;
+}
+
 // Only an https main frame may ask for an identity or a signature (audit H3): `cefMessage`, the raw
 // IPC under the wallet bridge, reaches every frame, so a subframe or a plain-http page could
 // otherwise send the request itself. `frameUrl` is the asking frame's own URL.

@@ -2875,6 +2875,48 @@ static void HandleBoltSign(const std::string& requestId,
                        kBoltPromptTimeoutMs);
 }
 
+// The name an app accepted for one of its identities (POST /bolt/label), reported by the page after a
+// successful sign-in: the wallet keeps it on that identity's link to this site and shows it instead of
+// a key. Never prompted: the preloaded notification browser's `window.boltLabel` keeps it only for an
+// identity already linked to this app here, and answers with `bolt_result`.
+static void HandleBoltLabel(const std::string& requestId,
+                            const std::string& bodyJson,
+                            const std::string& origin,
+                            CefRefPtr<CefFrame> frame) {
+    const nlohmann::json body = nlohmann::json::parse(bodyJson, nullptr, false);
+    if (body.is_discarded() || !body.is_object()) {
+        sendWalletResponseIpc(frame, requestId, false, BoltErrorJson("BOLT: the request is not JSON", ""));
+        return;
+    }
+    const std::string appPubKey = body.value("appPubKey", std::string());
+    const std::string identity = body.value("identity", std::string());
+    const std::string name = body.contains("name") && body["name"].is_string() ? body["name"].get<std::string>() : std::string();
+    std::string why;
+    if (!hodos::ValidateBoltLabel(appPubKey, identity, name, why)) {
+        sendWalletResponseIpc(frame, requestId, false, BoltErrorJson("BOLT: " + why, ""));
+        return;
+    }
+    CefRefPtr<CefBrowser> overlay = SimpleHandler::GetNotificationBrowser();
+    if (!overlay || !overlay->GetMainFrame()) {
+        sendWalletResponseIpc(frame, requestId, false, BoltErrorJson("BOLT: the wallet's prompt is not ready", ""));
+        return;
+    }
+    std::string key;
+    {
+        std::lock_guard<std::mutex> lock(g_boltMutex);
+        key = "bolt-" + std::to_string(++g_boltNext);
+        g_boltPending[key] = BoltPending{frame, requestId, origin, ""};
+    }
+    nlohmann::json args = {{"key", key}, {"domain", origin}, {"appPubKey", appPubKey}, {"identity", identity}, {"name", name}};
+    const std::string js = "if(window.boltLabel){window.boltLabel('" + escapeJsonForJs(args.dump()) +
+                           "')}else{window.cefMessage&&window.cefMessage.send('bolt_result',['" +
+                           escapeJsonForJs(key) + "',false,'" +
+                           escapeJsonForJs(BoltErrorJson("BOLT: the wallet's prompt is not loaded", "")) +
+                           "'])}";
+    overlay->GetMainFrame()->ExecuteJavaScript(js, "", 0);
+    CefPostDelayedTask(TID_UI, new BoltTimeoutTask(key, "BOLT: the wallet did not answer", ""), kBoltSilentTimeoutMs);
+}
+
 // Phase 2.5 Commit 6 sub-step 6.d.A — top-level wallet_call IPC dispatch.
 // See header for design intent. Called from simple_handler.cpp's wallet_call
 // IPC handler in sub-step 6.d.B (which is when external dApp traffic first
@@ -2924,7 +2966,7 @@ void HandleIpcWalletCall(
     // AuthBOLT: answered by Hodos's own prompt (or, under the person's grant, its silent signer),
     // never forwarded to the wallet by the page. The prompt is the consent, so it needs no domain
     // trust first; only an https main frame may ask (BoltRequest.h, audit H3).
-    if (endpoint == "/bolt/request" || endpoint == "/bolt/sign" || endpoint == "/bolt/fund-result") {
+    if (endpoint == "/bolt/request" || endpoint == "/bolt/sign" || endpoint == "/bolt/fund-result" || endpoint == "/bolt/label") {
         std::string why;
         if (!capturedFrame) return;  // nobody to answer
         if (!hodos::BoltFrameAllowed(capturedFrame->IsMain(), capturedFrame->GetURL().ToString(), why)) {
@@ -2935,6 +2977,8 @@ void HandleIpcWalletCall(
             HandleBoltRequest(requestId, bodyJson, origin, capturedFrame);
         } else if (endpoint == "/bolt/sign") {
             HandleBoltSign(requestId, bodyJson, origin, capturedFrame);
+        } else if (endpoint == "/bolt/label") {
+            HandleBoltLabel(requestId, bodyJson, origin, capturedFrame);
         } else {
             HandleBoltFundResult(requestId, bodyJson, origin, capturedFrame);
         }

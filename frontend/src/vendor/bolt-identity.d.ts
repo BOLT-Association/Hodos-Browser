@@ -5,6 +5,8 @@ export interface IdentityApp {
   domain: string;
   appPubKey: string;
   keepSignedIn: boolean;
+  /** The name the app accepted for this identity (the app's text, reported after a sign-in). */
+  label?: string;
   linkedAt: number;
 }
 
@@ -66,6 +68,8 @@ export interface IdentityWallet {
   present(o: { id: string; domain: string; appPubKey: string; data: string; keepSignedIn?: boolean; funder: Funder }): Promise<Presentation>;
   setKeepSignedIn(o: { id: string; domain: string; appPubKey: string; keep: boolean }): Promise<void>;
   forget(o: { id: string; domain: string; appPubKey: string }): Promise<void>;
+  /** Keep the name an app accepted for `identity` (its issuer key), only if it is linked to that app here. */
+  label(o: { domain: string; appPubKey: string; identity: string; name: string }): Promise<void>;
 }
 
 /** `call(endpoint, body)` resolves with the wallet's JSON reply and throws on an error reply. */

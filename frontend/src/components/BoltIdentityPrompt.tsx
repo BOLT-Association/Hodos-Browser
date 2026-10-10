@@ -59,6 +59,13 @@ function answer(key: string, ok: boolean, payload: unknown) {
 
 const short = (hex: string) => `${hex.slice(0, 8)}…${hex.slice(-6)}`;
 
+/**
+ * The name an app accepted for an identity (BOLT.label, after a successful sign-in): for that app on
+ * that site when given, else the first the identity has. The app's text, rendered as text only.
+ */
+const nameOf = (t: Identity, app?: { domain: string; appPubKey: string }) =>
+  (app ? t.apps.find((a) => a.domain === app.domain && a.appPubKey === app.appPubKey) : t.apps.find((a) => a.label))?.label;
+
 /** A coin request waiting for the page's answer, by request key (a move asks one at a time). */
 const coinAsks = new Map<string, { resolve: (coin: Coin) => void; reject: (e: Error) => void }>();
 const COIN_TIMEOUT_MS = 60_000;
@@ -84,8 +91,8 @@ const funderFor = async (key: string): Promise<Funder> =>
 
 /**
  * Install what C++ calls in the preloaded notification browser: `boltSign` (a silent /bolt/sign),
- * `boltSignPrompt` (a prompted one's arguments, before its screen shows) and `boltFundResult` (the
- * page's answer to a coin request).
+ * `boltSignPrompt` (a prompted one's arguments, before its screen shows), `boltLabel` (the name an
+ * app accepted for an identity) and `boltFundResult` (the page's answer to a coin request).
  */
 export function registerBoltHandlers() {
   const page = window as unknown as Record<string, unknown>;
@@ -116,6 +123,21 @@ export function registerBoltHandlers() {
       signRequests.set(args.key, args);
       window.dispatchEvent(new Event('bolt-sign-args'));
     } catch { /* malformed: the request times out as declined */ }
+  };
+  // POST /bolt/label, never shown: keep the name the app accepted for an identity linked to it.
+  page.boltLabel = async (argsJson: string) => {
+    let args: { key: string; domain: string; appPubKey: string; identity: string; name: string };
+    try {
+      args = JSON.parse(argsJson);
+    } catch {
+      return;
+    }
+    try {
+      await (await identities()).label({ domain: args.domain, appPubKey: args.appPubKey, identity: args.identity, name: args.name });
+      answer(args.key, true, { ok: true });
+    } catch (e) {
+      refuse(args.key, e);
+    }
   };
   page.boltFundResult = (json: string) => {
     let got: { key?: string; coin?: Coin; error?: string };
@@ -259,7 +281,7 @@ export const BoltIdentityPrompt: React.FC<Props> = ({ requestKey, domain, appPub
     </label>
   );
   const linkedTo = (t: Identity) => {
-    const sites = [...new Set(t.apps.map((a) => a.domain))];
+    const sites = [...new Set(t.apps.map((a) => (a.label ? `${a.label} on ${a.domain}` : a.domain)))];
     return sites.length ? `Linked to ${sites.join(', ')}` : 'Not linked to any site';
   };
 
@@ -285,7 +307,7 @@ export const BoltIdentityPrompt: React.FC<Props> = ({ requestKey, domain, appPub
         <div style={{ marginBottom: '12px' }}>
           {linked.map((t) => row(t.id, `Your identity for this site`, `${short(t.issuer)} · ${linkedTo(t)}`))}
           {linked.length === 0 && row(NEW, 'A new identity for this site', 'Recommended: its own key, so other sites cannot tell it is you')}
-          {(showOthers || linked.length === 0) && others.map((t) => row(t.id, `Identity ${short(t.issuer)}`, linkedTo(t)))}
+          {(showOthers || linked.length === 0) && others.map((t) => row(t.id, nameOf(t) ? `${nameOf(t)} · ${short(t.issuer)}` : `Identity ${short(t.issuer)}`, linkedTo(t)))}
           {linked.length > 0 && showOthers && row(NEW, 'A new identity for this site', 'Its own key, unlinked from your others')}
           {linked.length > 0 && !showOthers && (
             <button type="button" onClick={() => setShowOthers(true)}
@@ -452,9 +474,15 @@ export const BoltSignPrompt: React.FC<{ requestKey: string; domain: string; onDo
       {linked !== null && linked.length > 1 && linked.map((t) => (
         <label key={t.id} style={{ display: 'flex', gap: '8px', alignItems: 'center', color: COLORS.text, fontSize: '14px', marginBottom: '6px' }}>
           <input type="radio" name="bolt-sign-identity" checked={choice === t.id} onChange={() => setChoice(t.id)} />
-          Identity {short(t.issuer)}
+          {nameOf(t, args) ? `${nameOf(t, args)} · ${short(t.issuer)}` : `Identity ${short(t.issuer)}`}
         </label>
       ))}
+      {linked !== null && linked.length === 1 && nameOf(linked[0], args) && (
+        <p style={{ margin: '0 0 12px', fontSize: '14px', color: COLORS.text }}>
+          As <strong>{nameOf(linked[0], args)}</strong>
+          <span style={{ color: COLORS.muted, fontSize: '12px' }}> · {short(linked[0].issuer)}</span>
+        </p>
+      )}
       {(args.kind === 'signin' || args.kind === 'refresh') && (
         <label style={{ display: 'flex', gap: '8px', alignItems: 'center', color: COLORS.text, fontSize: '14px', margin: '4px 0 16px' }}>
           <input type="checkbox" checked={keepSignedIn} onChange={(e) => setKeepSignedIn(e.target.checked)} />
