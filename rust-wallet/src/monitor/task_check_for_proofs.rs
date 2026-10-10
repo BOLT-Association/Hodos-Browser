@@ -599,7 +599,7 @@ async fn create_proven_tx_from_arc(
     block_height: u64,
     block_hash: &str,
 ) -> Result<i64, String> {
-    let tsc_json = crate::beef::parse_bump_hex_to_tsc(merkle_path_hex)?;
+    let tsc_json = crate::beef::parse_bump_hex_to_tsc_for(merkle_path_hex, txid)?;
 
     let height = tsc_json["height"].as_u64().unwrap_or(block_height) as u32;
     let tx_index = tsc_json["index"].as_u64().unwrap_or(0);

@@ -99,7 +99,7 @@ cargo check              # Fast type-check without building
 | `src/overlay/ship_cache.rs` | `ShipDiscoveryCache` — SWR cache for SHIP host discovery (fresh < 5 min / stale 5–30 min spawns bg refresh / very-stale ≥ 30 min blocks). No-poison invariant: empty fetch results never overwrite or store. 9 unit tests. |
 | `src/services/` | `WalletServices` facade: `CallClass` per-call-class timeouts, `ProviderCollection`, and 9 providers in `providers/` (`whatsonchain`, `arcade`, `chaintracks`, `arc_gorillapool`, `arc_taal`, `gorillapool_mapi`, `gorillapool_ordinals`, `junglebus`, `bitails`) |
 | `src/arc_status.rs` | Centralized ARC miner response status classification (txStatus ladder) |
-| `src/beef.rs` | BEEF parser: `tsc_proof_to_bump`, `parse_bump_hex_to_tsc`, `compute_merkle_root_from_tsc`, `validate_beef_v1_hex`, `validate_beef_ancestry`, `read_node_offset` |
+| `src/beef.rs` | BEEF parser: `tsc_proof_to_bump`, `parse_bump_hex_to_tsc_for` (BUMP → TSC for one txid: the leaf is found by hash, since a BUMP may flag several client txids; every proof path uses it), `parse_bump_hex_to_tsc` (assumes one flagged leaf; tests only), `compute_merkle_root_from_tsc`, `validate_beef_v1_hex`, `validate_beef_ancestry`, `read_node_offset` |
 | `src/beef_helpers.rs` | Recursive BEEF building with ancestry chain and proof fetching |
 | `src/transaction/sighash.rs` | BSV ForkID SIGHASH implementation |
 | `src/script/` | Bitcoin script `parser.rs` + `pushdrop.rs` (BRC-48) |

@@ -1413,6 +1413,57 @@ mod verify_bumps_tests {
         assert_eq!(c.bump_hex_for(&txid), None, "no BUMP mapped to it");
     }
 
+    /// Arcade's proof for the 4th tx of a 4-tx regtest block (height 150, 2026-10-10): the tx at
+    /// offset 3, its sibling at offset 2, then offset 0 one level up. The SDK and chaintracks agree on
+    /// the root; the wallet rejected it ("ARC BUMP has wrong merkle root").
+    #[test]
+    fn arcade_bump_for_the_fourth_tx_of_a_block_gives_the_block_root() {
+        let bump = "9602020302251b2363ae37b7b8f6cd3f4de24e3076c4c68fd724b1bb52d6f8491d583c8ae00202d65a392a75fa5a7affd72fdb912bdefe598003e0da6daaa206ba22797017fb5d01000064c619690d18235d910ae7b4f80d6dbc532242c562c1d44a6fb91e74158a54db";
+        let txid = "e08a3c581d49f8d652bbb124d78fc6c476304ee24d3fcdf6b8b737ae63231b25";
+        // Arcade flags BOTH level-0 leaves as client txids (both are this wallet's): BRC-74 allows a
+        // BUMP to prove several txids, so the leaf is chosen by txid, not by its flag.
+        let tsc = parse_bump_hex_to_tsc_for(bump, txid).unwrap();
+        assert_eq!(tsc["index"].as_u64(), Some(3));
+        let nodes = tsc["nodes"].as_array().cloned().unwrap();
+        assert_eq!(
+            compute_merkle_root_from_tsc(txid, 150, 3, &nodes).unwrap(),
+            "b1816dd5192b28326939fd4c349775572a6d20f1d85a787abbf8f15c939b0838"
+        );
+        // The other flagged leaf proves too, with the same root.
+        let other = "5dfb17707922ba06a2aa6ddae0038059fede2b91db2fd7ff7a5afa752a395ad6";
+        let t2 = parse_bump_hex_to_tsc_for(bump, other).unwrap();
+        assert_eq!(t2["index"].as_u64(), Some(2));
+        let n2 = t2["nodes"].as_array().cloned().unwrap();
+        assert_eq!(compute_merkle_root_from_tsc(other, 150, 2, &n2).unwrap(), "b1816dd5192b28326939fd4c349775572a6d20f1d85a787abbf8f15c939b0838");
+        // A txid the BUMP does not prove is an error, never a proof of something else.
+        assert!(parse_bump_hex_to_tsc_for(bump, &"00".repeat(32)).is_err());
+    }
+
+    /// A compound BUMP proving leaves 0 and 2 of a 4-leaf tree omits the level-1 node for (2,3): it is
+    /// computed from the level-0 leaves, as BRC-74 allows.
+    #[test]
+    fn a_compound_bump_with_an_omitted_computable_node_gives_the_root() {
+        let leaf = |b: u8| [b; 32];
+        let (a, bb, c, d) = (leaf(1), leaf(2), leaf(3), leaf(4));
+        let h = |l: &[u8; 32], r: &[u8; 32]| -> [u8; 32] { let v = dsha(&[l.as_slice(), r.as_slice()].concat()); v.try_into().unwrap() };
+        let mut root = h(&h(&a, &bb), &h(&c, &d)).to_vec();
+        root.reverse();
+        let mut bump = vec![7u8, 2, 4];
+        for (off, flags, hash) in [(0u8, 2u8, a), (1, 0, bb), (2, 2, c), (3, 0, d)] {
+            bump.push(off);
+            bump.push(flags);
+            bump.extend_from_slice(&hash);
+        }
+        bump.push(0); // level 1: nothing given
+        let txid = |x: &[u8; 32]| { let mut v = x.to_vec(); v.reverse(); hex::encode(v) };
+        for (t, index) in [(txid(&a), 0u64), (txid(&c), 2)] {
+            let tsc = parse_bump_hex_to_tsc_for(&hex::encode(&bump), &t).unwrap();
+            assert_eq!(tsc["index"].as_u64(), Some(index));
+            let nodes = tsc["nodes"].as_array().cloned().unwrap();
+            assert_eq!(compute_merkle_root_from_tsc(&t, 7, index, &nodes).unwrap(), hex::encode(&root));
+        }
+    }
+
     #[test]
     fn accepts_matching_root_at_the_claimed_height() {
         let (b, root) = fixture();
@@ -2015,6 +2066,111 @@ pub fn parse_bump_hex_to_tsc(bump_hex: &str) -> Result<serde_json::Value, String
         "index": tx_index,
         "nodes": tsc_nodes,
         "target": "",  // Block hash not available from BUMP - will be looked up if needed
+    }))
+}
+
+/// One BUMP node: its hash (natural byte order) or the duplicate marker.
+#[derive(Clone, Copy)]
+enum BumpNode {
+    Hash([u8; 32]),
+    Duplicate,
+}
+
+/// Parse a BUMP (BRC-74) hex string into a TSC proof **for `txid`** (display hex).
+///
+/// A BUMP may prove several txids (BRC-74: every client leaf carries flag 0x02); Arcade flags the
+/// sibling too when it is also one of the wallet's transactions. So the transaction's leaf is found
+/// by its hash, never by its flag, and the sibling at each level is the node at the sibling
+/// position. A node a compound BUMP omits because it can be computed from the level below is
+/// computed. Errors when `txid` is not a level-0 leaf or a sibling cannot be found or computed.
+pub fn parse_bump_hex_to_tsc_for(bump_hex: &str, txid: &str) -> Result<serde_json::Value, String> {
+    use std::collections::HashMap;
+    use std::io::Read;
+
+    let bytes = hex::decode(bump_hex).map_err(|e| format!("Invalid BUMP hex: {}", e))?;
+    if bytes.is_empty() {
+        return Err("Empty BUMP data".to_string());
+    }
+    let mut want = hex::decode(txid).map_err(|e| format!("Invalid txid hex: {}", e))?;
+    if want.len() != 32 {
+        return Err("txid must be 32 bytes".to_string());
+    }
+    want.reverse(); // display → natural
+
+    let mut cursor = std::io::Cursor::new(bytes.as_slice());
+    let block_height = read_varint(&mut cursor)? as u32;
+    let tree_height = read_u8(&mut cursor)? as usize;
+    if tree_height == 0 {
+        return Err("Invalid BUMP: tree height is 0".to_string());
+    }
+    let mut levels: Vec<HashMap<u64, BumpNode>> = Vec::with_capacity(tree_height);
+    for level in 0..tree_height {
+        let count = read_varint(&mut cursor)? as usize;
+        let mut nodes = HashMap::with_capacity(count);
+        for _ in 0..count {
+            let offset = read_varint(&mut cursor)?;
+            let flags = read_u8(&mut cursor)?;
+            let node = if flags & 0x01 != 0 {
+                BumpNode::Duplicate
+            } else {
+                let mut hash = [0u8; 32];
+                cursor
+                    .read_exact(&mut hash)
+                    .map_err(|e| format!("Failed to read BUMP hash at level {}: {}", level, e))?;
+                BumpNode::Hash(hash)
+            };
+            nodes.insert(offset, node);
+        }
+        levels.push(nodes);
+    }
+
+    let index = levels[0]
+        .iter()
+        .find_map(|(offset, node)| match node {
+            BumpNode::Hash(h) if h.as_slice() == want.as_slice() => Some(*offset),
+            _ => None,
+        })
+        .ok_or_else(|| format!("the BUMP does not prove {}", txid))?;
+
+    // The node at (level, offset): given, or computed from its two children one level down.
+    fn node_at(levels: &[std::collections::HashMap<u64, BumpNode>], level: usize, offset: u64) -> Option<BumpNode> {
+        if let Some(n) = levels[level].get(&offset) {
+            return Some(*n);
+        }
+        if level == 0 {
+            return None;
+        }
+        let left = match node_at(levels, level - 1, offset * 2)? {
+            BumpNode::Hash(h) => h,
+            BumpNode::Duplicate => return None, // a left child is never a duplicate
+        };
+        let right = match node_at(levels, level - 1, offset * 2 + 1)? {
+            BumpNode::Hash(h) => h,
+            BumpNode::Duplicate => left,
+        };
+        use sha2::{Digest, Sha256};
+        let joined = [left.as_slice(), right.as_slice()].concat();
+        Some(BumpNode::Hash(Sha256::digest(Sha256::digest(&joined)).into()))
+    }
+
+    let mut nodes = Vec::with_capacity(tree_height);
+    for level in 0..tree_height {
+        let sibling = (index >> level) ^ 1;
+        match node_at(&levels, level, sibling) {
+            Some(BumpNode::Duplicate) => nodes.push("*".to_string()),
+            Some(BumpNode::Hash(mut h)) => {
+                h.reverse(); // natural → display, as TSC carries it
+                nodes.push(hex::encode(h));
+            }
+            None => return Err(format!("the BUMP has no node {} at level {} for {}", sibling, level, txid)),
+        }
+    }
+
+    Ok(serde_json::json!({
+        "height": block_height,
+        "index": index,
+        "nodes": nodes,
+        "target": "",
     }))
 }
 

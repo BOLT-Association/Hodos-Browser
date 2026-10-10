@@ -10039,7 +10039,7 @@ pub fn cache_arc_merkle_proof(
     merkle_path_hex: &str,
 ) {
     // Parse BUMP hex to TSC format
-    let tsc = match crate::beef::parse_bump_hex_to_tsc(merkle_path_hex) {
+    let tsc = match crate::beef::parse_bump_hex_to_tsc_for(merkle_path_hex, txid) {
         Ok(tsc) => tsc,
         Err(e) => {
             log::warn!("   ⚠️  Failed to parse ARC merklePath for {}: {}", txid, e);
