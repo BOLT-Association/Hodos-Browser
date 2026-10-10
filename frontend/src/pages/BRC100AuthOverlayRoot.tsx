@@ -3,7 +3,7 @@ import DomainPermissionForm from '../components/DomainPermissionForm';
 import { walletFetch } from '../services/walletApi';
 import type { DomainPermissionSettings } from '../components/DomainPermissionForm';
 import { HodosButton } from '../components/HodosButton';
-import { BoltIdentityPrompt, BoltSignPrompt, registerSilentPresenter } from '../components/BoltIdentityPrompt';
+import { BoltIdentityPrompt, BoltSignPrompt, registerBoltHandlers } from '../components/BoltIdentityPrompt';
 import { prompt as promptTheme } from '../styles/hodosTheme';
 // beta.3 Phase 0.8 — the connect modal is a consent surface, so the rule about
 // WHOSE numbers each limit field carries lives in a pure module that is
@@ -347,8 +347,8 @@ const BRC100AuthOverlayRoot: React.FC = () => {
   const [notificationType, setNotificationType] = useState<string>('');
   // AuthBOLT identity request ("bolt_request"): what the page asked, checked by C++ (BoltRequest.h).
   const [boltRequest, setBoltRequest] = useState<{ appPubKey: string; data: string; purpose: string }>({ appPubKey: '', data: '', purpose: '' });
-  // Keep-alives are answered without a window (C++ calls window.boltSilent in this overlay).
-  useEffect(() => { registerSilentPresenter(); }, []);
+  // Silent /bolt/sign requests and the page's coins reach this overlay unseen (C++ calls window.boltSign, boltFundResult).
+  useEffect(() => { registerBoltHandlers(); }, []);
   const [notificationDomain, setNotificationDomain] = useState<string>('');
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [showModifyLimits, setShowModifyLimits] = useState(false);

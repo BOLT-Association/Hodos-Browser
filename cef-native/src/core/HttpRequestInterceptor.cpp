@@ -2597,26 +2597,31 @@ void postIpcAuthTimeout(const std::string& requestId,
 
 // ============================================================================
 // AuthBOLT identity requests (POST /bolt/request) — ChainBrowsers
-// docs/authbolt-registration.md
+// docs/authbolt-registration.md, docs/authbolt-onchain-holder-keys.md
 // ============================================================================
 //
 // A page never presents an AuthBOLT identity itself. It asks; Hodos shows its own prompt (the
 // "bolt_request" type of BRC100AuthOverlayRoot), where the person chooses or creates the identity,
 // and the prompt answers with `bolt_result` (an approval-overlay-only message, IpcAuth.h). The
 // page's wallet_call is held here meanwhile and answered with the presentation, or a refusal.
+// A presentation is only ever a registration, and never silent (BoltRequest.h).
 //
-// A keep-alive or a write (`silent`) is not shown: it goes to the preloaded notification browser's
-// `window.boltSilent`, which presents only for an app the person chose to stay signed in to and
-// otherwise answers NEEDS_PROMPT. The overlay is never made visible for it, and a write is never
-// anything but silent (BoltRequest.h ValidateBoltSilence).
+// The app pays for moving the identity token. The page's request names its fund callback
+// (`fundId`); while the request is pending the wallet in the overlay asks for a coin with
+// `bolt_fund` (approval overlay only), the shell runs the page's `__boltFund`, and the page
+// answers with POST /bolt/fund-result, which the shell hands to the overlay's `boltFundResult`.
+// Only the frame that asked, still on the site that asked, is asked, and only its answer counts.
 //
-// ⛔ Every value that reaches the overlay is checked first (BoltRequest.h): lower-case hex and
-// the four purpose words only, so nothing a page sends can add a query parameter or reach script.
+// ⛔ Every value that reaches the overlay or the page is checked first (BoltRequest.h): lower-case
+// hex, the known words and plain ids only, so nothing a page sends can add a query parameter or
+// reach script.
 namespace {
 
 struct BoltPending {
     CefRefPtr<CefFrame> frame;
     std::string pageRequestId;
+    std::string origin;  // the site that asked: its frame must still show it when asked for a coin
+    std::string fundId;  // the page's fund callback; empty when the request carries none
 };
 
 std::mutex g_boltMutex;
@@ -2625,6 +2630,31 @@ int g_boltNext = 0;
 
 constexpr int kBoltPromptTimeoutMs = 5 * 60 * 1000;   // a person choosing an identity
 constexpr int kBoltSilentTimeoutMs = 20 * 1000;       // a keep-alive, no person involved
+constexpr int kBoltMoveTimeoutMs = 2 * 60 * 1000;     // a silent rotation: two coins from the app, two broadcasts
+
+bool FindBoltPending(const std::string& key, BoltPending& out) {
+    std::lock_guard<std::mutex> lock(g_boltMutex);
+    auto it = g_boltPending.find(key);
+    if (it == g_boltPending.end()) return false;
+    out = it->second;
+    return true;
+}
+
+// The page's answer to a coin request, for the wallet in the overlay (`window.boltFundResult`).
+void SendBoltFundAnswerToOverlay(const nlohmann::json& answer) {
+    CefRefPtr<CefBrowser> overlay = SimpleHandler::GetNotificationBrowser();
+    if (!overlay || !overlay->GetMainFrame()) {
+        LOG_WARNING_HTTP("🪪 BOLT coin answer for " + answer.value("key", std::string()) + ": the wallet's prompt is gone");
+        return;
+    }
+    const std::string js = "if(window.boltFundResult){window.boltFundResult('" + escapeJsonForJs(answer.dump()) + "')}";
+    overlay->GetMainFrame()->ExecuteJavaScript(js, "", 0);
+}
+
+void RefuseBoltFund(const std::string& key, const std::string& why) {
+    LOG_WARNING_HTTP("🪪 BOLT coin request for " + key + " refused: " + why);
+    SendBoltFundAnswerToOverlay({{"key", key}, {"error", "BOLT: " + why}});
+}
 
 std::string BoltErrorJson(const std::string& message, const std::string& code) {
     nlohmann::json j = {{"error", message}, {"status", "error"}};
@@ -2663,17 +2693,84 @@ bool AnswerBoltRequest(const std::string& key, bool ok, const std::string& paylo
     return true;
 }
 
+void ForwardBoltFund(const std::string& key, const std::string& requestJson) {
+    const nlohmann::json req = nlohmann::json::parse(requestJson, nullptr, false);
+    if (req.is_discarded() || !req.is_object() || !req.contains("step") || !req["step"].is_string() ||
+        !req.contains("amount") || !req["amount"].is_number_integer() || !req.contains("tx") || !req["tx"].is_string() ||
+        !req.contains("index") || !req["index"].is_number_integer()) {
+        RefuseBoltFund(key, "the coin request is malformed");
+        return;
+    }
+    const std::string step = req["step"].get<std::string>();
+    const long long amount = req["amount"].get<long long>();
+    const std::string tx = req["tx"].get<std::string>();
+    const long long index = req["index"].get<long long>();
+    std::string why;
+    if (!hodos::ValidateBoltFund(step, amount, tx, index, why)) {
+        RefuseBoltFund(key, why);
+        return;
+    }
+    BoltPending p;
+    if (!FindBoltPending(key, p)) {
+        RefuseBoltFund(key, "no request is waiting (answered or timed out)");
+        return;
+    }
+    if (p.fundId.empty()) {
+        RefuseBoltFund(key, "the page gave no way to pay for moving the identity token (fund)");
+        return;
+    }
+    if (!p.frame || !p.frame->IsValid() || hodos::OriginFromUrl(p.frame->GetURL().ToString()) != p.origin) {
+        RefuseBoltFund(key, "the page that asked has gone");
+        return;
+    }
+    const nlohmann::json request = {{"step", step}, {"amount", amount}, {"tx", tx}, {"index", index}};
+    const std::string js = "if(window.__boltFund){window.__boltFund('" + escapeJsonForJs(p.fundId) + "','" +
+                           escapeJsonForJs(key) + "',JSON.parse('" + escapeJsonForJs(request.dump()) + "'))}";
+    p.frame->ExecuteJavaScript(js, "", 0);
+    LOG_INFO_HTTP("🪪 BOLT " + key + ": asked " + p.origin + " for a " + std::to_string(amount) + " sat coin (" + step + ")");
+}
+
+// The page's answer to a coin request (POST /bolt/fund-result): accepted only from the frame that
+// holds the request, with the funding id it gave, and handed to the wallet in the overlay.
+static void HandleBoltFundResult(const std::string& requestId,
+                                 const std::string& bodyJson,
+                                 const std::string& origin,
+                                 CefRefPtr<CefFrame> frame) {
+    const nlohmann::json r = nlohmann::json::parse(bodyJson, nullptr, false);
+    std::string why;
+    if (!hodos::ValidateBoltFundResult(r, why)) {
+        sendWalletResponseIpc(frame, requestId, false, BoltErrorJson("BOLT: " + why, ""));
+        return;
+    }
+    const std::string key = r["key"].get<std::string>();
+    BoltPending p;
+    if (!FindBoltPending(key, p) || p.fundId != r["fundId"].get<std::string>() || p.origin != origin ||
+        !p.frame || p.frame->GetIdentifier() != frame->GetIdentifier()) {
+        sendWalletResponseIpc(frame, requestId, false, BoltErrorJson("BOLT: no request of this page is waiting for a coin", ""));
+        return;
+    }
+    nlohmann::json answer = {{"key", key}};
+    if (r.contains("error")) {
+        answer["error"] = r["error"];
+    } else {
+        answer["coin"] = r["coin"];
+    }
+    SendBoltFundAnswerToOverlay(answer);
+    sendWalletResponseIpc(frame, requestId, true, "{\"status\":\"ok\"}");
+}
+
 static void HandleBoltRequest(const std::string& requestId,
                               const std::string& bodyJson,
                               const std::string& origin,
                               CefRefPtr<CefFrame> frame) {
-    std::string appPubKey, data, purpose, why;
+    std::string appPubKey, data, purpose, fundId, why;
     bool silent = false;
     try {
         const nlohmann::json body = nlohmann::json::parse(bodyJson);
         appPubKey = body.value("appPubKey", std::string());
         data = body.value("data", std::string());
         purpose = body.value("purpose", std::string());
+        fundId = body.value("fundId", std::string());
         silent = body.value("silent", false);
     } catch (...) {
         sendWalletResponseIpc(frame, requestId, false, BoltErrorJson("BOLT: the request is not JSON", ""));
@@ -2683,33 +2780,18 @@ static void HandleBoltRequest(const std::string& requestId,
         sendWalletResponseIpc(frame, requestId, false, BoltErrorJson("BOLT: " + why, ""));
         return;
     }
+    if (!hodos::IsBoltFundId(fundId)) {
+        sendWalletResponseIpc(frame, requestId, false, BoltErrorJson("BOLT: the funding id is malformed", ""));
+        return;
+    }
 
     std::string key;
     {
         std::lock_guard<std::mutex> lock(g_boltMutex);
         key = "bolt-" + std::to_string(++g_boltNext);
-        g_boltPending[key] = BoltPending{frame, requestId};
+        g_boltPending[key] = BoltPending{frame, requestId, origin, fundId};
     }
-    LOG_INFO_HTTP("🪪 BOLT " + purpose + " request from " + origin + (silent ? " (keep-alive)" : "") + " as " + key);
-
-    if (silent) {
-        CefRefPtr<CefBrowser> overlay = SimpleHandler::GetNotificationBrowser();
-        if (!overlay || !overlay->GetMainFrame()) {
-            AnswerBoltRequest(key, false, BoltErrorJson("BOLT: NEEDS_PROMPT the wallet's prompt is not ready", "NEEDS_PROMPT"));
-            return;
-        }
-        nlohmann::json args = {{"key", key}, {"domain", origin}, {"appPubKey", appPubKey},
-                               {"data", data}, {"purpose", purpose}};
-        const std::string js = "if(window.boltSilent){window.boltSilent('" + escapeJsonForJs(args.dump()) +
-                               "')}else{window.cefMessage&&window.cefMessage.send('bolt_result',['" +
-                               escapeJsonForJs(key) + "',false,'" +
-                               escapeJsonForJs(BoltErrorJson("BOLT: NEEDS_PROMPT the wallet's prompt is not loaded", "NEEDS_PROMPT")) +
-                               "'])}";
-        overlay->GetMainFrame()->ExecuteJavaScript(js, "", 0);
-        CefPostDelayedTask(TID_UI, new BoltTimeoutTask(key, "BOLT: NEEDS_PROMPT the keep-alive got no answer", "NEEDS_PROMPT"),
-                           kBoltSilentTimeoutMs);
-        return;
-    }
+    LOG_INFO_HTTP("🪪 BOLT " + purpose + " request from " + origin + " as " + key);
 
     const std::string extra = "&appPubKey=" + appPubKey + "&data=" + data + "&purpose=" + purpose;
     CefPostTask(TID_UI, new CreateNotificationOverlayTask("bolt_request", origin, extra, key));
@@ -2717,26 +2799,29 @@ static void HandleBoltRequest(const std::string& requestId,
                        kBoltPromptTimeoutMs);
 }
 
-// Holder-key signatures (POST /bolt/sign) — ChainBrowsers docs/authbolt-registration.md, "After
-// registration". The page names a kind and a payload; the wallet builds the digest itself.
+// Holder-key signatures and the moves an app asks for (POST /bolt/sign) — ChainBrowsers
+// docs/authbolt-onchain-holder-keys.md. The page names a kind and a payload; the wallet builds the
+// digest (signin, refresh, write) or the transactions (rotate, reissue: paid by the page's fund) itself.
 //
-// Silent requests go to the preloaded notification browser's `window.boltSign`, which signs only
+// Silent requests go to the preloaded notification browser's `window.boltSign`, which answers only
 // for an app the person chose to stay signed in to, and only what the app's published tiers call
-// silent; otherwise it answers NEEDS_PROMPT and the page asks again, not silent. A prompted request
-// hands its arguments to the same browser (`window.boltSignPrompt`) and then shows the prompt
-// ("bolt_sign"), which reads them by key: a write can be 64 KiB, so only the kind and the app key
-// travel in the overlay's URL. Nothing reaches either unless BoltRequest.h passed it.
+// silent (a reissue never is); otherwise it answers NEEDS_PROMPT and the page asks again, not
+// silent. A prompted request hands its arguments to the same browser (`window.boltSignPrompt`) and
+// then shows the prompt ("bolt_sign"), which reads them by key: a write can be 64 KiB, so only the
+// kind and the app key travel in the overlay's URL. Nothing reaches either unless BoltRequest.h
+// passed it.
 static void HandleBoltSign(const std::string& requestId,
                            const std::string& bodyJson,
                            const std::string& origin,
                            CefRefPtr<CefFrame> frame) {
-    std::string kind, appPubKey, payload, why;
+    std::string kind, appPubKey, payload, fundId, why;
     bool silent = false;
     try {
         const nlohmann::json body = nlohmann::json::parse(bodyJson);
         kind = body.value("kind", std::string());
         appPubKey = body.value("appPubKey", std::string());
         payload = body.value("payload", std::string());
+        fundId = body.value("fundId", std::string());
         silent = body.value("silent", false);
     } catch (...) {
         sendWalletResponseIpc(frame, requestId, false, BoltErrorJson("BOLT: the request is not JSON", ""));
@@ -2744,6 +2829,10 @@ static void HandleBoltSign(const std::string& requestId,
     }
     if (!hodos::ValidateBoltSign(kind, appPubKey, payload, silent, why)) {
         sendWalletResponseIpc(frame, requestId, false, BoltErrorJson("BOLT: " + why, ""));
+        return;
+    }
+    if (!hodos::IsBoltFundId(fundId)) {
+        sendWalletResponseIpc(frame, requestId, false, BoltErrorJson("BOLT: the funding id is malformed", ""));
         return;
     }
     CefRefPtr<CefBrowser> overlay = SimpleHandler::GetNotificationBrowser();
@@ -2757,7 +2846,7 @@ static void HandleBoltSign(const std::string& requestId,
     {
         std::lock_guard<std::mutex> lock(g_boltMutex);
         key = "bolt-" + std::to_string(++g_boltNext);
-        g_boltPending[key] = BoltPending{frame, requestId};
+        g_boltPending[key] = BoltPending{frame, requestId, origin, fundId};
     }
     LOG_INFO_HTTP("🪪 BOLT sign " + kind + " from " + origin + (silent ? " (silent)" : "") + " as " + key);
 
@@ -2772,7 +2861,7 @@ static void HandleBoltSign(const std::string& requestId,
     overlay->GetMainFrame()->ExecuteJavaScript(js, "", 0);
     if (silent) {
         CefPostDelayedTask(TID_UI, new BoltTimeoutTask(key, "BOLT: NEEDS_PROMPT the wallet got no answer", "NEEDS_PROMPT"),
-                           kBoltSilentTimeoutMs);
+                           kind == "rotate" ? kBoltMoveTimeoutMs : kBoltSilentTimeoutMs);
         return;
     }
     const std::string extra = "&kind=" + kind + "&appPubKey=" + appPubKey;
@@ -2830,7 +2919,7 @@ void HandleIpcWalletCall(
     // AuthBOLT: answered by Hodos's own prompt (or, under the person's grant, its silent signer),
     // never forwarded to the wallet by the page. The prompt is the consent, so it needs no domain
     // trust first; only an https main frame may ask (BoltRequest.h, audit H3).
-    if (endpoint == "/bolt/request" || endpoint == "/bolt/sign") {
+    if (endpoint == "/bolt/request" || endpoint == "/bolt/sign" || endpoint == "/bolt/fund-result") {
         std::string why;
         if (!capturedFrame) return;  // nobody to answer
         if (!hodos::BoltFrameAllowed(capturedFrame->IsMain(), capturedFrame->GetURL().ToString(), why)) {
@@ -2839,8 +2928,10 @@ void HandleIpcWalletCall(
         }
         if (endpoint == "/bolt/request") {
             HandleBoltRequest(requestId, bodyJson, origin, capturedFrame);
-        } else {
+        } else if (endpoint == "/bolt/sign") {
             HandleBoltSign(requestId, bodyJson, origin, capturedFrame);
+        } else {
+            HandleBoltFundResult(requestId, bodyJson, origin, capturedFrame);
         }
         return;
     }

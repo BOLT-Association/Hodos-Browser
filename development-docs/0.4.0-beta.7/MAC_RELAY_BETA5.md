@@ -9,6 +9,40 @@
 
 ---
 
+# 📋 ROUND W-07b (**Windows**) — 🍎 **Shared C++ changed again on branch `arcade-provider` (not `0.4.0`): AuthBOLT registration is now an on-chain move paid by the app, and the shell relays the app's coins between the prompt and the page. Rebuild the shell + `hodos_tests` on that branch when you next pull.** No macOS-specific file was touched.
+
+Design: ChainBrowsers `docs/authbolt-onchain-holder-keys.md`. Registering moves the identity token from
+its mint to the identity's first holder key in a commit and a settle, broadcast before the page is
+answered. The app pays: for each transaction the wallet (in the prompt) asks the page for one coin of an
+exact amount, signed by the app's funding wallet with SIGHASH_SINGLE | ANYONECANPAY.
+
+## §1 — 🔨 What changed in shared C++ (all outside `#ifdef` blocks)
+
+| File | Change |
+|---|---|
+| `include/core/BoltRequest.h` | Rewritten checks. `/bolt/request` is a registration only (70 bytes of counted auth data, tag 01, holder count ≥ 1, never silent). `/bolt/sign` kinds: `signin`, `refresh`, `write`, `rotate` (counted, tag 05), `reissue` (counted, tag 06, never silent). New: `IsBoltFundId`, `ValidateBoltFund` (the wallet's coin request), `ValidateBoltFundResult` (the page's answer, an `nlohmann::json`) |
+| `src/core/HttpRequestInterceptor.cpp` | `BoltPending` keeps the asking site and the page's `fundId`. The silent-presentation path (`window.boltSilent`) is gone. New `ForwardBoltFund` (runs the page's `__boltFund` in the frame that asked, only if it still shows the same site) and `HandleBoltFundResult` for `POST /bolt/fund-result` (only from that frame, with that `fundId`; handed to the overlay's `window.boltFundResult`). A silent `rotate` times out after 2 min instead of 20 s |
+| `include/core/HttpRequestInterceptor.h` | Declares `ForwardBoltFund` |
+| `src/handlers/simple_handler.cpp` | The `bolt_fund` arm (`[key, requestJson]` → `ForwardBoltFund`) |
+| `include/core/IpcAuth.h` | `bolt_fund` joins `IsGrantApproveMessage` (approval overlay only) |
+| `include/core/BoltShimScript.h` | Regenerated: the page shim keeps `fund` under an id and answers `__boltFund` |
+| `tests/bolt_request_test.cpp`, `tests/ipc_role_guard_test.cpp` | 14 BOLT tests (was 5); `bolt_fund` in the role-gate family |
+
+Frontend: `BoltIdentityPrompt.tsx` (registration only offers an identity whose token has not moved yet;
+rotate/reissue screens; the coin relay), `bolt-identity.d.ts`, the regenerated `bolt-identity.js`.
+
+## §2 — 📏 Windows results (do NOT inherit them for macOS)
+
+- `hodos_tests` **399 passed, 1 skipped** (the existing `UpdateStagerRig`). **Negative control:** the holder-count check and the reissue-never-silent check removed from `BoltRequest.h` → 3 BOLT tests red; restored → green. `bolt_fund` missing from the family → 2 role-gate tests red.
+- The shell's changed files compile (VS 2022, CEF 150). The live run comes with ChainBrowsers step 6 (`tests/authbolt/peerloop.live.mjs`, on-chain).
+
+## §3 — 🍎 Asks (no owner time needed)
+
+1. **Build** the shell and `hodos_tests`; report any clang warning in `HttpRequestInterceptor.cpp` around `ForwardBoltFund` / `HandleBoltFundResult` (`nlohmann::json::parse(…, nullptr, false)`, `CefFrame::GetIdentifier()` compared as strings, `escapeJsonForJs`).
+2. Nothing else until the Windows live run is reported here.
+
+---
+
 # 📋 ROUND W-07a (**Windows**) — 🍎 **Shared C++ changed on branch `arcade-provider` (BOLT-Association/Hodos-Browser PR #1), NOT on `0.4.0`: `window.BOLT` injection and AuthBOLT identity requests. Please rebuild the shell + `hodos_tests` on that branch and run the four checks in §3.** Built and run on Windows only so far. No macOS-specific file was touched.
 
 ⚠️ **Which branch.** This is the BOLT work (spv mode, `window.BOLT`, AuthBOLT identities), on

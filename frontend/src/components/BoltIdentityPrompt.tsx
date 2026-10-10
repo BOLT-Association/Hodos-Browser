@@ -1,21 +1,24 @@
 // AuthBOLT identity prompt (notification type "bolt_request").
 //
-// A site asked to see an identity (register, sign in). The site never chooses and never signs:
-// the person does, here. The identity already linked to this site is offered first; otherwise a new
-// identity for this site (its own key, so sites cannot link identities the person keeps apart);
-// other identities are behind "Use another identity", each showing the sites it is linked to.
-// The answer goes back to the page that asked as `bolt_result` (C++ holds its request meanwhile).
+// A site asked to register an identity. The site never chooses and never signs: the person does,
+// here. Registering moves the identity token on chain from its mint to the identity's first holder
+// key, so only an identity whose token has not moved yet can register: a new identity for this
+// site (its own key, so sites cannot link identities the person keeps apart) is offered, or an
+// unused one the wallet already holds. The answer goes back to the page that asked as `bolt_result`
+// (C++ holds its request meanwhile).
 //
-// Keep-alives never reach this screen: `registerSilentPresenter` answers them without a window,
-// only for an app the person chose to stay signed in to.
+// The app pays for every move of the token: the wallet asks the page for a coin per transaction
+// (`bolt_fund`; C++ runs the page's fund callback) and the page's answer comes back through
+// `window.boltFundResult`. Nothing the page sends is trusted: the wallet checks each coin's amount,
+// and a coin that is not valid makes the transaction fail on the network.
 //
-// After registering, the app knows the identity's holder key, and the page asks for signatures with
-// POST /bolt/sign (`BoltSignPrompt` below; silently through `window.boltSign`). The wallet builds
-// each digest itself (ChainBrowsers packages/bolt `signDigest`).
+// After registering, the page asks for signatures and the moves the app asks for with POST
+// /bolt/sign (`BoltSignPrompt` below; silently through `window.boltSign`). The wallet builds each
+// digest and transaction itself (ChainBrowsers packages/bolt `signDigest`, `IdentityWallet`).
 import React, { useEffect, useState } from 'react';
 import { HodosButton } from './HodosButton';
 import { walletFetch } from '../services/walletApi';
-import type { Identity, IdentityWallet, SignKind } from '../vendor/bolt-identity.js';
+import type { Coin, CoinRequest, Funder, Identity, IdentityWallet, SignKind } from '../vendor/bolt-identity.js';
 
 // The identity code (b017 + the SDK, ~400 KB) is loaded the first time an AuthBOLT request needs
 // it, not with the overlay: every other prompt type shares this overlay and must stay light.
@@ -56,33 +59,38 @@ function answer(key: string, ok: boolean, payload: unknown) {
 
 const short = (hex: string) => `${hex.slice(0, 8)}…${hex.slice(-6)}`;
 
+/** A coin request waiting for the page's answer, by request key (a move asks one at a time). */
+const coinAsks = new Map<string, { resolve: (coin: Coin) => void; reject: (e: Error) => void }>();
+const COIN_TIMEOUT_MS = 60_000;
+
+function askPage(key: string, request: CoinRequest): Promise<Coin> {
+  return new Promise((resolve, reject) => {
+    coinAsks.get(key)?.reject(new Error('a newer coin request replaced this one'));
+    const timer = window.setTimeout(() => {
+      coinAsks.delete(key);
+      reject(new Error('the site gave no coin in time to pay for moving your identity token'));
+    }, COIN_TIMEOUT_MS);
+    coinAsks.set(key, {
+      resolve: (coin) => { window.clearTimeout(timer); coinAsks.delete(key); resolve(coin); },
+      reject: (e) => { window.clearTimeout(timer); coinAsks.delete(key); reject(e); },
+    });
+    window.cefMessage?.send('bolt_fund', [key, JSON.stringify(request)]);
+  });
+}
+
+/** The app's coins for request `key`, asked of the page that holds it. */
+const funderFor = async (key: string): Promise<Funder> =>
+  (await loadIdentityModule()).textFunder((request) => askPage(key, request));
+
 /**
- * Answer keep-alives and writes with no window (C++ calls `window.boltSilent(json)` in the preloaded
- * notification browser). Presents only when the person chose to stay signed in to that app on that
- * site; otherwise answers NEEDS_PROMPT: a keep-alive's session lapses at its expiry, and a write is
- * not made. A write is one change the person makes in the app (tag 04), signed in passing.
+ * Install what C++ calls in the preloaded notification browser: `boltSign` (a silent /bolt/sign),
+ * `boltSignPrompt` (a prompted one's arguments, before its screen shows) and `boltFundResult` (the
+ * page's answer to a coin request).
  */
-export function registerSilentPresenter() {
-  (window as any).boltSilent = async (argsJson: string) => {
-    let args: { key: string; domain: string; appPubKey: string; data: string; purpose: string };
-    try {
-      args = JSON.parse(argsJson);
-    } catch {
-      return;
-    }
-    try {
-      if (args.purpose !== 'refresh' && args.purpose !== 'write') {
-        throw Object.assign(new Error('only a keep-alive or a write is answered without asking'), { code: 'NEEDS_PROMPT' });
-      }
-      const shown = await (await identities()).refresh({ domain: args.domain, appPubKey: args.appPubKey, data: args.data });
-      answer(args.key, true, { package: shown.package });
-    } catch (e: any) {
-      refuse(args.key, e);
-    }
-  };
-  // POST /bolt/sign, silent: signs only under the grant and only silent-tier writes (the wallet
-  // decides, from the app's published tiers); anything else answers NEEDS_PROMPT.
+export function registerBoltHandlers() {
   const page = window as unknown as Record<string, unknown>;
+  // POST /bolt/sign, silent: answers only under the grant, only silent-tier writes and rotations
+  // (the wallet decides, from the app's published tiers); anything else answers NEEDS_PROMPT.
   page.boltSign = async (argsJson: string) => {
     let args: SignArgs;
     try {
@@ -91,7 +99,10 @@ export function registerSilentPresenter() {
       return;
     }
     try {
-      const got = await (await identities()).answer({ domain: args.domain, appPubKey: args.appPubKey, kind: args.kind, payload: args.payload, silent: true });
+      const got = await (await identities()).answer({
+        domain: args.domain, appPubKey: args.appPubKey, kind: args.kind, payload: args.payload, silent: true,
+        funder: await funderFor(args.key),
+      });
       answer(args.key, true, got);
     } catch (e) {
       refuse(args.key, e);
@@ -105,6 +116,18 @@ export function registerSilentPresenter() {
       signRequests.set(args.key, args);
       window.dispatchEvent(new Event('bolt-sign-args'));
     } catch { /* malformed: the request times out as declined */ }
+  };
+  page.boltFundResult = (json: string) => {
+    let got: { key?: string; coin?: Coin; error?: string };
+    try {
+      got = JSON.parse(json);
+    } catch {
+      return;
+    }
+    const ask = got.key ? coinAsks.get(got.key) : undefined;
+    if (!ask) return; // nothing asked (or it timed out): ignored
+    if (got.coin) ask.resolve(got.coin);
+    else ask.reject(new Error(`the site gave no coin: ${got.error ?? 'no reason given'}`));
   };
 }
 
@@ -158,7 +181,7 @@ export const BoltIdentityPrompt: React.FC<Props> = ({ requestKey, domain, appPub
       let d: ReturnType<IdentityModule['decodeAuthData']> | null = null;
       try {
         const got = m.decodeAuthData(data);
-        d = got.appPubKey === appPubKey && got.purpose === purpose ? got : null;
+        d = got.appPubKey === appPubKey && got.purpose === 'register' && purpose === 'register' ? got : null;
       } catch { /* not auth data: refused below */ }
       if (live) setDecoded(d);
     });
@@ -169,11 +192,12 @@ export const BoltIdentityPrompt: React.FC<Props> = ({ requestKey, domain, appPub
     let live = true;
     (async () => {
       try {
-        const all = await (await identities()).identities();
-        const mine = all.filter((t) => t.apps.some((a) => a.domain === domain && a.appPubKey === appPubKey));
+        // Only a token still at its mint can register (its move to holder 1 is the registration).
+        const unused = (await (await identities()).identities()).filter((t) => t.holderCount === 0);
+        const mine = unused.filter((t) => t.apps.some((a) => a.domain === domain && a.appPubKey === appPubKey));
         if (!live) return;
         setLinked(mine);
-        setOthers(all.filter((t) => !mine.includes(t)));
+        setOthers(unused.filter((t) => !mine.includes(t)));
         setChoice(mine[0]?.id ?? NEW);
         const app = mine[0]?.apps.find((a) => a.domain === domain && a.appPubKey === appPubKey);
         if (app) setKeepSignedIn(app.keepSignedIn);
@@ -198,8 +222,8 @@ export const BoltIdentityPrompt: React.FC<Props> = ({ requestKey, domain, appPub
         setBusy('Creating your identity for this site…');
         id = (await (await identities()).create()).id;
       }
-      setBusy(purpose === 'register' ? 'Preparing your registration…' : 'Signing you in…');
-      const shown = await (await identities()).present({ id, domain, appPubKey, data, keepSignedIn });
+      setBusy('Registering your identity (the site pays the network fees)…');
+      const shown = await (await identities()).present({ id, domain, appPubKey, data, keepSignedIn, funder: await funderFor(requestKey) });
       answer(requestKey, true, { package: shown.package });
       onDone();
     } catch (e: any) {
@@ -221,7 +245,6 @@ export const BoltIdentityPrompt: React.FC<Props> = ({ requestKey, domain, appPub
     );
   }
 
-  const title = purpose === 'register' ? 'Create an account' : 'Sign in';
   const row = (id: string, label: React.ReactNode, detail: string) => (
     <label key={id} style={{ display: 'flex', gap: '10px', alignItems: 'flex-start', padding: '10px 12px',
       border: `1px solid ${choice === id ? COLORS.gold : COLORS.border}`, borderRadius: '8px', cursor: 'pointer', marginBottom: '8px' }}>
@@ -243,13 +266,14 @@ export const BoltIdentityPrompt: React.FC<Props> = ({ requestKey, domain, appPub
         {/* The BOLT Association's mark (boltassociation.com): this is an AuthBOLT request. */}
         <img src="/authbolt.png" alt="" width={36} height={36} style={{ borderRadius: '8px', flex: 'none' }} />
         <h2 style={{ fontSize: '18px', fontWeight: 600, color: COLORS.text, margin: 0 }}>
-          {title} on {domain}
+          Create an account on {domain}
           <span style={{ display: 'block', fontSize: '12px', fontWeight: 500, color: COLORS.muted, marginTop: '2px' }}>with an AuthBOLT identity</span>
         </h2>
       </div>
       <p style={{ margin: '0 0 16px', fontSize: '14px', color: COLORS.text, lineHeight: 1.6 }}>
-        {domain} asks to see an identity token from this wallet. It learns only that identity, and
-        that you chose to show it. No password, and nothing is spent{choice === NEW ? ' except a small network fee to create the token' : ''}.
+        {domain} asks to register an identity token from this wallet. It learns only that identity, and
+        that you chose to show it. No password. {domain} pays the network fees for registering
+        it{choice === NEW ? '; creating the new token costs a small network fee from this wallet' : ''}.
       </p>
 
       {linked === null && !error && <p style={{ color: COLORS.muted }}>Reading your identities…</p>}
@@ -271,7 +295,7 @@ export const BoltIdentityPrompt: React.FC<Props> = ({ requestKey, domain, appPub
 
       <label style={{ display: 'flex', gap: '8px', alignItems: 'center', color: COLORS.text, fontSize: '14px', margin: '4px 0 16px' }}>
         <input type="checkbox" checked={keepSignedIn} onChange={(e) => setKeepSignedIn(e.target.checked)} />
-        Keep me signed in on {domain} (it can renew your session without asking)
+        Keep me signed in on {domain} (it can renew your session and change your signing key without asking)
       </label>
 
       {busy && <p style={{ color: COLORS.muted, margin: '0 0 12px' }}>{busy}</p>}
@@ -280,7 +304,7 @@ export const BoltIdentityPrompt: React.FC<Props> = ({ requestKey, domain, appPub
       <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
         <HodosButton variant="secondary" onClick={decline} disabled={!!busy}>Decline</HodosButton>
         <HodosButton variant="primary" onClick={approve} disabled={!!busy || linked === null || !choice}>
-          {purpose === 'register' ? 'Create account' : 'Sign in'}
+          Create account
         </HodosButton>
       </div>
     </div>
@@ -306,14 +330,16 @@ const SIGN_TITLES: Record<SignKind, string> = {
   refresh: 'Stay signed in',
   write: 'Approve a change',
   rotate: 'Change your signing key',
-  confirm: 'Change your signing key',
-  recover: 'Recover your account',
+  reissue: 'Recover your account',
 };
+
+const moves = (kind: SignKind) => kind === 'rotate' || kind === 'reissue';
 
 /**
  * A prompted /bolt/sign request ("bolt_sign"): a sign-in without the keep-signed-in grant, a change
- * the wallet always asks about (roles, approvals, blocks, a channel's settings), or a recovery with
- * the identity's issuer key. The person sees what is signed, as text, and for which identity.
+ * the wallet always asks about (roles, approvals, blocks, a channel's settings), a key change the
+ * app asked for, or a recovery (a new token from the identity's issuer key). The person sees what
+ * is signed, as text, and for which identity.
  */
 export const BoltSignPrompt: React.FC<{ requestKey: string; domain: string; onDone: () => void }> = ({ requestKey, domain, onDone }) => {
   const [args, setArgs] = useState<SignArgs | undefined>(() => signRequests.get(requestKey));
@@ -358,10 +384,13 @@ export const BoltSignPrompt: React.FC<{ requestKey: string; domain: string; onDo
   const approve = async () => {
     if (!args || !choice) return;
     setError('');
-    setBusy(args.kind === 'recover' ? 'Signing with your identity key…' : 'Signing…');
+    setBusy(moves(args.kind) ? 'Moving your identity token (the site pays the network fees)…' : 'Signing…');
     try {
       const ids = await identities();
-      const got = await ids.answer({ id: choice, domain: args.domain, appPubKey: args.appPubKey, kind: args.kind, payload: args.payload, silent: false });
+      const got = await ids.answer({
+        id: choice, domain: args.domain, appPubKey: args.appPubKey, kind: args.kind, payload: args.payload, silent: false,
+        funder: moves(args.kind) ? await funderFor(requestKey) : undefined,
+      });
       if (args.kind === 'signin' || args.kind === 'refresh') {
         await ids.setKeepSignedIn({ id: choice, domain: args.domain, appPubKey: args.appPubKey, keep: keepSignedIn });
       }
@@ -398,16 +427,17 @@ export const BoltSignPrompt: React.FC<{ requestKey: string; domain: string; onDo
           </pre>
         </div>
       )}
-      {args.kind === 'recover' && (
+      {args.kind === 'reissue' && (
         <p style={{ margin: '0 0 12px', fontSize: '14px', color: COLORS.text, lineHeight: 1.6 }}>
-          {domain} asks you to recover your account: your identity key signs a new signing key for this
-          site, and every session there ends. Do this only if you asked to recover your account.
+          {domain} asks you to recover your account: your identity key makes a new identity token and
+          moves it to a new signing key held by this wallet, and the old token can no longer be used.
+          {' '}{domain} pays the network fees. Do this only if you asked to recover your account.
         </p>
       )}
-      {(args.kind === 'signin' || args.kind === 'refresh' || args.kind === 'rotate' || args.kind === 'confirm') && (
+      {(args.kind === 'signin' || args.kind === 'refresh' || args.kind === 'rotate') && (
         <p style={{ margin: '0 0 12px', fontSize: '14px', color: COLORS.text, lineHeight: 1.6 }}>
-          {args.kind === 'rotate' || args.kind === 'confirm'
-            ? `${domain} asks to move your account to a new signing key held by this wallet.`
+          {args.kind === 'rotate'
+            ? `${domain} asks to move your account to a new signing key held by this wallet. ${domain} pays the network fees.`
             : `${domain} asks you to sign in with the identity you registered there. Nothing is spent.`}
         </p>
       )}
@@ -425,7 +455,7 @@ export const BoltSignPrompt: React.FC<{ requestKey: string; domain: string; onDo
       {(args.kind === 'signin' || args.kind === 'refresh') && (
         <label style={{ display: 'flex', gap: '8px', alignItems: 'center', color: COLORS.text, fontSize: '14px', margin: '4px 0 16px' }}>
           <input type="checkbox" checked={keepSignedIn} onChange={(e) => setKeepSignedIn(e.target.checked)} />
-          Keep me signed in on {domain} (it can renew your session and sign everyday changes without asking)
+          Keep me signed in on {domain} (it can renew your session, sign everyday changes and change your signing key without asking)
         </label>
       )}
 
@@ -435,7 +465,7 @@ export const BoltSignPrompt: React.FC<{ requestKey: string; domain: string; onDo
       <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
         <HodosButton variant="secondary" onClick={decline} disabled={!!busy}>Decline</HodosButton>
         <HodosButton variant="primary" onClick={approve} disabled={!!busy || !choice}>
-          {args.kind === 'write' ? 'Sign this change' : args.kind === 'recover' ? 'Recover' : 'Sign'}
+          {args.kind === 'write' ? 'Sign this change' : args.kind === 'reissue' ? 'Recover' : args.kind === 'rotate' ? 'Change key' : 'Sign'}
         </HodosButton>
       </div>
     </div>

@@ -40,6 +40,8 @@ namespace hodos {
 //                                      empty-requestId → g_pendingModalDomain fallback)
 //   bolt_result                      — answers a page's AuthBOLT request with a presentation
 //                                      the prompt built (an identity disclosure)
+//   bolt_fund                        — the wallet asks the page that asked for a coin to pay a
+//                                      move of its identity token (runs that page's fund callback)
 // NOT here: domain_permission_invalidate — it is legitimately sent from the
 // settings AND wallet panels too (ApprovedSitesTab / DomainPermissionsTab), so it
 // gets a narrower tab-only denial (see IsTabRole) rather than this allowlist.
@@ -51,7 +53,8 @@ inline bool IsGrantApproveMessage(const std::string& name) {
         || name == "approve_identity_key_reveal"
         || name == "approve_key_linkage_reveal"
         || name == "brc100_auth_response"
-        || name == "bolt_result";  // an AuthBOLT presentation for the page that asked (BoltRequest.h)
+        || name == "bolt_result"   // an AuthBOLT presentation for the page that asked (BoltRequest.h)
+        || name == "bolt_fund";    // a coin request to that page while its request is pending
 }
 
 // The ONLY roles that may drive the IsGrantApproveMessage family: the two roles
