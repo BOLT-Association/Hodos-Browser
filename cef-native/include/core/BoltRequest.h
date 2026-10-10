@@ -122,6 +122,34 @@ inline bool ValidateBoltSign(const std::string& kind, const std::string& appPubK
     return false;
 }
 
+// The holder the app expects, named with a signature (a refused sign-in names it): `count` (1 to
+// 2^32-1) and `holder` (its hash, 20 bytes lower-case hex), both or neither, for signin, refresh and
+// write only (a move names its count in its auth data). The wallet derives that holder's key and signs
+// with it only if it hashes to `holder`. False with the reason in `why`.
+inline bool ValidateBoltSignHolder(const std::string& kind, const nlohmann::json& body, std::string& why) {
+    const bool hasCount = body.contains("count"), hasHolder = body.contains("holder");
+    if (!hasCount && !hasHolder) return true;
+    if (kind != "signin" && kind != "refresh" && kind != "write") {
+        why = "only a signature names the holder the app expects";
+        return false;
+    }
+    if (!hasCount || !hasHolder) {
+        why = "the expected holder is a count and its hash, together";
+        return false;
+    }
+    const nlohmann::json& c = body["count"];
+    if (!c.is_number_integer() || c.get<long long>() < 1 || c.get<long long>() > 4294967295LL) {
+        why = "the holder count is a whole number from 1";
+        return false;
+    }
+    const nlohmann::json& h = body["holder"];
+    if (!h.is_string() || h.get<std::string>().size() != 40 || !IsLowerHex(h.get<std::string>())) {
+        why = "the holder is its hash: 20 bytes of lower-case hex";
+        return false;
+    }
+    return true;
+}
+
 // Only an https main frame may ask for an identity or a signature (audit H3): `cefMessage`, the raw
 // IPC under the wallet bridge, reaches every frame, so a subframe or a plain-http page could
 // otherwise send the request itself. `frameUrl` is the asking frame's own URL.

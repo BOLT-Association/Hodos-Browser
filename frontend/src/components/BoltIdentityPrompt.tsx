@@ -101,7 +101,7 @@ export function registerBoltHandlers() {
     try {
       const got = await (await identities()).answer({
         domain: args.domain, appPubKey: args.appPubKey, kind: args.kind, payload: args.payload, silent: true,
-        funder: await funderFor(args.key),
+        count: args.count, holder: args.holder, funder: await funderFor(args.key),
       });
       answer(args.key, true, got);
     } catch (e) {
@@ -147,6 +147,9 @@ interface SignArgs {
   kind: SignKind;
   payload: string;
   silent: boolean;
+  /** The holder the app expects (a refused sign-in named it): its count and hash. Checked by C++. */
+  count?: number;
+  holder?: string;
 }
 
 /** Prompted /bolt/sign requests waiting for their screen, by key. */
@@ -389,7 +392,7 @@ export const BoltSignPrompt: React.FC<{ requestKey: string; domain: string; onDo
       const ids = await identities();
       const got = await ids.answer({
         id: choice, domain: args.domain, appPubKey: args.appPubKey, kind: args.kind, payload: args.payload, silent: false,
-        funder: moves(args.kind) ? await funderFor(requestKey) : undefined,
+        count: args.count, holder: args.holder, funder: moves(args.kind) ? await funderFor(requestKey) : undefined,
       });
       if (args.kind === 'signin' || args.kind === 'refresh') {
         await ids.setKeepSignedIn({ id: choice, domain: args.domain, appPubKey: args.appPubKey, keep: keepSignedIn });

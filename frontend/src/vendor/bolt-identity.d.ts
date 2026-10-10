@@ -54,8 +54,11 @@ export interface Coin {
 }
 
 export interface IdentityWallet {
-  /** Answer a page's /bolt/sign request (silently only under the keep-signed-in grant). */
-  answer(o: { id?: string; domain: string; appPubKey: string; kind: SignKind; payload: string; silent: boolean; funder?: Funder }): Promise<SignAnswer>;
+  /**
+   * Answer a page's /bolt/sign request (silently only under the keep-signed-in grant). `count` and
+   * `holder` name the holder the app expects: the wallet signs with that key only if it holds it.
+   */
+  answer(o: { id?: string; domain: string; appPubKey: string; kind: SignKind; payload: string; silent: boolean; funder?: Funder; count?: number; holder?: string }): Promise<SignAnswer>;
   identities(): Promise<Identity[]>;
   forApp(o: { domain: string; appPubKey: string }): Promise<Identity[]>;
   create(): Promise<Identity>;

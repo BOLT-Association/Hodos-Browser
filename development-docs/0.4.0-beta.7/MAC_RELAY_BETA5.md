@@ -23,17 +23,18 @@ exact amount, signed by the app's funding wallet with SIGHASH_SINGLE | ANYONECAN
 | `include/core/BoltRequest.h` | Rewritten checks. `/bolt/request` is a registration only (70 bytes of counted auth data, tag 01, holder count ≥ 1, never silent). `/bolt/sign` kinds: `signin`, `refresh`, `write`, `rotate` (counted, tag 05), `reissue` (counted, tag 06, never silent). New: `IsBoltFundId`, `ValidateBoltFund` (the wallet's coin request), `ValidateBoltFundResult` (the page's answer, an `nlohmann::json`) |
 | `src/core/HttpRequestInterceptor.cpp` | `BoltPending` keeps the asking site and the page's `fundId`. The silent-presentation path (`window.boltSilent`) is gone. New `ForwardBoltFund` (runs the page's `__boltFund` in the frame that asked, only if it still shows the same site) and `HandleBoltFundResult` for `POST /bolt/fund-result` (only from that frame, with that `fundId`; handed to the overlay's `window.boltFundResult`). A silent `rotate` times out after 2 min instead of 20 s |
 | `include/core/HttpRequestInterceptor.h` | Declares `ForwardBoltFund` |
+| `include/core/BoltRequest.h` + `HttpRequestInterceptor.cpp :: HandleBoltSign` (second commit) | `ValidateBoltSignHolder`: a signature may name the holder the app expects (`count` + `holder` hash, both or neither, signin/refresh/write only); they are passed on to the overlay so the wallet signs with that holder's key when it holds it (a refused sign-in names them) |
 | `src/handlers/simple_handler.cpp` | The `bolt_fund` arm (`[key, requestJson]` → `ForwardBoltFund`) |
 | `include/core/IpcAuth.h` | `bolt_fund` joins `IsGrantApproveMessage` (approval overlay only) |
 | `include/core/BoltShimScript.h` | Regenerated: the page shim keeps `fund` under an id and answers `__boltFund` |
-| `tests/bolt_request_test.cpp`, `tests/ipc_role_guard_test.cpp` | 14 BOLT tests (was 5); `bolt_fund` in the role-gate family |
+| `tests/bolt_request_test.cpp`, `tests/ipc_role_guard_test.cpp` | 15 BOLT tests (was 5); `bolt_fund` in the role-gate family |
 
 Frontend: `BoltIdentityPrompt.tsx` (registration only offers an identity whose token has not moved yet;
 rotate/reissue screens; the coin relay), `bolt-identity.d.ts`, the regenerated `bolt-identity.js`.
 
 ## §2 — 📏 Windows results (do NOT inherit them for macOS)
 
-- `hodos_tests` **399 passed, 1 skipped** (the existing `UpdateStagerRig`). **Negative control:** the holder-count check and the reissue-never-silent check removed from `BoltRequest.h` → 3 BOLT tests red; restored → green. `bolt_fund` missing from the family → 2 role-gate tests red.
+- `hodos_tests` **400 passed, 1 skipped** (the existing `UpdateStagerRig`; 399 at the first commit). **Negative control:** the holder-count check and the reissue-never-silent check removed from `BoltRequest.h` → 3 BOLT tests red; restored → green. `bolt_fund` missing from the family → 2 role-gate tests red.
 - The shell's changed files compile (VS 2022, CEF 150). The live run comes with ChainBrowsers step 6 (`tests/authbolt/peerloop.live.mjs`, on-chain).
 
 ## §3 — 🍎 Asks (no owner time needed)

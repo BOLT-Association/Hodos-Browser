@@ -2816,8 +2816,9 @@ static void HandleBoltSign(const std::string& requestId,
                            CefRefPtr<CefFrame> frame) {
     std::string kind, appPubKey, payload, fundId, why;
     bool silent = false;
+    nlohmann::json body;
     try {
-        const nlohmann::json body = nlohmann::json::parse(bodyJson);
+        body = nlohmann::json::parse(bodyJson);
         kind = body.value("kind", std::string());
         appPubKey = body.value("appPubKey", std::string());
         payload = body.value("payload", std::string());
@@ -2827,7 +2828,7 @@ static void HandleBoltSign(const std::string& requestId,
         sendWalletResponseIpc(frame, requestId, false, BoltErrorJson("BOLT: the request is not JSON", ""));
         return;
     }
-    if (!hodos::ValidateBoltSign(kind, appPubKey, payload, silent, why)) {
+    if (!hodos::ValidateBoltSign(kind, appPubKey, payload, silent, why) || !hodos::ValidateBoltSignHolder(kind, body, why)) {
         sendWalletResponseIpc(frame, requestId, false, BoltErrorJson("BOLT: " + why, ""));
         return;
     }
@@ -2852,6 +2853,10 @@ static void HandleBoltSign(const std::string& requestId,
 
     nlohmann::json args = {{"key", key}, {"domain", origin}, {"appPubKey", appPubKey},
                            {"kind", kind}, {"payload", payload}, {"silent", silent}};
+    if (body.contains("count")) {  // the holder the app expects (checked above)
+        args["count"] = body["count"];
+        args["holder"] = body["holder"];
+    }
     const std::string fn = silent ? "boltSign" : "boltSignPrompt";
     const std::string js = "if(window." + fn + "){window." + fn + "('" + escapeJsonForJs(args.dump()) +
                            "')}else{window.cefMessage&&window.cefMessage.send('bolt_result',['" +
