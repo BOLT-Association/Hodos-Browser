@@ -158,6 +158,28 @@ TEST(BoltSign, TheExpectedHolderIsACountAndAHash) {
     EXPECT_FALSE(ok("signin", {{"count", 2}, {"holder", "a'" + std::string(38, 'a')}}));
 }
 
+// The name an app accepted for an identity (POST /bolt/label, after a successful sign-in): the wallet
+// keeps it to show instead of a key. It reaches the wallet's script, so the shell checks it first.
+// NC: make ValidateBoltLabel return true unconditionally.
+TEST(BoltLabel, ANameIsShortTextForAnIdentityOfThisApp) {
+    const auto ok = [](const std::string& app, const std::string& identity, const std::string& name) {
+        std::string why;
+        return hodos::ValidateBoltLabel(app, identity, name, why);
+    };
+    const std::string id = "03" + std::string(64, 'c');
+    EXPECT_TRUE(ok(kApp, id, "fred"));
+    EXPECT_TRUE(ok(kApp, id, "admin-123.b_c"));
+    EXPECT_TRUE(ok(kApp, id, "Zo\xc3\xab"));  // UTF-8 text ("Zo" + e with diaeresis)
+    EXPECT_TRUE(ok(kApp, id, std::string(64, 'x')));
+    EXPECT_FALSE(ok(kApp, id, ""));
+    EXPECT_FALSE(ok(kApp, id, std::string(65, 'x'))) << "over 64 characters";
+    EXPECT_FALSE(ok(kApp, id, "a\nb")) << "a control character";
+    EXPECT_FALSE(ok(kApp, id, std::string("a\0b", 3)));
+    EXPECT_FALSE(ok(kApp, id, "\xff\xfe")) << "not UTF-8";
+    EXPECT_FALSE(ok("04" + std::string(64, 'a'), id, "fred")) << "not an app key";
+    EXPECT_FALSE(ok(kApp, "zz" + std::string(64, 'c'), "fred")) << "not an identity key";
+}
+
 // Only an https main frame may ask (audit H3): `cefMessage` reaches every frame, so a subframe or a
 // plain-http page could otherwise send wallet_call itself. NC: make BoltFrameAllowed return true.
 TEST(BoltSign, OnlyAnHttpsMainFrameMayAsk) {
