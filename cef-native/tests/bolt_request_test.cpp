@@ -134,6 +134,30 @@ TEST(BoltSign, AReissueIsNeverSilent) {
     EXPECT_FALSE(Sign("reissue", Counted("06", "00000003"), true));
 }
 
+// The app may name the holder it expects (a refused sign-in names it): a count and the holder's hash,
+// together, for a signature only. They reach the wallet's script, so the shell checks them first.
+// NC: make ValidateBoltSignHolder return true unconditionally.
+TEST(BoltSign, TheExpectedHolderIsACountAndAHash) {
+    const auto ok = [](const std::string& kind, const nlohmann::json& body) {
+        std::string why;
+        return hodos::ValidateBoltSignHolder(kind, body, why);
+    };
+    const std::string h(40, 'a');
+    EXPECT_TRUE(ok("signin", nlohmann::json::object())) << "none named";
+    EXPECT_TRUE(ok("signin", {{"count", 2}, {"holder", h}}));
+    EXPECT_TRUE(ok("refresh", {{"count", 1}, {"holder", h}}));
+    EXPECT_TRUE(ok("write", {{"count", 4294967295LL}, {"holder", h}}));
+    EXPECT_FALSE(ok("rotate", {{"count", 2}, {"holder", h}})) << "a move names its count in its data";
+    EXPECT_FALSE(ok("signin", {{"count", 2}})) << "a count without the hash";
+    EXPECT_FALSE(ok("signin", {{"holder", h}})) << "a hash without the count";
+    EXPECT_FALSE(ok("signin", {{"count", 0}, {"holder", h}}));
+    EXPECT_FALSE(ok("signin", {{"count", 4294967296LL}, {"holder", h}}));
+    EXPECT_FALSE(ok("signin", {{"count", "2"}, {"holder", h}})) << "a count as text";
+    EXPECT_FALSE(ok("signin", {{"count", 2}, {"holder", std::string(40, 'A')}})) << "upper case";
+    EXPECT_FALSE(ok("signin", {{"count", 2}, {"holder", h + "aa"}})) << "21 bytes";
+    EXPECT_FALSE(ok("signin", {{"count", 2}, {"holder", "a'" + std::string(38, 'a')}}));
+}
+
 // Only an https main frame may ask (audit H3): `cefMessage` reaches every frame, so a subframe or a
 // plain-http page could otherwise send wallet_call itself. NC: make BoltFrameAllowed return true.
 TEST(BoltSign, OnlyAnHttpsMainFrameMayAsk) {
