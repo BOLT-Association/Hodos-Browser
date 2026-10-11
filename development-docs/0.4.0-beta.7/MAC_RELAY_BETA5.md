@@ -9,6 +9,91 @@
 
 ---
 
+# 📋 ROUND W-07b (**Windows**) — 🍎 **Shared C++ changed again on branch `arcade-provider` (not `0.4.0`): AuthBOLT registration is now an on-chain move paid by the app, and the shell relays the app's coins between the prompt and the page. Rebuild the shell + `hodos_tests` on that branch when you next pull.** No macOS-specific file was touched.
+
+Design: ChainBrowsers `docs/authbolt-onchain-holder-keys.md`. Registering moves the identity token from
+its mint to the identity's first holder key in a commit and a settle, broadcast before the page is
+answered. The app pays: for each transaction the wallet (in the prompt) asks the page for one coin of an
+exact amount, signed by the app's funding wallet with SIGHASH_SINGLE | ANYONECANPAY.
+
+## §1 — 🔨 What changed in shared C++ (all outside `#ifdef` blocks)
+
+| File | Change |
+|---|---|
+| `include/core/BoltRequest.h` | Rewritten checks. `/bolt/request` is a registration only (70 bytes of counted auth data, tag 01, holder count ≥ 1, never silent). `/bolt/sign` kinds: `signin`, `refresh`, `write`, `rotate` (counted, tag 05), `reissue` (counted, tag 06, never silent). New: `IsBoltFundId`, `ValidateBoltFund` (the wallet's coin request), `ValidateBoltFundResult` (the page's answer, an `nlohmann::json`) |
+| `src/core/HttpRequestInterceptor.cpp` | `BoltPending` keeps the asking site and the page's `fundId`. The silent-presentation path (`window.boltSilent`) is gone. New `ForwardBoltFund` (runs the page's `__boltFund` in the frame that asked, only if it still shows the same site) and `HandleBoltFundResult` for `POST /bolt/fund-result` (only from that frame, with that `fundId`; handed to the overlay's `window.boltFundResult`). A silent `rotate` times out after 2 min instead of 20 s |
+| `include/core/HttpRequestInterceptor.h` | Declares `ForwardBoltFund` |
+| `include/core/BoltRequest.h` + `HttpRequestInterceptor.cpp :: HandleBoltSign` (second commit) | `ValidateBoltSignHolder`: a signature may name the holder the app expects (`count` + `holder` hash, both or neither, signin/refresh/write only); they are passed on to the overlay so the wallet signs with that holder's key when it holds it (a refused sign-in names them) |
+| `include/core/BoltRequest.h` (later commits) | `ValidateBoltLabel` (`POST /bolt/label`, handled in `HttpRequestInterceptor.cpp :: HandleBoltLabel`, never prompted) and the `resume` kind in `ValidateBoltSign` (hand the app a rotation it never received: counted data, tag 05, like `rotate`) |
+| `include/core/BoltRequest.h` + `src/core/HttpRequestInterceptor.cpp` (restore) | A restored wallet gets its identity's token back: `ValidateBoltSign` takes kind `restore` (66 bytes, tag 07, this app, never silent), `ValidateBoltSignIssuer` (a restore names its `issuer` and may carry the account's `name`), `ValidateBoltName` (split out of `ValidateBoltLabel`, unchanged), `ValidateBoltRestore` + new route `POST /bolt/restore` (`HandleBoltRestore`, never prompted: the overlay's `window.boltRestore` keeps the app's package only after an approved restore signature). Regenerated `BoltShimScript.h` (`BOLT.restore`). 2 new tests in `tests/bolt_request_test.cpp` |
+| `src/handlers/simple_handler.cpp` | The `bolt_fund` arm (`[key, requestJson]` → `ForwardBoltFund`) |
+| `include/core/IpcAuth.h` | `bolt_fund` joins `IsGrantApproveMessage` (approval overlay only) |
+| `include/core/BoltShimScript.h` | Regenerated: the page shim keeps `fund` under an id and answers `__boltFund`; regenerated again when a token's move began attaching merkle proofs from the wallet's new `POST /boltProof` (Rust only; no C++ change beyond the generated header) |
+| `tests/bolt_request_test.cpp`, `tests/ipc_role_guard_test.cpp` | 15 BOLT tests (was 5); `bolt_fund` in the role-gate family |
+
+Frontend: `BoltIdentityPrompt.tsx` (registration only offers an identity whose token has not moved yet;
+rotate/reissue screens; the coin relay), `bolt-identity.d.ts`, the regenerated `bolt-identity.js`.
+
+## §2 — 📏 Windows results (do NOT inherit them for macOS)
+
+- `hodos_tests` **400 passed, 1 skipped** (the existing `UpdateStagerRig`; 399 at the first commit). **Negative control:** the holder-count check and the reissue-never-silent check removed from `BoltRequest.h` → 3 BOLT tests red; restored → green. `bolt_fund` missing from the family → 2 role-gate tests red.
+- `ValidateBoltSignHolder` forced to `true` → `BoltSign.TheExpectedHolderIsACountAndAHash` red; restored → green.
+- Restore (2026-10-11): `hodos_tests` **404 passed**. Negative control: `ValidateBoltRestore` forced to `true` and the restore's never-silent check removed → `BoltRestore.ARestoreIsTheAppsPackageForAnIdentityAndACount` and `BoltSign.ARestoreSignsTheAppsRestoreDataNamingTheIdentity` red; restored → green. Shell built (VS 2022, CEF 150); live `peerloop.live.mjs` PASS including step 4h (a wallet with no record of its token restores it by account name and signs in).
+- Shell builds (VS 2022, CEF 150). Live, Windows dev build in spv mode on the regtest stack, throwaway data dir: ChainBrowsers `node tests/authbolt/peerloop.live.mjs` **PASS** on chain: registration (the token moved to holder 1, the app's funding wallet paying through the page), holder-key sign-in, a rotation the server asked for (holder 2), a reissue (holder 3), and an unposted move recovered by signing with the holder the server names. Its negative controls `NC_NO_VERIFIER=1` and `NC_NO_FUND=1` fail at registration.
+
+## §3 — 🍎 Asks (no owner time needed)
+
+1. **Build** the shell and `hodos_tests`; report any clang warning in `HttpRequestInterceptor.cpp` around `ForwardBoltFund` / `HandleBoltFundResult` (`nlohmann::json::parse(…, nullptr, false)`, `CefFrame::GetIdentifier()` compared as strings, `escapeJsonForJs`).
+2. The prompt's coin relay (`bolt_fund` → page → `/bolt/fund-result`) runs in the notification overlay: on macOS, please check one registration end to end when you next have the stack up (W-07a §3.2's setup), and that the overlay stays hidden during a silent rotation.
+
+---
+
+# 📋 ROUND W-07a (**Windows**) — 🍎 **Shared C++ changed on branch `arcade-provider` (BOLT-Association/Hodos-Browser PR #1), NOT on `0.4.0`: `window.BOLT` injection and AuthBOLT identity requests. Please rebuild the shell + `hodos_tests` on that branch and run the four checks in §3.** Built and run on Windows only so far. No macOS-specific file was touched.
+
+⚠️ **Which branch.** This is the BOLT work (spv mode, `window.BOLT`, AuthBOLT identities), on
+`arcade-provider` of `BOLT-Association/Hodos-Browser`, based on `main` (`3a22035d`) and open as PR #1.
+It is **not** in the beta cycle and nothing here changes `0.4.0`. Pull that branch to build it.
+Design and status: ChainBrowsers `docs/authbolt-registration.md`; page interface: ChainBrowsers
+`docs/bolt-browser.md`.
+
+## §1 — 🔨 What changed in shared C++ (all outside `#ifdef` blocks)
+
+📏 `git diff --stat origin/main..arcade-provider -- cef-native`:
+
+| File | Change | Commit |
+|---|---|---|
+| `src/handlers/simple_render_process_handler.cpp` | +5: injects `BoltShimScript()` right after `CWI_SHIM_SCRIPT`, same gate (external `https://` main frames only) | `53a9703c` |
+| `include/core/BoltShimScript.h` | **generated** (ChainBrowsers `packages/bolt`, `npm run bundle`): the ~425 KB page script as separate ~16 KB literals joined at runtime, because MSVC caps a literal (C2026). ⚠️ clang has no such cap; nothing to do, but don't "simplify" it into one literal | `53a9703c`, `3c35cc33`, `d6033b5a` |
+| `include/core/BoltRequest.h` | **new**, header-only: `ValidateBoltRequest` (checks a page's `POST /bolt/request`) | `d6033b5a` |
+| `src/core/HttpRequestInterceptor.cpp` | +129: `HandleBoltRequest` / `AnswerBoltRequest`. `HandleIpcWalletCall` diverts `endpoint == "/bolt/request"` (after the wallet-state checks) to them: the page's call is held in a map, the prompt opens through the existing `CreateNotificationOverlayTask("bolt_request", …)`, and the answer goes back through `sendWalletResponseIpc`. Timeouts via `CefPostDelayedTask(TID_UI, …)` (5 min prompt, 20 s keep-alive). A keep-alive (`silent`) is **not shown**: it is `ExecuteJavaScript`'d into `SimpleHandler::GetNotificationBrowser()` as `window.boltSilent(...)` | `d6033b5a` |
+| `include/core/HttpRequestInterceptor.h` | +4: declares `AnswerBoltRequest` | `d6033b5a` |
+| `src/handlers/simple_handler.cpp` | +19: the `bolt_result` arm (`[key, ok, payloadJson]` → `AnswerBoltRequest`) | `d6033b5a` |
+| `include/core/IpcAuth.h` | `bolt_result` joins `IsGrantApproveMessage`, so only the approval overlay role may send it (and it is outside the web-page allowlist by default) | `d6033b5a` |
+| `tests/bolt_request_test.cpp` (new), `tests/ipc_role_guard_test.cpp`, `tests/CMakeLists.txt` | 5 tests for the request checks; `bolt_result` added to the role-gate family | `d6033b5a` |
+
+Frontend (no rebuild of the shell needed for it, but the Mac dev server must serve it): the
+`bolt_request` type in `BRC100AuthOverlayRoot.tsx`, `components/BoltIdentityPrompt.tsx`, a generated
+`src/vendor/bolt-identity.js` loaded lazily, and `public/authbolt.png`.
+
+## §2 — 📏 Windows results (do NOT inherit them for macOS)
+
+- Shell `HodosBrowserShell` builds (VS 2022, CEF 150 `g9ccef04`); `hodos_tests` **390 passed, 1 skipped** (the existing `UpdateStagerRig`). **Negative control:** `ValidateBoltRequest` forced to `true` and `bolt_result` removed from the family → 5 tests red (`FamilyClassified.EveryPrivilegedArmIsRecognised` + 4 `BoltRequest.*`); restored → green.
+- `cargo test --bin hodos-wallet` 770 passed (shared Rust: `/boltTokens` scoping, `identity_guard.rs`, `bolt_tokens` in the backup).
+- Live, Windows dev build in spv mode on the regtest stack, throwaway data dir: ChainBrowsers `node tests/authbolt/peerloop.live.mjs` **PASS** (a page registers, signs in, keeps a session alive silently, signs in again; the prompt is clicked through DevTools on `:9322`). Its negative control (`NC_NO_VERIFIER=1`) fails at registration. `packages/bolt/live/hodos-page.live.mjs` **PASS** (`window.BOLT` on an https page, none on http).
+
+## §3 — 🍎 Asks (no owner time needed)
+
+1. **Build** the shell and `hodos_tests` on `arcade-provider`; run `hodos_tests`. Expect the 5 `BoltRequest.*` cases and the role-gate family to pass. Report any clang warning in `HttpRequestInterceptor.cpp` around `HandleBoltRequest` (it uses `nlohmann::json`, `escapeJsonForJs`, `CefPostDelayedTask`; all already used in that file).
+2. **The prompt opens and answers.** With the regtest stack up and a funded spv wallet (ChainBrowsers `docs/hodos-spv.md`), open an https page that calls `window.BOLT.requestPresentation(...)` (simplest: the live test above, with the macOS equivalent of `--host-resolver-rules="MAP app.lab 127.0.0.1" --ignore-certificate-errors`). Expected: the notification overlay shows "Create an account on app.lab:8443 · with an AuthBOLT identity", and the page's promise resolves after the click. 📏 Please report whether the overlay **gets focus** for its radio buttons and checkbox (OSR keyboard/mouse forwarding; M-01b §2 found a paste gap in another OSR overlay).
+3. **The keep-alive stays invisible.** It relies on the notification browser already existing (`GetNotificationBrowser()` non-null) **without showing its window**. On Windows the overlay is preloaded idle and kept alive. 📏 Please check the macOS notification overlay is likewise alive (but hidden) after the first prompt, and that a `silent` request does **not** bring the window forward. If the browser does not exist yet, the code answers `NEEDS_PROMPT` (the session then lapses; no hang). Report which you see.
+4. **Self-navigation gate.** From a tab, navigate to `http://127.0.0.1:5137/brc100-auth?type=bolt_request&...` and click the prompt's button: `bolt_result` must be **denied** (log line `IPC DENIED (P0.5-B1 self-nav guard): 'bolt_result'`). That is the `IsApprovalOverlayRole` check, shared code, but worth one look on macOS.
+
+## §4 — 🚦 Not urgent
+
+This branch is not in a release. Answer when you next pull; nothing here blocks beta.6/beta.7 work.
+
+---
+
 # 📋 ROUND M-01b (**macOS**) — ✅ **beta.6 macOS smoke: S1–S7 all PASS (S3 with an explained environment gap). Two macOS-only code fixes past the freeze, both smoke-found and 👤 owner-approved: `96aa837` (plist floor 12.0, announced in M-01b-pre) and `8415c31` (⌘V in the wallet overlay). ⇒ Build the release from `8415c31` or later.** Plus a Turnstile investigation: the dev loop is the KNOWN dev-flag cause, the beta.6 engine passes with farbling on, and **the users' trigger is still NOT reproduced**.
 
 **Build under test:** `0.4.0` @ `1c9fa912` (code = the `4fec006` freeze), then + `96aa837`, then + `8415c31`. App rebuilt via `mac_build_run.sh` minus its launch line; the staged engine is unchanged (`cef-binaries-macos-150.0.48-g7d50c1c`, M-30b). ⚠️ The first sign failed on the known stray `Contents/MacOS/debug.log` (from a 09-30 run); removed and re-signed; `codesign --verify --deep --strict` OK. The embedded Renderer helper was refreshed at the same build time. Wallet `cargo build --release` exit 0.

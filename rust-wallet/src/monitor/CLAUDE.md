@@ -1,6 +1,6 @@
 # Monitor — Background Task Scheduler
 
-> Single tokio task that runs 14 named background tasks on configurable intervals, handling transaction lifecycle, proof acquisition, UTXO sync, PeerPay delivery, on-chain backup, dust consolidation, double-spend verification, and SHIP cache warming.
+> Single tokio task that runs 16 named background tasks on configurable intervals, handling transaction lifecycle, proof acquisition, UTXO sync, PeerPay delivery, on-chain backup, dust consolidation, double-spend verification, and SHIP cache warming.
 
 **Last Updated:** 2026-08-03
 
@@ -22,11 +22,11 @@ The Monitor replaces the ad-hoc background services (`arc_status_poller`, `cache
 
 ## Files
 
-15 files: `mod.rs` plus 14 `task_*.rs` modules — one per entry in `TaskSchedule`.
+`mod.rs` plus the `task_*.rs` modules — one per entry in `TaskSchedule` (16), plus `task_push.rs` and `task_tip_stream.rs` (spv stream listeners, started once, not scheduled) and `task_recheck_proofs.rs` (run right after `sync_headers`).
 
 | File | Purpose | Interval |
 |------|---------|----------|
-| `mod.rs` | `Monitor` struct, `TaskSchedule` (14 fields), tick loop, `MONITOR_STARTED` guard, `Monitor::log_event()`, `log_monitor_event()`, `Monitor::db_available()`, `Monitor::now_secs()` | 30s tick |
+| `mod.rs` | `Monitor` struct, `TaskSchedule` (16 fields), tick loop, `MONITOR_STARTED` guard, `Monitor::log_event()`, `log_monitor_event()`, `Monitor::db_available()`, `Monitor::now_secs()` | 30s tick |
 | `task_check_for_proofs.rs` | Acquire merkle proofs for `sending`/`unproven`/`nosend` transactions via the `services` tx-status chain + 3-oracle txid quorum | 60s |
 | `task_send_waiting.rs` | Crash recovery: re-broadcast or clean up transactions stuck in `sending` status | 120s |
 | `task_fail_abandoned.rs` | Fail `unprocessed`/`unsigned` transactions older than 5 minutes (and stuck backup broadcasts older than 10 minutes), restore reserved outputs | 300s |
@@ -40,6 +40,10 @@ The Monitor replaces the ad-hoc background services (`arc_status_poller`, `cache
 | `task_consolidate_dust.rs` | Daily sweep: consolidate ≤1000-sat UTXOs into one self-output when 20+ accumulate | 86400s (24h) |
 | `task_verify_double_spend.rs` | Independent verification of suspected double-spends against WhatsOnChain (SDK-style, never trusts a single broadcaster) | 60s |
 | `task_retry_peerpay_outbox.rs` | Retry MessageBox delivery for PeerPay sends that succeeded on-chain but failed to deliver | 30s (fast tick; actual retry gated by `next_retry_at`) |
+| `task_sync_headers.rs` | WS4: sync the verified header chain from `HODOS_CHAINTRACKS_URL` (spv mode only), persist new headers (V26 `header_chain`), log reorgs. No-op when unset | 30s |
+| `task_push.rs` | spv + `HODOS_ARCADE_SSE_URL`: owns the Arcade SSE client and the callback token; a MINED/IMMUTABLE/REJECTED/... event runs `task_sync_headers` then `task_check_for_proofs` at once, retrying every 2 s (up to 8 times) while a mined tx is still waiting for its header. Wake-up only; polling is unchanged. `task_check_for_proofs::run` and `task_sync_headers::run` take a static async lock so a push-triggered run and the monitor's tick never overlap | event-driven |
+| `task_tip_stream.rs` | spv (off with `HODOS_TIP_STREAM=off`): owns the chaintracks tip stream client (`tip_stream.rs`); when the tip changes it runs `task_sync_headers` then `task_check_for_proofs` at once. Wake-up only: the 30 s header sync and the 60 s proof check are unchanged, and both runs take the same static locks as the monitor's tick | event-driven |
+| `task_recheck_proofs.rs` | WS4: after a header-chain reorg (and once after the first sync) find `proven_txs` whose root no longer matches the active chain; replace with a verified re-mined proof via `apply_replacement`. Never changes tx status/outputs. Runs in the same tick as `task_sync_headers`; no-op when nothing pending | 30s |
 | `task_refresh_ship_cache.rs` | Keep `AppState.ship_cache` warm for `tm_identity` — **runs outside the `db_available()` gate** | 300s |
 
 **First-tick seeding** (`mod.rs :: Monitor::run`): most `last_*` markers start at `0` so the task fires on the first eligible tick. Exceptions: `last_backup` is seeded from `SettingsRepository::get_last_backup_at()` (so a backup triggers soon after a long shutdown rather than 3 hours later), and `last_consolidate_dust` is seeded to "now" so the daily dust sweep does not run at startup. The loop also sleeps 5 seconds before its first tick.

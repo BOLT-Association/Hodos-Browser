@@ -329,6 +329,12 @@ pub fn dispatch_scoped_grant(
     endpoint: &str,
     scoped_call: ScopedCall<'_>,
 ) -> GateOutcome {
+    // AuthBOLT identity keys are the wallet's own, whatever the site's grants (identity_guard.rs).
+    if let ScopedCall::Protocol { name, .. } = &scoped_call {
+        if let Some(refused) = super::identity_guard::refuse_identity_protocol(http_req, name) {
+            return GateOutcome::EarlyReturn(refused);
+        }
+    }
     let domain = match http_req
         .headers()
         .get(X_REQUESTING_DOMAIN)

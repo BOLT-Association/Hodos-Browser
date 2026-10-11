@@ -27,6 +27,7 @@
 pub mod audit;
 pub mod context_builder;
 pub mod handlers;
+pub mod identity_guard;
 pub mod request_gate;
 pub mod state;
 

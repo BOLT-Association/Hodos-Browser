@@ -5298,6 +5298,37 @@ bool SimpleHandler::OnProcessMessageReceived(
         return true;
     }
 
+    // AuthBOLT: Hodos's identity prompt answers a page's held POST /bolt/request with a
+    // presentation, or a refusal. Reaches here only from the approval overlay (the default-deny
+    // gate refuses web pages; IsGrantApproveMessage + IsApprovalOverlayRole refuse other roles).
+    // Args: [key, ok, payloadJson].
+    if (message_name == "bolt_result") {
+        CefRefPtr<CefListValue> args = message->GetArgumentList();
+        if (args->GetSize() < 3) {
+            LOG_WARNING_BROWSER("bolt_result missing arguments");
+            return true;
+        }
+        const std::string key = args->GetString(0).ToString();
+        const bool ok = args->GetBool(1);
+        const std::string payload = args->GetString(2).ToString();
+        if (!AnswerBoltRequest(key, ok, payload)) {
+            LOG_DEBUG_BROWSER("bolt_result for " + key + ": no request waiting (answered or timed out)");
+        }
+        return true;
+    }
+
+    // AuthBOLT: the wallet in the prompt asks the page holding request `key` for a coin to pay a
+    // move of the identity token (the app pays). Same gate as bolt_result. Args: [key, requestJson].
+    if (message_name == "bolt_fund") {
+        CefRefPtr<CefListValue> args = message->GetArgumentList();
+        if (args->GetSize() < 2) {
+            LOG_WARNING_BROWSER("bolt_fund missing arguments");
+            return true;
+        }
+        ForwardBoltFund(args->GetString(0).ToString(), args->GetString(1).ToString());
+        return true;
+    }
+
     if (message_name == "brc100_auth_response") {
         LOG_DEBUG_BROWSER("🔐 brc100_auth_response message received from role: " + role_);
 
