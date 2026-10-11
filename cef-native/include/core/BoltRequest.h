@@ -107,6 +107,26 @@ inline bool ValidateBoltSign(const std::string& kind, const std::string& appPubK
         // A resume hands the app a rotation it never received: the app's rotation data for that count.
         return ValidateCountedData(kind == "reissue" ? "06" : "05", appPubKey, payload, why);
     }
+    if (kind == "restore") {
+        // A restored wallet's issuer key signs the app's restore challenge: 66 bytes, tag 07, this app.
+        if (silent) {
+            why = "a restore is never silent";
+            return false;
+        }
+        if (payload.size() != 132 || !IsLowerHex(payload)) {
+            why = "restore data is exactly 66 bytes (lower-case hex)";
+            return false;
+        }
+        if (payload.compare(0, 2, "07") != 0) {
+            why = "the auth data is for another purpose";
+            return false;
+        }
+        if (payload.compare(2, 66, appPubKey) != 0) {
+            why = "the auth data names another app than the one asking";
+            return false;
+        }
+        return true;
+    }
     if (kind == "write") {
         if (payload.empty() || payload.size() > kBoltSignMaxPayload) {
             why = "a write is at most 64 KiB";
@@ -119,7 +139,7 @@ inline bool ValidateBoltSign(const std::string& kind, const std::string& appPubK
         }
         return true;
     }
-    why = "kind must be signin, refresh, write, rotate, reissue or resume";
+    why = "kind must be signin, refresh, write, rotate, reissue, resume or restore";
     return false;
 }
 
@@ -151,19 +171,8 @@ inline bool ValidateBoltSignHolder(const std::string& kind, const nlohmann::json
     return true;
 }
 
-// The name an app accepted for one of its identities (POST /bolt/label): the app's key, the identity
-// (its issuer key) and 1 to 64 characters of UTF-8 text with no control characters. False with the
-// reason in `why`.
-inline bool ValidateBoltLabel(const std::string& appPubKey, const std::string& identity, const std::string& name,
-                              std::string& why) {
-    if (!IsAppKey(appPubKey)) {
-        why = "the app key must be a 33-byte compressed public key (lower-case hex)";
-        return false;
-    }
-    if (!IsAppKey(identity)) {
-        why = "the identity is its issuer key: 33 bytes, compressed, lower-case hex";
-        return false;
-    }
+// An account's name as an app gives it: 1 to 64 characters of UTF-8 text with no control characters.
+inline bool ValidateBoltName(const std::string& name, std::string& why) {
     std::size_t chars = 0;
     for (std::size_t i = 0; i < name.size(); ++chars) {
         const unsigned char c = static_cast<unsigned char>(name[i]);
@@ -186,6 +195,89 @@ inline bool ValidateBoltLabel(const std::string& appPubKey, const std::string& i
     }
     if (chars < 1 || chars > 64) {
         why = "a name is 1 to 64 characters";
+        return false;
+    }
+    return true;
+}
+
+// The name an app accepted for one of its identities (POST /bolt/label): the app's key, the identity
+// (its issuer key) and the name (ValidateBoltName). False with the reason in `why`.
+inline bool ValidateBoltLabel(const std::string& appPubKey, const std::string& identity, const std::string& name,
+                              std::string& why) {
+    if (!IsAppKey(appPubKey)) {
+        why = "the app key must be a 33-byte compressed public key (lower-case hex)";
+        return false;
+    }
+    if (!IsAppKey(identity)) {
+        why = "the identity is its issuer key: 33 bytes, compressed, lower-case hex";
+        return false;
+    }
+    return ValidateBoltName(name, why);
+}
+
+// A restore names the identity it is for (`issuer`, its issuer key) and may carry the account's name
+// for the prompt; no other kind names an identity this way. False with the reason in `why`.
+inline bool ValidateBoltSignIssuer(const std::string& kind, const nlohmann::json& body, std::string& why) {
+    if (kind != "restore") {
+        if (body.contains("issuer")) {
+            why = "only a restore names the identity it is for";
+            return false;
+        }
+        return true;
+    }
+    if (!body.contains("issuer") || !body["issuer"].is_string() || !IsAppKey(body["issuer"].get<std::string>())) {
+        why = "a restore names the identity: its issuer key, 33 bytes, compressed, lower-case hex";
+        return false;
+    }
+    if (body.contains("name") && (!body["name"].is_string() || !ValidateBoltName(body["name"].get<std::string>(), why))) {
+        if (why.empty()) why = "a name is text";
+        return false;
+    }
+    return true;
+}
+
+constexpr std::size_t kBoltRestoreMaxPackage = 1 << 20;
+
+// The token an app handed back to a restored wallet (POST /bolt/restore): its key, the identity (issuer
+// key), the move's 2 to 4 transactions (lower-case hex, 1 MiB at most in all), the holder count (from 1)
+// and optionally the account's name. False with the reason in `why`.
+inline bool ValidateBoltRestore(const nlohmann::json& body, std::string& why) {
+    if (!body.is_object()) {
+        why = "the request is not a JSON object";
+        return false;
+    }
+    if (!body.contains("appPubKey") || !body["appPubKey"].is_string() || !IsAppKey(body["appPubKey"].get<std::string>())) {
+        why = "the app key must be a 33-byte compressed public key (lower-case hex)";
+        return false;
+    }
+    if (!body.contains("issuer") || !body["issuer"].is_string() || !IsAppKey(body["issuer"].get<std::string>())) {
+        why = "the identity is its issuer key: 33 bytes, compressed, lower-case hex";
+        return false;
+    }
+    const nlohmann::json& pkg = body.contains("package") ? body["package"] : nlohmann::json();
+    if (!pkg.is_array() || pkg.size() < 2 || pkg.size() > 4) {
+        why = "a package is the move's 2 to 4 transactions";
+        return false;
+    }
+    std::size_t total = 0;
+    for (const auto& tx : pkg) {
+        if (!tx.is_string() || !IsLowerHex(tx.get<std::string>())) {
+            why = "a package's transactions are lower-case hex";
+            return false;
+        }
+        total += tx.get<std::string>().size();
+    }
+    if (total > kBoltRestoreMaxPackage) {
+        why = "a package is at most 1 MiB";
+        return false;
+    }
+    const nlohmann::json& c = body.contains("count") ? body["count"] : nlohmann::json();
+    if (!c.is_number_integer() || c.get<long long>() < 1 || c.get<long long>() > 4294967295LL) {
+        why = "the holder count is a whole number from 1";
+        return false;
+    }
+    if (body.contains("name") && (!body["name"].is_string() || !ValidateBoltName(body["name"].get<std::string>(), why))) {
+        if (why.empty()) why = "a name is text";
         return false;
     }
     return true;

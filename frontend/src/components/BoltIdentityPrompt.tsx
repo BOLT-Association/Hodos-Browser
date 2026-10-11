@@ -92,7 +92,8 @@ const funderFor = async (key: string): Promise<Funder> =>
 /**
  * Install what C++ calls in the preloaded notification browser: `boltSign` (a silent /bolt/sign),
  * `boltSignPrompt` (a prompted one's arguments, before its screen shows), `boltLabel` (the name an
- * app accepted for an identity) and `boltFundResult` (the page's answer to a coin request).
+ * app accepted for an identity), `boltRestore` (a restored wallet's token, as the app handed it back)
+ * and `boltFundResult` (the page's answer to a coin request).
  */
 export function registerBoltHandlers() {
   const page = window as unknown as Record<string, unknown>;
@@ -139,6 +140,25 @@ export function registerBoltHandlers() {
       refuse(args.key, e);
     }
   };
+  // POST /bolt/restore, never shown: keep the token the app handed back to a restored wallet. The wallet
+  // keeps it only after the person approved the restore signature ("bolt_sign", kind restore) for this
+  // site, app and identity, and only if the seed derives the token's keys.
+  page.boltRestore = async (argsJson: string) => {
+    let args: { key: string; domain: string; appPubKey: string; issuer: string; package: string[]; count: number; name?: string };
+    try {
+      args = JSON.parse(argsJson);
+    } catch {
+      return;
+    }
+    try {
+      const restored = await (await identities()).restore({
+        domain: args.domain, appPubKey: args.appPubKey, issuer: args.issuer, package: args.package, count: args.count, name: args.name,
+      });
+      answer(args.key, true, { identity: restored.issuer, holderCount: restored.holderCount });
+    } catch (e) {
+      refuse(args.key, e);
+    }
+  };
   page.boltFundResult = (json: string) => {
     let got: { key?: string; coin?: Coin; error?: string };
     try {
@@ -172,6 +192,9 @@ interface SignArgs {
   /** The holder the app expects (a refused sign-in named it): its count and hash. Checked by C++. */
   count?: number;
   holder?: string;
+  /** A restore's identity (its issuer key) and the account's name at the app. Checked by C++. */
+  issuer?: string;
+  name?: string;
 }
 
 /** Prompted /bolt/sign requests waiting for their screen, by key. */
@@ -357,6 +380,7 @@ const SIGN_TITLES: Record<SignKind, string> = {
   rotate: 'Change your signing key',
   reissue: 'Recover your account',
   resume: 'Finish changing your signing key',
+  restore: 'Restore your account',
 };
 
 const moves = (kind: SignKind) => kind === 'rotate' || kind === 'reissue';
@@ -407,15 +431,18 @@ export const BoltSignPrompt: React.FC<{ requestKey: string; domain: string; onDo
   };
   const decline = () => finish(false, { error: 'BOLT: the user declined', code: 'DECLINED' });
 
+  // A restore is for an identity this wallet does not hold yet (a wallet restored from its seed): no
+  // identity to choose; the wallet derives the key the app names.
+  const restoring = args?.kind === 'restore';
   const approve = async () => {
-    if (!args || !choice) return;
+    if (!args || (!choice && !restoring)) return;
     setError('');
     setBusy(moves(args.kind) ? 'Moving your identity token (the site pays the network fees)…' : 'Signing…');
     try {
       const ids = await identities();
       const got = await ids.answer({
-        id: choice, domain: args.domain, appPubKey: args.appPubKey, kind: args.kind, payload: args.payload, silent: false,
-        count: args.count, holder: args.holder, funder: moves(args.kind) ? await funderFor(requestKey) : undefined,
+        id: choice || undefined, domain: args.domain, appPubKey: args.appPubKey, kind: args.kind, payload: args.payload, silent: false,
+        count: args.count, holder: args.holder, issuer: args.issuer, funder: moves(args.kind) ? await funderFor(requestKey) : undefined,
       });
       if (args.kind === 'signin' || args.kind === 'refresh') {
         await ids.setKeepSignedIn({ id: choice, domain: args.domain, appPubKey: args.appPubKey, keep: keepSignedIn });
@@ -459,6 +486,15 @@ export const BoltSignPrompt: React.FC<{ requestKey: string; domain: string; onDo
           received it. Send it the move it asked for. Nothing is signed or spent.
         </p>
       )}
+      {restoring && (
+        <p style={{ margin: '0 0 12px', fontSize: '14px', color: COLORS.text, lineHeight: 1.6 }}>
+          {domain} has an account{args.name ? <> named <strong>{args.name}</strong></> : null} for an identity
+          this wallet can derive ({short(args.issuer ?? '')}), but no record of its identity token, as after
+          restoring the wallet from its recovery phrase. Sign with your identity key to get it back: {domain}
+          hands back the token, and the wallet keeps it once it checks the token is yours. Nothing is spent.
+          Do this only if you asked to restore your account.
+        </p>
+      )}
       {args.kind === 'reissue' && (
         <p style={{ margin: '0 0 12px', fontSize: '14px', color: COLORS.text, lineHeight: 1.6 }}>
           {domain} asks you to recover your account: your identity key makes a new identity token and
@@ -474,17 +510,17 @@ export const BoltSignPrompt: React.FC<{ requestKey: string; domain: string; onDo
         </p>
       )}
 
-      {linked === null && !error && <p style={{ color: COLORS.muted }}>Reading your identities…</p>}
-      {linked !== null && linked.length === 0 && (
+      {!restoring && linked === null && !error && <p style={{ color: COLORS.muted }}>Reading your identities…</p>}
+      {!restoring && linked !== null && linked.length === 0 && (
         <p style={{ color: COLORS.error }}>None of your identities is registered with {domain}.</p>
       )}
-      {linked !== null && linked.length > 1 && linked.map((t) => (
+      {!restoring && linked !== null && linked.length > 1 && linked.map((t) => (
         <label key={t.id} style={{ display: 'flex', gap: '8px', alignItems: 'center', color: COLORS.text, fontSize: '14px', marginBottom: '6px' }}>
           <input type="radio" name="bolt-sign-identity" checked={choice === t.id} onChange={() => setChoice(t.id)} />
           {nameOf(t, args) ? `${nameOf(t, args)} · ${short(t.issuer)}` : `Identity ${short(t.issuer)}`}
         </label>
       ))}
-      {linked !== null && linked.length === 1 && nameOf(linked[0], args) && (
+      {!restoring && linked !== null && linked.length === 1 && nameOf(linked[0], args) && (
         <p style={{ margin: '0 0 12px', fontSize: '14px', color: COLORS.text }}>
           As <strong>{nameOf(linked[0], args)}</strong>
           <span style={{ color: COLORS.muted, fontSize: '12px' }}> · {short(linked[0].issuer)}</span>
@@ -502,8 +538,8 @@ export const BoltSignPrompt: React.FC<{ requestKey: string; domain: string; onDo
 
       <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
         <HodosButton variant="secondary" onClick={decline} disabled={!!busy}>Decline</HodosButton>
-        <HodosButton variant="primary" onClick={approve} disabled={!!busy || !choice}>
-          {args.kind === 'write' ? 'Sign this change' : args.kind === 'reissue' ? 'Recover' : args.kind === 'rotate' ? 'Change key' : args.kind === 'resume' ? 'Send it' : 'Sign'}
+        <HodosButton variant="primary" onClick={approve} disabled={!!busy || (!choice && !restoring)}>
+          {args.kind === 'write' ? 'Sign this change' : args.kind === 'reissue' ? 'Recover' : args.kind === 'rotate' ? 'Change key' : args.kind === 'resume' ? 'Send it' : restoring ? 'Restore' : 'Sign'}
         </HodosButton>
       </div>
     </div>

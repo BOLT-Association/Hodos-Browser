@@ -191,6 +191,57 @@ TEST(BoltLabel, ANameIsShortTextForAnIdentityOfThisApp) {
     EXPECT_FALSE(ok(kApp, "zz" + std::string(64, 'c'), "fred")) << "not an identity key";
 }
 
+// A restored wallet asks the app for its identity's token: the issuer key signs the app's restore
+// challenge (66 bytes, tag 07, this app), never silently, naming the identity it is for.
+// NC: drop the restore branch from ValidateBoltSign, or make ValidateBoltSignIssuer return true.
+TEST(BoltSign, ARestoreSignsTheAppsRestoreDataNamingTheIdentity) {
+    EXPECT_TRUE(Sign("restore", Data("07"), false));
+    EXPECT_FALSE(Sign("restore", Data("07"))) << "never silent";
+    EXPECT_FALSE(Sign("restore", Data("02"), false)) << "a sign-in's tag";
+    EXPECT_FALSE(Sign("restore", Data("07", "02" + std::string(64, 'c')), false)) << "another app";
+    EXPECT_FALSE(Sign("restore", Counted("07"), false)) << "70 bytes";
+    const auto ok = [](const std::string& kind, const nlohmann::json& body) {
+        std::string why;
+        return hodos::ValidateBoltSignIssuer(kind, body, why);
+    };
+    const std::string id = "03" + std::string(64, 'c');
+    EXPECT_TRUE(ok("restore", {{"issuer", id}}));
+    EXPECT_TRUE(ok("restore", {{"issuer", id}, {"name", "fred"}}));
+    EXPECT_TRUE(ok("signin", nlohmann::json::object()));
+    EXPECT_FALSE(ok("restore", nlohmann::json::object())) << "names no identity";
+    EXPECT_FALSE(ok("restore", {{"issuer", "zz" + std::string(64, 'c')}}));
+    EXPECT_FALSE(ok("restore", {{"issuer", id}, {"name", std::string("a\x01" "b")}})) << "a name with a control character";
+    EXPECT_FALSE(ok("signin", {{"issuer", id}})) << "only a restore names an identity";
+}
+
+// The token the app handed back to a restored wallet (POST /bolt/restore): the app's key, the identity,
+// the move's 2 to 4 transactions (hex), the holder count and the account's name. It reaches the wallet's
+// script, so the shell checks its shape first. NC: make ValidateBoltRestore return true.
+TEST(BoltRestore, ARestoreIsTheAppsPackageForAnIdentityAndACount) {
+    const auto ok = [](const nlohmann::json& body) {
+        std::string why;
+        return hodos::ValidateBoltRestore(body, why);
+    };
+    const std::string id = "03" + std::string(64, 'c');
+    const nlohmann::json good = {{"appPubKey", kApp}, {"issuer", id}, {"package", {"0100beef", "0100cafe"}}, {"count", 2}, {"name", "fred"}};
+    EXPECT_TRUE(ok(good));
+    auto with = [&](const char* k, const nlohmann::json& v) { nlohmann::json b = good; b[k] = v; return b; };
+    auto without = [&](const char* k) { nlohmann::json b = good; b.erase(k); return b; };
+    EXPECT_TRUE(ok(without("name"))) << "the name is optional";
+    EXPECT_FALSE(ok(without("package")));
+    EXPECT_FALSE(ok(with("package", {"0100beef"}))) << "one transaction";
+    EXPECT_FALSE(ok(with("package", {"aa", "bb", "cc", "dd", "ee"}))) << "five";
+    EXPECT_FALSE(ok(with("package", {"0100beef", "0100BEEF"}))) << "upper case";
+    EXPECT_FALSE(ok(with("package", {"0100beef", 7}))) << "not text";
+    EXPECT_FALSE(ok(with("package", {"0100beef", std::string(1 << 20, 'a')}))) << "over 1 MiB";
+    EXPECT_FALSE(ok(with("count", 0)));
+    EXPECT_FALSE(ok(with("count", "2")));
+    EXPECT_FALSE(ok(with("issuer", "04" + std::string(64, 'c'))));
+    EXPECT_FALSE(ok(with("appPubKey", "zz")));
+    EXPECT_FALSE(ok(with("name", std::string(65, 'x'))));
+    EXPECT_FALSE(ok(nlohmann::json::array()));
+}
+
 // Only an https main frame may ask (audit H3): `cefMessage` reaches every frame, so a subframe or a
 // plain-http page could otherwise send wallet_call itself. NC: make BoltFrameAllowed return true.
 TEST(BoltSign, OnlyAnHttpsMainFrameMayAsk) {

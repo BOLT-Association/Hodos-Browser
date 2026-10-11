@@ -29,7 +29,7 @@ export interface Presentation {
 }
 
 /** What the page's /bolt/sign asks: a holder-key signature, or a move of the identity token. */
-export type SignKind = 'signin' | 'refresh' | 'write' | 'rotate' | 'reissue' | 'resume';
+export type SignKind = 'signin' | 'refresh' | 'write' | 'rotate' | 'reissue' | 'resume' | 'restore';
 
 export interface SignAnswer {
   identity?: string;
@@ -62,7 +62,7 @@ export interface IdentityWallet {
    * Answer a page's /bolt/sign request (silently only under the keep-signed-in grant). `count` and
    * `holder` name the holder the app expects: the wallet signs with that key only if it holds it.
    */
-  answer(o: { id?: string; domain: string; appPubKey: string; kind: SignKind; payload: string; silent: boolean; funder?: Funder; count?: number; holder?: string }): Promise<SignAnswer>;
+  answer(o: { id?: string; domain: string; appPubKey: string; kind: SignKind; payload: string; silent: boolean; funder?: Funder; count?: number; holder?: string; issuer?: string }): Promise<SignAnswer>;
   identities(): Promise<Identity[]>;
   forApp(o: { domain: string; appPubKey: string }): Promise<Identity[]>;
   create(): Promise<Identity>;
@@ -72,6 +72,12 @@ export interface IdentityWallet {
   forget(o: { id: string; domain: string; appPubKey: string }): Promise<void>;
   /** Keep the name an app accepted for `identity` (its issuer key), only if it is linked to that app here. */
   label(o: { domain: string; appPubKey: string; identity: string; name: string }): Promise<void>;
+  /**
+   * A restored wallet's identity: keep the token the app handed back (its last move and holder count),
+   * only after the person approved the restore signature (`answer` kind 'restore') for this app and
+   * identity, and only if the seed derives the token's keys.
+   */
+  restore(o: { domain: string; appPubKey: string; issuer: string; package: string[]; count: number; name?: string }): Promise<Identity>;
 }
 
 /** `call(endpoint, body)` resolves with the wallet's JSON reply and throws on an error reply. */
