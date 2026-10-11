@@ -154,6 +154,72 @@ pub async fn bolt_broadcast(state: web::Data<AppState>, body: web::Bytes) -> Htt
     }
 }
 
+// ---------------------------------------------------------------- proofs
+
+#[derive(Deserialize)]
+struct ProofRequest {
+    txid: String,
+}
+
+#[derive(Debug, PartialEq)]
+enum ProofAnswer {
+    Proven { bump: String, height: u64 },
+    Pending(String),
+}
+
+/// The merkle path a status carries for `txid` (BUMP hex) and its TSC form to check, or why there is
+/// none yet.
+fn proof_of(status: &TxStatus, txid: &str) -> Result<(String, serde_json::Value), String> {
+    if status.state != TxState::Mined {
+        return Err(format!("not mined ({:?})", status.state));
+    }
+    let bump = status.merkle_path_bump.clone().ok_or_else(|| "mined, but no merkle path yet".to_string())?;
+    let mut tsc = crate::beef::parse_bump_hex_to_tsc_for(&bump, txid)?;
+    if let Some(h) = status.block_height {
+        tsc["height"] = serde_json::json!(h);
+    }
+    Ok((bump, tsc))
+}
+
+/// A path is handed out only when it proves into the wallet's own headers.
+fn decide(bump: String, tsc: &serde_json::Value, checked: Result<bool, String>) -> ProofAnswer {
+    match checked {
+        Ok(true) => ProofAnswer::Proven { bump, height: tsc["height"].as_u64().unwrap_or(0) },
+        Ok(false) => ProofAnswer::Pending("the merkle path does not match the wallet's headers".into()),
+        Err(e) => ProofAnswer::Pending(format!("cannot check it yet: {e}")),
+    }
+}
+
+/// `POST /boltProof` `{ txid }` → `{ status: "proven", bump, height }` or `{ status: "pending", detail }`.
+///
+/// A mined tx's merkle path, checked against the wallet's header chain (spv mode) first: a token's next
+/// move then carries this proof instead of its whole unmined history. Read-only chain data.
+pub async fn bolt_proof(state: web::Data<AppState>, body: web::Bytes) -> HttpResponse {
+    let req: ProofRequest = match serde_json::from_slice(&body) {
+        Ok(r) => r,
+        Err(e) => return bad_request(format!("invalid request: {e}")),
+    };
+    if !is_hex_len(&req.txid, 64) {
+        return bad_request("txid must be 64 hex characters");
+    }
+    let pending = |detail: String| HttpResponse::Ok().json(serde_json::json!({ "status": "pending", "detail": detail }));
+    let status = match state.services.tx_status(&req.txid).await {
+        Ok(s) => s,
+        Err(e) => return pending(e.to_string()),
+    };
+    let (bump, tsc) = match proof_of(&status, &req.txid) {
+        Ok(p) => p,
+        Err(e) => return pending(e),
+    };
+    let checked = crate::cache_helpers::verify_tsc_proof_against_block(&reqwest::Client::new(), &req.txid, &tsc)
+        .await
+        .map_err(|e| e.to_string());
+    match decide(bump, &tsc, checked) {
+        ProofAnswer::Proven { bump, height } => HttpResponse::Ok().json(serde_json::json!({ "status": "proven", "bump": bump, "height": height })),
+        ProofAnswer::Pending(detail) => pending(detail),
+    }
+}
+
 // ---------------------------------------------------------------- token store
 
 #[derive(Deserialize)]
@@ -394,6 +460,34 @@ pub async fn bolt_tokens(state: web::Data<AppState>, http_req: HttpRequest, body
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// Arcade's real BUMP for the 4th tx of a 4-tx block (beef.rs regression test): both level-0 leaves
+    /// are flagged, the proof is read for the asked txid.
+    const BUMP: &str = "9602020302251b2363ae37b7b8f6cd3f4de24e3076c4c68fd724b1bb52d6f8491d583c8ae00202d65a392a75fa5a7affd72fdb912bdefe598003e0da6daaa206ba22797017fb5d01000064c619690d18235d910ae7b4f80d6dbc532242c562c1d44a6fb91e74158a54db";
+    const MINED_TXID: &str = "e08a3c581d49f8d652bbb124d78fc6c476304ee24d3fcdf6b8b737ae63231b25";
+
+    fn mined(bump: Option<&str>) -> TxStatus {
+        TxStatus { txid: MINED_TXID.into(), state: TxState::Mined, block_height: Some(150), block_hash: None,
+            merkle_path_bump: bump.map(String::from), raw_provider_status: None }
+    }
+
+    /// /boltProof gives a token's next move a proof instead of its unmined history, but never a path
+    /// the wallet's own headers did not confirm.
+    #[test]
+    fn a_proof_is_handed_out_only_for_a_mined_tx_whose_path_the_headers_confirm() {
+        let (bump, tsc) = proof_of(&mined(Some(BUMP)), MINED_TXID).expect("a mined tx with a path");
+        assert_eq!(bump, BUMP);
+        assert_eq!(tsc["index"].as_u64(), Some(3));
+        assert_eq!(tsc["height"].as_u64(), Some(150));
+        assert_eq!(decide(bump.clone(), &tsc, Ok(true)), ProofAnswer::Proven { bump: BUMP.into(), height: 150 });
+        assert!(matches!(decide(bump.clone(), &tsc, Ok(false)), ProofAnswer::Pending(_)), "a root the headers contradict");
+        assert!(matches!(decide(bump, &tsc, Err("no header yet".into())), ProofAnswer::Pending(_)), "cannot check yet");
+        assert!(proof_of(&mined(None), MINED_TXID).is_err(), "mined but no path yet");
+        assert!(proof_of(&mined(Some(BUMP)), &"00".repeat(32)).is_err(), "a path that does not prove this txid");
+        let mut seen = mined(Some(BUMP));
+        seen.state = TxState::InMempool;
+        assert!(proof_of(&seen, MINED_TXID).is_err(), "not mined");
+    }
 
     fn status(state: TxState, raw: Option<&str>) -> TxStatus {
         TxStatus {

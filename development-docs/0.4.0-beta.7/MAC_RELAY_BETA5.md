@@ -27,7 +27,7 @@ exact amount, signed by the app's funding wallet with SIGHASH_SINGLE | ANYONECAN
 | `include/core/BoltRequest.h` (later commits) | `ValidateBoltLabel` (`POST /bolt/label`, handled in `HttpRequestInterceptor.cpp :: HandleBoltLabel`, never prompted) and the `resume` kind in `ValidateBoltSign` (hand the app a rotation it never received: counted data, tag 05, like `rotate`) |
 | `src/handlers/simple_handler.cpp` | The `bolt_fund` arm (`[key, requestJson]` → `ForwardBoltFund`) |
 | `include/core/IpcAuth.h` | `bolt_fund` joins `IsGrantApproveMessage` (approval overlay only) |
-| `include/core/BoltShimScript.h` | Regenerated: the page shim keeps `fund` under an id and answers `__boltFund` |
+| `include/core/BoltShimScript.h` | Regenerated: the page shim keeps `fund` under an id and answers `__boltFund`; regenerated again when a token's move began attaching merkle proofs from the wallet's new `POST /boltProof` (Rust only; no C++ change beyond the generated header) |
 | `tests/bolt_request_test.cpp`, `tests/ipc_role_guard_test.cpp` | 15 BOLT tests (was 5); `bolt_fund` in the role-gate family |
 
 Frontend: `BoltIdentityPrompt.tsx` (registration only offers an identity whose token has not moved yet;

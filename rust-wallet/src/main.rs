@@ -37,7 +37,7 @@ mod manifest;  // Phase 2.6-G: Rust port of C++ ManifestFetcher (fetch + lenient
 mod chain_mode;
 mod pending_proofs;  // spv mode: proofs held until the header chain can verify them (V27 pending_proofs)
 mod zero_conf;  // spv mode: received outputs spendable once seen on the network (HODOS_ZERO_CONF)
-mod bolt;  // window.BOLT rails: /boltBroadcast (network verdict) + /boltTokens (V28 bolt_tokens)
+mod bolt;  // window.BOLT rails: /boltBroadcast (network verdict) + /boltTokens (V28 bolt_tokens) + /boltProof (a verified merkle path)
 mod arcade_push;  // spv mode: Arcade SSE wake-up for the proof task (polling stays the safety net)  // HODOS_CHAIN_MODE: public | spv (Arcade + verified headers only)
 mod tip_stream;  // spv mode: chaintracks tip stream, a wake-up for the header sync (the 30 s sync stays)
 mod header_chain;
@@ -1400,6 +1400,7 @@ async fn main() -> std::io::Result<()> {
             // window.BOLT rails (the token logic runs in the page; see bolt.rs)
             .route("/boltBroadcast", web::post().to(bolt::bolt_broadcast))
             .route("/boltTokens", web::post().to(bolt::bolt_tokens))
+            .route("/boltProof", web::post().to(bolt::bolt_proof))
             // P11-11-A4 — the other half of the pair: the BRC-121 retry calls this when
             // the server definitively refuses, so the dead payment does not keep a
             // spendable phantom output and a reserved input until a sweeper notices.
