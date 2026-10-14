@@ -17,6 +17,8 @@ use crate::services::{BlockKey, IndexerProvider};
 
 /// Safety bound on how far back a single sync will look for a common ancestor.
 const MAX_WALK_BACK: u32 = 10_000;
+/// Headers asked for per request when adding forward (the walk-back stays per height).
+const SYNC_BATCH: u32 = 2_000;
 
 #[async_trait]
 pub trait HeaderSource: Send + Sync {
@@ -24,6 +26,21 @@ pub trait HeaderSource: Send + Sync {
     async fn tip_height(&self) -> Result<u32, String>;
     /// 80-byte header hex at `height` on the source's chain.
     async fn header_hex_at(&self, height: u32) -> Result<String, String>;
+    /// Up to `count` consecutive headers from `start`; fewer when the source has fewer.
+    /// The default fetches per height and stops at the first failure, returning what it has
+    /// so those headers are still applied (and any reorg among them reported); a failure on
+    /// the very first height is the error.
+    async fn headers_hex_from(&self, start: u32, count: u32) -> Result<Vec<String>, String> {
+        let mut v = Vec::with_capacity(count as usize);
+        for h in start..start.saturating_add(count) {
+            match self.header_hex_at(h).await {
+                Ok(hex) => v.push(hex),
+                Err(e) if v.is_empty() => return Err(e),
+                Err(_) => break,
+            }
+        }
+        Ok(v)
+    }
 }
 
 /// `HeaderSource` backed by an Arcade chaintracks server.
@@ -41,6 +58,10 @@ impl HeaderSource for ChaintracksSource {
             .await
             .map(|h| h.header_hex)
             .map_err(|e| e.to_string())
+    }
+
+    async fn headers_hex_from(&self, start: u32, count: u32) -> Result<Vec<String>, String> {
+        self.0.headers_bulk(start, count).await.map_err(|e| e.to_string())
     }
 }
 
@@ -116,29 +137,50 @@ async fn sync_into(
         }
     }
 
-    for height in start..=server_tip {
-        let hex = source.header_hex_at(height).await?;
-        let header = Header::from_hex(&hex).map_err(|e| format!("header at {}: {}", height, e))?;
-        let (outcome, entry) = {
-            let mut c = chain.lock().unwrap();
-            let outcome = c
-                .add_header(header.clone(), now)
-                .map_err(|e| format!("header at {} rejected: {}", height, e))?;
-            let entry = c.get(&header.hash_hex()).cloned();
-            (outcome, entry)
-        };
-        match &outcome {
-            AddOutcome::Known => {}
-            AddOutcome::Reorg { .. } => {
-                report.added += 1;
-                report.reorgs.push(outcome.clone());
-            }
-            _ => report.added += 1,
+    let mut next = start;
+    while next <= server_tip {
+        let want = (server_tip - next + 1).min(SYNC_BATCH);
+        let batch = source.headers_hex_from(next, want).await?;
+        if batch.is_empty() {
+            return Err(format!("source returned no headers from height {}", next));
         }
-        if outcome != AddOutcome::Known {
-            if let Some(e) = entry {
-                persist(&e);
-            }
+        for hex in batch {
+            let height = next;
+            next += 1;
+            add_one(chain, &hex, height, now, persist, report)?;
+        }
+    }
+    Ok(())
+}
+
+fn add_one(
+    chain: &Mutex<HeaderChain>,
+    hex: &str,
+    height: u32,
+    now: u32,
+    persist: &mut (dyn FnMut(&Entry) + Send),
+    report: &mut SyncReport,
+) -> Result<(), String> {
+    let header = Header::from_hex(hex).map_err(|e| format!("header at {}: {}", height, e))?;
+    let (outcome, entry) = {
+        let mut c = chain.lock().unwrap();
+        let outcome = c
+            .add_header(header.clone(), now)
+            .map_err(|e| format!("header at {} rejected: {}", height, e))?;
+        let entry = c.get(&header.hash_hex()).cloned();
+        (outcome, entry)
+    };
+    match &outcome {
+        AddOutcome::Known => {}
+        AddOutcome::Reorg { .. } => {
+            report.added += 1;
+            report.reorgs.push(outcome.clone());
+        }
+        _ => report.added += 1,
+    }
+    if outcome != AddOutcome::Known {
+        if let Some(e) = entry {
+            persist(&e);
         }
     }
     Ok(())
@@ -325,6 +367,51 @@ mod tests {
         assert_eq!(r2.added, 0);
     }
 
+    /// Serves headers only in bulk, at most `cap` per call, and counts the calls.
+    struct BulkOnly {
+        headers: Vec<String>,
+        cap: u32,
+        calls: Mutex<u32>,
+    }
+
+    #[async_trait]
+    impl HeaderSource for BulkOnly {
+        async fn tip_height(&self) -> Result<u32, String> {
+            Ok(self.headers.len() as u32 - 1)
+        }
+        async fn header_hex_at(&self, h: u32) -> Result<String, String> {
+            Err(format!("per-height fetch of {} on a bulk-only source", h))
+        }
+        async fn headers_hex_from(&self, start: u32, count: u32) -> Result<Vec<String>, String> {
+            *self.calls.lock().unwrap() += 1;
+            let end = (start + count.min(self.cap)) as usize;
+            Ok(self.headers[start as usize..end.min(self.headers.len())].to_vec())
+        }
+    }
+
+    #[tokio::test]
+    async fn initial_sync_fetches_in_batches_and_follows_short_ones() {
+        let (_, g) = fixture();
+        let headers: Vec<String> = chain_of(&g, 4_500, 1_000).iter().map(|h| h.to_hex()).collect();
+        let server = BulkOnly { headers, cap: 1_500, calls: Mutex::new(0) };
+        let chain = empty_with_genesis_of(&g);
+        let mut persisted = 0u32;
+        let r = sync_once(&chain, &server, NOW, &mut |_| persisted += 1).await.unwrap();
+        assert_eq!(r.tip_height, Some(4_500));
+        assert_eq!((r.added, persisted), (4_501, 4_501));
+        assert_eq!(*server.calls.lock().unwrap(), 4, "4501 headers at <= 1500 per call");
+    }
+
+    #[tokio::test]
+    async fn a_source_that_returns_nothing_is_an_error_not_a_loop() {
+        let (_, g) = fixture();
+        let headers: Vec<String> = chain_of(&g, 3, 1_000).iter().map(|h| h.to_hex()).collect();
+        let server = BulkOnly { headers, cap: 0, calls: Mutex::new(0) };
+        let chain = empty_with_genesis_of(&g);
+        let e = sync_once(&chain, &server, NOW, &mut |_| {}).await.unwrap_err();
+        assert!(e.contains("no headers from height 0"), "{}", e);
+    }
+
     #[tokio::test]
     async fn server_reorg_to_heavier_chain_is_followed_and_reported() {
         let (_, g) = fixture();
@@ -439,6 +526,30 @@ mod tests {
         assert!(r.added > 100);
         let again = sync_once(&chain, &src, now, &mut |_| {}).await.expect("resync");
         assert!(again.added <= 3, "only newly mined blocks: {:?}", again);
+    }
+
+    /// Live: the whole public teratestnet chain, verified under the real rules (DAA, 20-minute
+    /// minimum difficulty, checkpoints). `HODOS_CHAINTRACKS_URL` overrides the default server.
+    /// `cargo test --lib header_sync_live_ttn -- --ignored --nocapture`
+    #[tokio::test]
+    #[ignore]
+    async fn header_sync_live_ttn() {
+        let base = std::env::var(crate::chain_mode::ENV_CHAINTRACKS)
+            .unwrap_or_else(|_| "https://arcade-ttn-us-1.bsvblockchain.tech/chaintracks/v2".into());
+        let src = ChaintracksSource(ChaintracksProvider::new(reqwest::Client::new(), base));
+        let chain = Mutex::new(HeaderChain::new(Params::teratestnet()));
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_secs() as u32;
+        let t0 = std::time::Instant::now();
+        let r = sync_once(&chain, &src, now, &mut |_| {}).await.expect("sync");
+        println!("synced {} headers to {:?} in {:?}", r.added, r.tip_height, t0.elapsed());
+        let c = chain.lock().unwrap();
+        for (h, hash) in Params::teratestnet().checkpoints {
+            assert_eq!(&c.header_at_height(*h).expect("checkpoint height").hash, hash);
+        }
+        assert!(r.tip_height.unwrap() > 36_000);
     }
 
     async fn rpc(c: &reqwest::Client, method: &str, params: serde_json::Value) -> serde_json::Value {

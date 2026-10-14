@@ -65,6 +65,38 @@ impl ChaintracksProvider {
                 reason: "missing 'height'".into(),
             })
     }
+
+    /// Up to `count` consecutive headers from `height` (`GET /headers?height=&count=`, raw
+    /// concatenated 80-byte headers), as hex. Fewer than asked is not an error: the server
+    /// caps a request at its tip. Nothing here is trusted; the header chain validates each one.
+    pub async fn headers_bulk(&self, height: u32, count: u32) -> Result<Vec<String>, IndexerError> {
+        let resp = self
+            .client
+            .get(format!("{}/headers", self.base))
+            .query(&[("height", height), ("count", count)])
+            .send()
+            .await
+            .map_err(|e| IndexerError::Transport(e.to_string()))?;
+        if !resp.status().is_success() {
+            return Err(IndexerError::ProviderStatus {
+                provider: NAME,
+                status: resp.status().as_u16(),
+                body: resp.text().await.unwrap_or_default(),
+            });
+        }
+        let body = resp.bytes().await.map_err(|e| IndexerError::Transport(e.to_string()))?;
+        split_headers(&body, count)
+    }
+}
+
+fn split_headers(body: &[u8], count: u32) -> Result<Vec<String>, IndexerError> {
+    if body.len() % 80 != 0 || body.len() / 80 > count as usize {
+        return Err(IndexerError::InvalidResponse {
+            provider: NAME,
+            reason: format!("bulk headers: {} bytes for at most {} headers", body.len(), count),
+        });
+    }
+    Ok(body.chunks(80).map(hex::encode).collect())
 }
 
 #[async_trait]
@@ -236,6 +268,34 @@ mod tests {
         let mut j = sample();
         j.as_object_mut().unwrap().remove("bits");
         assert!(parse_header(&j).is_err());
+    }
+
+    #[test]
+    fn split_headers_checks_the_length() {
+        let two = [7u8; 160];
+        assert_eq!(split_headers(&two, 2).unwrap(), vec![hex::encode([7u8; 80]); 2]);
+        assert_eq!(split_headers(&two, 5).unwrap().len(), 2); // capped at the server's tip
+        assert!(split_headers(&two, 1).is_err()); // more than asked
+        assert!(split_headers(&[7u8; 81], 2).is_err()); // not whole headers
+        assert!(split_headers(&[], 2).unwrap().is_empty());
+    }
+
+    /// Live: `HODOS_CHAINTRACKS_URL=<…/chaintracks/v2> cargo test --lib chaintracks_live -- --ignored`.
+    /// The bulk headers must be the same bytes as the per-height ones.
+    #[tokio::test]
+    #[ignore]
+    async fn chaintracks_live_bulk_matches_per_height() {
+        let base = std::env::var(crate::chain_mode::ENV_CHAINTRACKS)
+            .unwrap_or_else(|_| "http://localhost:8083/chaintracks/v2".into());
+        let p = ChaintracksProvider::new(reqwest::Client::new(), base);
+        let bulk = p.headers_bulk(0, 10).await.expect("bulk");
+        assert_eq!(bulk.len(), 10);
+        for (h, hex) in bulk.iter().enumerate() {
+            let one = p.get_block_header(BlockKey::Height(h as u32)).await.expect("by height");
+            assert_eq!(&one.header_hex, hex, "height {}", h);
+        }
+        let tip = p.tip_height().await.expect("tip");
+        assert_eq!(p.headers_bulk(tip, 50).await.expect("at tip").len(), 1, "capped at the tip");
     }
 
     /// Live check against the spv-testnet stack: `cargo test --lib chaintracks_live -- --ignored`.
