@@ -29,6 +29,7 @@ Cite `file.rs :: symbol_name`, not `file.rs:1234`. Symbols survive edits.
 | [`AUTO_APPROVE_ENGINE.md`](./AUTO_APPROVE_ENGINE.md) | The permission decision flow end to end: what C++ collects, what Rust decides, how a prompt round-trips back. Matrix C branch order. |
 | [`IPC_BRIDGE.md`](./IPC_BRIDGE.md) | The `wallet_call` / `wallet_response` process-message bridge that carries every page-originated wallet call. Message contract, chunking, promise correlation. |
 | [`WALLET_API_MAP.md`](./WALLET_API_MAP.md) | Which wallet endpoints are permission-gated, by which dispatcher, and which shim method reaches them. The gate map — **not** an endpoint roster. |
+| [`architecture-diff.md`](./architecture-diff.md) | Public-indexer wallet vs spv wallet (`HODOS_CHAIN_MODE=spv`): where chain data comes from in each mode, how a payment is received and proven, the trust model, and what mainnet still needs. |
 
 `PERMISSION_GATES.md` was listed as "TBD" here for two months and never
 written. It is not planned: everything it would have covered lives in
