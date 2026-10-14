@@ -303,8 +303,9 @@ mod tests {
     fn empty_with_genesis_of(g: &Header) -> Mutex<HeaderChain> {
         let params = Params {
             name: "test",
-            fixed_bits: 0x207f_ffff,
+            difficulty: crate::header_chain::Difficulty::Fixed(0x207f_ffff),
             genesis_hash: Box::leak(g.hash_hex().into_boxed_str()),
+            checkpoints: &[],
         };
         Mutex::new(HeaderChain::new(params))
     }

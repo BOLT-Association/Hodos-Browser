@@ -6,13 +6,14 @@
 //! third-party API's say-so.
 //!
 //! Enforced per header: 80-byte layout, proof-of-work (`hash <= target(bits)`),
-//! `bits` equal to the network's fixed difficulty, parent known, `height = parent + 1`,
-//! timestamp no more than 2 h in the future. The first header must be the pinned
-//! genesis.
+//! `bits` equal to what the network's difficulty rule requires, parent known,
+//! `height = parent + 1`, timestamp no more than 2 h in the future, and the pinned hash at
+//! every checkpoint height. The first header must be the pinned genesis.
 //!
-//! **Regtest only for now.** Mainnet needs a checkpoint and the retarget/DAA rules;
-//! `Params` has no mainnet constructor on purpose so nothing can silently run
-//! unverified under a mainnet name. Median-time-past is not enforced yet.
+//! Networks: **regtest** (fixed difficulty) and **teratestnet** (cw-144 DAA plus the testnet
+//! 20-minute minimum-difficulty rule, ported from Teranode `services/blockchain/Difficulty.go`
+//! and `go-chaincfg` `TeraTestNetParams`). `Params` has no mainnet constructor on purpose so
+//! nothing can silently run under a mainnet name. Median-time-past is not enforced yet.
 
 use std::collections::HashMap;
 
@@ -31,6 +32,7 @@ pub enum HeaderError {
     UnknownParent(String),
     NotGenesis(String),
     TimeTooFarInFuture,
+    CheckpointMismatch { height: u32, got: String },
 }
 
 impl std::fmt::Display for HeaderError {
@@ -119,6 +121,17 @@ impl U256 {
         U256(r)
     }
 
+    fn checked_mul_u64(self, m: u64) -> Option<U256> {
+        let mut r = [0u64; 4];
+        let mut carry = 0u128;
+        for i in 0..4 {
+            let p = self.0[i] as u128 * m as u128 + carry;
+            r[i] = p as u64;
+            carry = p >> 64;
+        }
+        if carry != 0 { None } else { Some(U256(r)) }
+    }
+
     fn bit(&self, n: usize) -> bool {
         (self.0[n / 64] >> (n % 64)) & 1 == 1
     }
@@ -183,6 +196,22 @@ pub fn compact_to_target(bits: u32) -> Result<U256, HeaderError> {
         }
     }
     Ok(U256::from_be_bytes(b))
+}
+
+/// Encode a target as compact `bits` (Bitcoin's `GetCompact` / Teranode `BigToCompact`).
+pub fn target_to_compact(target: U256) -> u32 {
+    let b = target.to_be_bytes();
+    let Some(first) = b.iter().position(|&x| x != 0) else { return 0 };
+    let mut size = (32 - first) as u32;
+    let byte = |i: usize| if i < 32 { b[i] as u32 } else { 0 };
+    // Fewer than 3 significant bytes: the zero padding read past the end left-aligns the
+    // mantissa, which is Bitcoin's `low64 << 8 * (3 - size)`.
+    let mut mant = (byte(first) << 16) | (byte(first + 1) << 8) | byte(first + 2);
+    if mant & 0x0080_0000 != 0 {
+        mant >>= 8;
+        size += 1;
+    }
+    (size << 24) | mant
 }
 
 /// Expected work for a header with this target: `2^256 / (target + 1)`.
@@ -264,13 +293,30 @@ impl Header {
     }
 }
 
+/// How a network sets the `bits` a header must carry.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Difficulty {
+    /// Every header carries exactly these `bits` (no retargeting).
+    Fixed(u32),
+    /// cw-144 DAA (bitcoin-sv `pow.cpp`, Teranode `Difficulty.go`). With
+    /// `reduce_min_difficulty`, a header more than two spacings after its parent may use
+    /// `pow_limit_bits` (the testnet rule).
+    Daa { pow_limit_bits: u32, spacing_secs: u32, reduce_min_difficulty: bool },
+}
+
+/// DAA window, and the parent height below which the window does not exist yet
+/// (Teranode: `blockHeight < DifficultyAdjustmentWindow + 4` -> powLimit).
+const DAA_WINDOW: u32 = 144;
+const DAA_MIN_PARENT_HEIGHT: u32 = DAA_WINDOW + 4;
+
 #[derive(Debug, Clone)]
 pub struct Params {
     pub name: &'static str,
-    /// Fixed difficulty: every header must carry exactly these `bits` (no retargeting).
-    pub fixed_bits: u32,
+    pub difficulty: Difficulty,
     /// Display-hex hash of the pinned genesis header.
     pub genesis_hash: &'static str,
+    /// `(height, display-hex hash)` every chain must pass through.
+    pub checkpoints: &'static [(u32, &'static str)],
 }
 
 impl Params {
@@ -278,17 +324,23 @@ impl Params {
     pub fn regtest() -> Params {
         Params {
             name: "regtest",
-            fixed_bits: 0x207f_ffff,
+            difficulty: Difficulty::Fixed(0x207f_ffff),
             genesis_hash: "0f9188f13cb7b2c71f2a335e3a4fc328bf5beb436012afca590b1a11466e2206",
+            checkpoints: &[],
         }
     }
 
-    /// Teranode test network (teratestnet).
+    /// Teranode test network (`go-chaincfg` v1.5.8 `TeraTestNetParams`).
     pub fn teratestnet() -> Params {
         Params {
             name: "teratestnet",
-            fixed_bits: 0x1d00_ffff,
+            difficulty: Difficulty::Daa { pow_limit_bits: 0x1d00_ffff, spacing_secs: 600, reduce_min_difficulty: true },
             genesis_hash: "000000000499eabba0a88f5b3747231c74b9191c1a4a04b2c2ea817976b7776d",
+            checkpoints: &[
+                (5000, "00000000038392cdae17df19464dfcccadb754b24441d11f3294cc04a90749b8"),
+                (9500, "00000000bd750801352dd82fcb0e675d62a308b38a6486698308ae06fcb3bc10"),
+                (18000, "00000000174095c3c94343b28d29f45010b44bf221e22df5cea6e0ce547a10b5"),
+            ],
         }
     }
 }
@@ -416,10 +468,26 @@ impl HeaderChain {
             return Ok(AddOutcome::Known);
         }
 
-        // Difficulty and proof-of-work.
-        if header.bits != self.params.fixed_bits {
-            return Err(HeaderError::WrongDifficulty { got: header.bits, want: self.params.fixed_bits });
-        }
+        // Linkage first: the difficulty rule is a function of the parent's ancestry. The genesis
+        // has no parent; it is accepted only as the pinned header.
+        let (height, parent_work) = if self.entries.is_empty() {
+            if hash != self.params.genesis_hash {
+                return Err(HeaderError::NotGenesis(hash));
+            }
+            (0, U256::ZERO)
+        } else {
+            let prev = display_hex(&header.prev_hash);
+            let Some(p) = self.entries.get(&prev) else {
+                return Err(HeaderError::UnknownParent(prev));
+            };
+            let want = self.required_bits(p, header.time)?;
+            if header.bits != want {
+                return Err(HeaderError::WrongDifficulty { got: header.bits, want });
+            }
+            (p.height + 1, p.chainwork)
+        };
+
+        // Proof-of-work.
         let target = compact_to_target(header.bits)?;
         let mut h = header.hash();
         h.reverse(); // to big-endian for numeric comparison
@@ -429,20 +497,11 @@ impl HeaderChain {
         if header.time > now.saturating_add(MAX_FUTURE_SECS) {
             return Err(HeaderError::TimeTooFarInFuture);
         }
-
-        // Linkage.
-        let (height, parent_work) = if self.entries.is_empty() {
-            if hash != self.params.genesis_hash {
-                return Err(HeaderError::NotGenesis(hash));
+        if let Some((_, want)) = self.params.checkpoints.iter().find(|(ch, _)| *ch == height) {
+            if hash != *want {
+                return Err(HeaderError::CheckpointMismatch { height, got: hash });
             }
-            (0, U256::ZERO)
-        } else {
-            let prev = display_hex(&header.prev_hash);
-            match self.entries.get(&prev) {
-                Some(p) => (p.height + 1, p.chainwork),
-                None => return Err(HeaderError::UnknownParent(prev)),
-            }
-        };
+        }
 
         let chainwork = parent_work
             .checked_add(work_for_target(target))
@@ -470,6 +529,71 @@ impl HeaderChain {
                 }
             }
         }
+    }
+
+    /// The `bits` a header on top of `parent`, timestamped `time`, must carry.
+    fn required_bits(&self, parent: &Entry, time: u32) -> Result<u32, HeaderError> {
+        let (pow_limit_bits, spacing, reduce_min) = match self.params.difficulty {
+            Difficulty::Fixed(bits) => return Ok(bits),
+            Difficulty::Daa { pow_limit_bits, spacing_secs, reduce_min_difficulty } => {
+                (pow_limit_bits, spacing_secs, reduce_min_difficulty)
+            }
+        };
+        if reduce_min && time as u64 > parent.header.time as u64 + 2 * spacing as u64 {
+            return Ok(pow_limit_bits);
+        }
+        if parent.height < DAA_MIN_PARENT_HEIGHT {
+            return Ok(pow_limit_bits);
+        }
+        let last = self.suitable(parent)?;
+        let first = self.suitable(self.ancestor(parent, DAA_WINDOW)?)?;
+
+        // Bound the timespan so one adjustment moves difficulty at most 2x (72..288 spacings).
+        let spacing = spacing as u64;
+        let span = (last.header.time as u64).saturating_sub(first.header.time as u64).clamp(72 * spacing, 288 * spacing);
+        let work = last.chainwork.sub(first.chainwork);
+        let projected = work
+            .checked_mul_u64(spacing)
+            .ok_or(HeaderError::BadBits(pow_limit_bits))?
+            .div(U256([span, 0, 0, 0]));
+        if projected.is_zero() {
+            return Ok(last.header.bits);
+        }
+        // target = (2^256 - projected) / projected; 2^256 - x is ~x + 1 in 256 bits.
+        let neg = U256([!projected.0[0], !projected.0[1], !projected.0[2], !projected.0[3]])
+            .checked_add(U256::ONE)
+            .unwrap_or(U256::ZERO);
+        let target = neg.div(projected).min(compact_to_target(pow_limit_bits)?);
+        Ok(target_to_compact(target))
+    }
+
+    fn parent_of(&self, e: &Entry) -> Result<&Entry, HeaderError> {
+        let prev = display_hex(&e.header.prev_hash);
+        self.entries.get(&prev).ok_or(HeaderError::UnknownParent(prev))
+    }
+
+    fn ancestor<'a>(&'a self, mut e: &'a Entry, back: u32) -> Result<&'a Entry, HeaderError> {
+        for _ in 0..back {
+            e = self.parent_of(e)?;
+        }
+        Ok(e)
+    }
+
+    /// Median-by-time of `e`, its parent and grandparent, sorted oldest-first with the same
+    /// three-step network as bitcoin-sv / Teranode so ties pick the same block.
+    fn suitable<'a>(&'a self, e: &'a Entry) -> Result<&'a Entry, HeaderError> {
+        let p = self.parent_of(e)?;
+        let mut s = [self.parent_of(p)?, p, e];
+        if s[0].header.time > s[2].header.time {
+            s.swap(0, 2);
+        }
+        if s[0].header.time > s[1].header.time {
+            s.swap(0, 1);
+        }
+        if s[1].header.time > s[2].header.time {
+            s.swap(1, 2);
+        }
+        Ok(s[1])
     }
 
     fn reorg_to(&mut self, new_tip: &str) -> AddOutcome {
@@ -526,7 +650,7 @@ pub(crate) mod tests {
     pub(crate) fn fixture() -> (HeaderChain, Header) {
         let g = mine([0; 32], 0, 0x207f_ffff);
         let ghash: &'static str = Box::leak(g.hash_hex().into_boxed_str());
-        let params = Params { name: "test", fixed_bits: 0x207f_ffff, genesis_hash: ghash };
+        let params = Params { name: "test", difficulty: Difficulty::Fixed(0x207f_ffff), genesis_hash: ghash, checkpoints: &[] };
         let mut c = HeaderChain::new(params);
         assert_eq!(c.add_header(g.clone(), NOW), Ok(AddOutcome::Extended));
         (c, g)
@@ -747,6 +871,30 @@ pub(crate) mod tests {
         let (c, rejected) = HeaderChain::from_stored(Params::teratestnet(), stored, NOW);
         assert_eq!(rejected, 0);
         assert_eq!(c.tip_height(), Some(700));
+    }
+
+    #[test]
+    fn a_header_other_than_the_checkpoint_is_rejected_at_its_height() {
+        let (mut c, g) = fixture();
+        let a1 = extend(&mut c, &g, 1);
+        let a2 = extend(&mut c, &a1, 2);
+        let mut params = c.params().clone();
+        params.checkpoints = Box::leak(vec![(2u32, &*Box::leak(a2.hash_hex().into_boxed_str()))].into_boxed_slice());
+        let mut c = HeaderChain::new(params);
+        c.add_header(g.clone(), NOW).unwrap();
+        c.add_header(a1.clone(), NOW).unwrap();
+        let b2 = mine(a1.hash(), 22, 0x207f_ffff);
+        assert!(matches!(c.add_header(b2, NOW), Err(HeaderError::CheckpointMismatch { height: 2, .. })));
+        assert_eq!(c.add_header(a2, NOW), Ok(AddOutcome::Extended));
+    }
+
+    #[test]
+    fn target_to_compact_round_trips() {
+        for bits in [0x1d00_ffffu32, 0x1c7f_ff80, 0x1c0a_8eba, 0x207f_ffff, 0x0312_3456, 0x0212_3400, 0x0112_0000] {
+            assert_eq!(target_to_compact(compact_to_target(bits).unwrap()), bits, "{:#x}", bits);
+        }
+        // A mantissa with the sign bit set moves up a byte.
+        assert_eq!(target_to_compact(U256([0x80, 0, 0, 0])), 0x0200_8000);
     }
 
     #[test]
