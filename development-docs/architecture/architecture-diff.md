@@ -194,16 +194,55 @@ Harnesses: `rust-wallet/tests/spv-ttn/` (public testnet, faucet-funded; `connect
 
 ## 5. Where this stops: mainnet
 
-Mainnet spv is **not** a configuration change. Three things are missing, in order of size:
+Mainnet spv is **not** a configuration change. The service side exists (checked live,
+2026-10-14); the wallet side has two pieces of real work.
 
-1. **A mainnet Arcade with chaintracks.** Arcade is ARC-compatible for broadcast and status, but
-   the wallet also needs its `/chaintracks/v2` header service (bulk `/headers`, `/tip/stream`).
-   Whether a public mainnet instance exists, and whether it serves headers, has not been checked.
-2. **Mainnet header rules.** `Params` deliberately has no mainnet constructor. Verifying from
+### 5.1 The public mainnet Arcade (exists; verified)
+
+Four hosts, all Arcade **v0.16.0**, all serving `/chaintracks/v2`:
+
+| Host | Observed |
+|---|---|
+| `arcade-v2-eu-1.bsvblockchain.tech` | healthy end to end during the probes; **use this one first** |
+| `arcade-v2-us-1.bsvblockchain.tech` | named as the public mainnet instance in Arcade's issue tracker (bsv-blockchain/arcade #339) |
+| `arcade-us-1.bsvblockchain.tech`, `arcade-us-1.bsvb.tech` | the BSVA pattern `arcade-${app_suffix}.bsvb.tech` (ts-stack `docs/infrastructure/index.md`); `.bsvb.tech` redirects to `.bsvblockchain.tech` |
+
+What the wallet needs, as observed on the EU host:
+
+| Need | Result |
+|---|---|
+| Genesis | header 0 hashes to `000000000019d6689c085ae165831e934ff763ae46a2a6c172b3f1b60a8ce26f` |
+| Header integrity | hashes at 504031, 600000, 800000, 971000 equal WhatsOnChain's (independent source) |
+| Bulk `/headers?height=&count=` | up to at least 71k headers per request; 2000-header batches ~1.5 s mid-chain (6.8 s at genesis, 3 s at the tip); a full 971k sync is 10-12 min at the wallet's batch size, under two at 50k per request |
+| `/tip/stream` | present tip on connect, same frames as the testnet |
+| SSE `/events?callbackToken=` | `200 text/event-stream`, `: keepalive` within ~15 s (a probe that gives up sooner sees nothing) |
+| `/policy` | 1 sat/KB (below the wallet's 100 sat/KB sanity floor, so the 1000 sat/KB default applies, as on the testnet) |
+
+Two caveats that shape the design:
+
+- **A public chaintracks can reset under you.** During the probes the three US hosts went from
+  serving 900000→tip to `height: 0` and headers 0-21987 only: their header store restarted and was
+  re-bootstrapping from genesis, while `/health` kept reporting `blockHeight: 971087` (the datahub's
+  height, not chaintracks'). The EU host was unaffected. The wallet's most-work rule already refuses
+  to follow a tip that went backwards, but the sync will log errors until the server catches up:
+  make the chaintracks URL a per-region setting and treat "server tip below ours" as *unavailable*,
+  never as a reorg.
+- **`GET /tx/:id` knows only transactions Arcade itself tracks.** Two random mined mainnet txs
+  answered `404 transaction not found`, as on the testnet. The merkle-service
+  (`merkle-service-us-1.bsvb.tech`) is **not** a proof lookup: its API is `POST /watch` (txid +
+  callback URL) and `GET /api/lookup/{txid}`, and Arcade's README says the same. So the only proof
+  source for a transaction without its own BUMP is Arcade after a (re-)submission, and that works:
+  re-submitting an already-mined tx to the testnet Arcade answered `202 txStatus: MINED` with the
+  merkle path at once. The `internalizeAction` re-broadcast (section 3.2) is exactly this path.
+
+### 5.2 Still to build in the wallet
+
+1. **Mainnet header rules.** `Params` deliberately has no mainnet constructor. Verifying from
    genesis means three difficulty regimes (2016-block retarget, the 2017 Emergency Difficulty
-   Adjustment, then the DAA from height 504031), or an **assume-valid checkpoint** near the tip
-   with full rules only after it. The second is the normal wallet answer and the cheaper one.
-3. **Scale.** ~900k headers: the in-memory chain (`HashMap<String, Entry>` with hex strings) is
+   Adjustment from 478558, then the DAA from 504031), or an **assume-valid checkpoint** near the
+   tip with full rules only after it. The second is the normal wallet answer and the cheaper one;
+   the chaintracks data supports either.
+2. **Scale.** ~971k headers: the in-memory chain (`HashMap<String, Entry>` with hex strings) is
    a few MB for 36k and roughly 200 MB at mainnet size; the per-header ancestor walk for the DAA
    is fine, the `side_branch_has_root` scan over every entry is not. Both need a pass before a
    mainnet switch, not after.
