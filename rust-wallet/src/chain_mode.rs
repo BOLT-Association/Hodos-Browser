@@ -30,7 +30,8 @@ pub const ENV_ARCADE_PUSH: &str = "HODOS_ARCADE_PUSH";
 pub const ENV_TIP_STREAM: &str = "HODOS_TIP_STREAM";
 /// `off` / `0` / `false` / `no` disables zero-conf acceptance of received outputs.
 pub const ENV_ZERO_CONF: &str = "HODOS_ZERO_CONF";
-/// Which chain the verified header chain follows: `regtest` (default) or `teratestnet`.
+/// Which chain the verified header chain follows: `teratestnet` (default) or `regtest`.
+/// Only read in spv mode (`HODOS_CHAIN_MODE=spv`, itself off by default).
 pub const ENV_NETWORK: &str = "HODOS_CHAIN_NETWORK";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -62,11 +63,12 @@ pub fn parse(value: Option<&str>) -> Result<ChainMode, String> {
     }
 }
 
-/// Header-chain rules for `HODOS_CHAIN_NETWORK`. Unset means `regtest` (the local stack).
+/// Header-chain rules for `HODOS_CHAIN_NETWORK`. Unset means `teratestnet` (the public
+/// Teranode testnet); the local regtest stack must ask for `regtest` explicitly.
 pub fn parse_network(value: Option<&str>) -> Result<crate::header_chain::Params, String> {
     match value.map(|v| v.trim().to_ascii_lowercase()).as_deref() {
-        None | Some("") | Some("regtest") => Ok(crate::header_chain::Params::regtest()),
-        Some("teratestnet") => Ok(crate::header_chain::Params::teratestnet()),
+        None | Some("") | Some("teratestnet") => Ok(crate::header_chain::Params::teratestnet()),
+        Some("regtest") => Ok(crate::header_chain::Params::regtest()),
         Some(other) => Err(format!(
             "{} = '{}' is not recognised (expected 'regtest' or 'teratestnet')",
             ENV_NETWORK, other
@@ -285,9 +287,10 @@ mod tests {
 
     #[test]
     fn network_values() {
-        assert_eq!(parse_network(None).unwrap().name, "regtest");
-        assert_eq!(parse_network(Some("")).unwrap().name, "regtest");
+        assert_eq!(parse_network(None).unwrap().name, "teratestnet");
+        assert_eq!(parse_network(Some("")).unwrap().name, "teratestnet");
         assert_eq!(parse_network(Some(" TeraTestNet ")).unwrap().name, "teratestnet");
+        assert_eq!(parse_network(Some("regtest")).unwrap().name, "regtest");
         assert!(parse_network(Some("mainnet")).is_err());
     }
 
