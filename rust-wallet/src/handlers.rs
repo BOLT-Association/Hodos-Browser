@@ -18687,10 +18687,9 @@ pub async fn get_header_for_height(
 pub async fn get_network(_body: web::Bytes) -> HttpResponse {
     log::info!("📋 /getNetwork called");
 
-    // For now, return hardcoded "mainnet"
-    // TODO: Could read from config file or environment variable later
+    // "mainnet" in public mode; "testnet" in spv mode (chain_mode::network_name).
     HttpResponse::Ok().json(serde_json::json!({
-        "network": "mainnet"
+        "network": crate::chain_mode::network_name()
     }))
 }
 

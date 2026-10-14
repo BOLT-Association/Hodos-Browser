@@ -891,6 +891,9 @@ async fn main() -> std::io::Result<()> {
         // validate_startup has already refused an unrecognised HODOS_CHAIN_NETWORK.
         let params = chain_mode::header_params().expect("HODOS_CHAIN_NETWORK validated at startup");
         let network = params.name;
+        if let Some(hint) = chain_mode::regtest_hint() {
+            log::warn!("⚠️  {}", hint);
+        }
         let stored = {
             let db = database.lock().unwrap();
             database::HeaderChainRepository::new(db.connection()).load(params.name).unwrap_or_default()

@@ -82,6 +82,31 @@ pub fn header_params() -> Result<crate::header_chain::Params, String> {
     parse_network(std::env::var(ENV_NETWORK).ok().as_deref())
 }
 
+/// The BRC-100 `getNetwork` answer: `mainnet` in public mode, `testnet` in spv mode (both
+/// teratestnet and regtest are test networks to a dApp: same address prefixes, no real coins).
+pub fn network_name() -> &'static str {
+    if is_spv() { "testnet" } else { "mainnet" }
+}
+
+/// A hint for the regtest trap: spv mode, no `HODOS_CHAIN_NETWORK`, and chaintracks on this
+/// machine. The default (`teratestnet`) then rejects every header of the local stack as
+/// `NotGenesis`, which is loud in the log but never fatal, so say what to set.
+pub fn regtest_hint() -> Option<String> {
+    if !is_spv() || non_empty_env(ENV_NETWORK) {
+        return None;
+    }
+    let ct = std::env::var(ENV_CHAINTRACKS).ok()?;
+    let host = reqwest::Url::parse(ct.trim()).ok()?.host_str()?.to_ascii_lowercase();
+    if host == "localhost" || host == "127.0.0.1" || host == "::1" {
+        Some(format!(
+            "{} is unset and {} is on this machine ({}); the header chain follows teratestnet by default. A local regtest stack needs {}=regtest",
+            ENV_NETWORK, ENV_CHAINTRACKS, host, ENV_NETWORK
+        ))
+    } else {
+        None
+    }
+}
+
 /// Current mode, read from the environment each call. Fails closed to `Spv`.
 pub fn current() -> ChainMode {
     parse(std::env::var(ENV_MODE).ok().as_deref()).unwrap_or(ChainMode::Spv)
@@ -305,6 +330,25 @@ mod tests {
             None => std::env::remove_var(ENV_NETWORK),
         }
         assert!(r.unwrap_err().contains(ENV_NETWORK));
+    }
+
+    #[test]
+    fn network_name_and_regtest_hint() {
+        with_env(None, None, None, || {
+            assert_eq!(network_name(), "mainnet");
+            assert!(regtest_hint().is_none(), "public mode never hints");
+        });
+        with_env(Some("spv"), Some("http://localhost:8080"), Some("http://localhost:8083/chaintracks/v2"), || {
+            assert_eq!(network_name(), "testnet");
+            let hint = regtest_hint().expect("local chaintracks with no network set");
+            assert!(hint.contains("HODOS_CHAIN_NETWORK=regtest"), "{}", hint);
+            std::env::set_var(ENV_NETWORK, "regtest");
+            assert!(regtest_hint().is_none(), "set explicitly: no hint");
+            std::env::remove_var(ENV_NETWORK);
+        });
+        with_env(Some("spv"), Some("https://arcade.example"), Some("https://arcade.example/chaintracks/v2"), || {
+            assert!(regtest_hint().is_none(), "remote chaintracks: no hint");
+        });
     }
 
     #[test]
