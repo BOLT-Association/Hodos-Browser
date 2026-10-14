@@ -953,8 +953,8 @@ enum TimeoutAction {
 
 /// The final check's decision. In spv mode Arcade is the only oracle, so an error from it (outage,
 /// 5xx) proves nothing: the tx may be mined, and failing it would restore inputs it already spent
-/// (ChainBrowsers docs/issues/hodos-spv-outage-fails-mined-txs.md). Public mode keeps its forced
-/// failure on an inconclusive three-oracle answer.
+/// (seen live during an Arcade outage: mined txs were failed and their inputs restored). Public
+/// mode keeps its forced failure on an inconclusive three-oracle answer.
 fn timeout_action(verdict: &OracleVerdict, spv: bool) -> TimeoutAction {
     match verdict {
         OracleVerdict::Present { any_confirmed: true } => TimeoutAction::Confirm,
@@ -1117,7 +1117,7 @@ mod spv_oracle_tests {
         })
     }
 
-    /// ChainBrowsers docs/issues/hodos-spv-outage-fails-mined-txs.md: in spv mode Arcade is the only
+    /// Arcade outage regression: in spv mode Arcade is the only
     /// oracle, so an error from it says nothing about the tx; past the timeout the wallet must keep
     /// asking, not fail its own (possibly mined) tx and restore its inputs. Public mode is unchanged.
     #[test]
