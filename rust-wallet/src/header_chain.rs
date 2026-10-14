@@ -33,6 +33,10 @@ pub enum HeaderError {
     NotGenesis(String),
     TimeTooFarInFuture,
     CheckpointMismatch { height: u32, got: String },
+    /// The DAA's projected work does not fit in 256 bits (needs 144 blocks of work above 2^246).
+    DifficultyOverflow,
+    /// The DAA produced a zero target (projected work above 2^255).
+    ZeroTarget,
 }
 
 impl std::fmt::Display for HeaderError {
@@ -554,7 +558,7 @@ impl HeaderChain {
         let work = last.chainwork.sub(first.chainwork);
         let projected = work
             .checked_mul_u64(spacing)
-            .ok_or(HeaderError::BadBits(pow_limit_bits))?
+            .ok_or(HeaderError::DifficultyOverflow)?
             .div(U256([span, 0, 0, 0]));
         if projected.is_zero() {
             return Ok(last.header.bits);
@@ -564,6 +568,9 @@ impl HeaderChain {
             .checked_add(U256::ONE)
             .unwrap_or(U256::ZERO);
         let target = neg.div(projected).min(compact_to_target(pow_limit_bits)?);
+        if target.is_zero() {
+            return Err(HeaderError::ZeroTarget);
+        }
         Ok(target_to_compact(target))
     }
 
