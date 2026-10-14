@@ -12996,7 +12996,9 @@ pub async fn internalize_action(
     // in the bundle, trailing bytes) is returned as the error it is instead of
     // degrading into the plain-BEEF / raw-transaction fallbacks below, and so a
     // non-Atomic payload is refused rather than accepted on a lucky parse.
-    {
+    // The validated bytes are kept: if the subject is not on the network yet, they are what
+    // gets broadcast (they carry the parents the broadcaster needs).
+    let atomic_beef_bytes: Vec<u8> = {
         use base64::{Engine as _, engine::general_purpose};
         let raw: Option<Vec<u8>> = hex::decode(&tx_string).ok()
             .or_else(|| general_purpose::STANDARD.decode(&tx_string).ok());
@@ -13019,7 +13021,8 @@ pub async fn internalize_action(
                 "description": format!("Invalid Atomic BEEF: {}", e)
             }));
         }
-    }
+        raw.unwrap_or_default()
+    };
 
     let (main_tx_bytes, parsed_beef, has_beef, is_atomic_beef) = {
         // Try Atomic BEEF from base64 first
@@ -13329,9 +13332,11 @@ pub async fn internalize_action(
     if !tx_exists {
         log::info!("   📡 Transaction not on-chain, broadcasting...");
 
-        // Broadcast the transaction ourselves
-        let raw_tx_hex = hex::encode(&main_tx_bytes);
-        match broadcast_transaction(&raw_tx_hex, &state.services, Some(&state.database), Some(&txid)).await {
+        // Broadcast it ourselves, as the Atomic BEEF we were given rather than the bare
+        // transaction: Arcade builds Extended Format from the parents inside it, and
+        // broadcast_transaction already takes Atomic BEEF (as /transaction/send does).
+        let beef_hex = hex::encode(&atomic_beef_bytes);
+        match broadcast_transaction(&beef_hex, &state.services, Some(&state.database), Some(&txid)).await {
             Ok(broadcast_msg) => {
                 // broadcast_transaction returns a message string, not a txid.
                 // Our locally-computed txid is authoritative (passed via txid_for_cache).
