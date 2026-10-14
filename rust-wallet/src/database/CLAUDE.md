@@ -300,7 +300,7 @@ Identity mapping (master pubkey → userId). Single-user wallets have one defaul
 
 ## Schema & Migrations
 
-**Current version**: **V24** (tracked in the `schema_version` table; the runner reads `MAX(version)`). New databases get the consolidated V1 schema and then run every incremental migration V2→V24 in the same pass, because `current_version` starts at 0 and each guard is `current_version < N`. All migrations are idempotent (check column/table existence, or use `IF NOT EXISTS` / `DROP … IF EXISTS`).
+**Current version**: **V27** (tracked in the `schema_version` table; the runner reads `MAX(version)`). New databases get the consolidated V1 schema and then run every incremental migration V2→V27 in the same pass, because `current_version` starts at 0 and each guard is `current_version < N`. All migrations are idempotent (check column/table existence, or use `IF NOT EXISTS` / `DROP … IF EXISTS`).
 
 Migration runner: `connection.rs :: WalletDatabase::migrate`. Migration bodies: `migrations.rs :: create_schema_v1` + `migrate_vN_to_vN+1` (23 incremental functions, `migrate_v1_to_v2` … `migrate_v23_to_v24`).
 

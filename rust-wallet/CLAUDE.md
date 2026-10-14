@@ -86,7 +86,7 @@ cargo check              # Fast type-check without building
 | `src/database/permission_audit_repo.rs` | `PermissionAuditEntry`, `PermissionAuditRepository` — the long-lived `permission_audit_log` surface (V20) |
 | `src/recovery.rs` | `derive_private_key_bip32` (legacy BIP32 `m/{index}`), `recover_wallet_from_mnemonic`, `derive_key_at_path`, `derive_address_at_path`, `scan_external_wallet`, `build_sweep_transactions`, `pubkey_to_address`, `address_to_p2pkh_script` |
 | `src/action_storage.rs` | `ActionStatus`, `TransactionStatus`, `ProvenTxReqStatus` enums |
-| `src/monitor/mod.rs` | `Monitor`, `TaskSchedule` (14 interval fields), `log_monitor_event` — background scheduler on a 30s tick with a `db_available()` gate |
+| `src/monitor/mod.rs` | `Monitor`, `TaskSchedule` (16 interval fields), `log_monitor_event` — background scheduler on a 30s tick with a `db_available()` gate |
 | `src/permission_service/` | `PermissionService`, `domain_trust_gate`, `dispatch_privacy_perimeter`, `dispatch_scoped_grant`, `dispatch_cert_disclosure`, `dispatch_payment`, `is_protected_basket`, `GateOutcome`, `ScopedCall`, `PaymentCall`, `PendingApproval`, `SessionCounters`, session handlers |
 | `crates/hodos_permission_engine/` | Pure decision crate: `decide()` in `src/lib.rs`, cascade in `src/matrix_c.rs`, `PermissionContext`/`CallKind`/`TrustLevel` in `src/context.rs`, `PermissionDecision`/`EngineReason`/`PromptType` in `src/decision.rs`. 40 unit tests. |
 | `src/manifest.rs` | Rust port of the C++ `ManifestFetcher` — `fetch_manifest` (3s cap, 64 KB cap) + pure lenient `parse_manifest` for `.well-known/wallet-manifest.json` |
@@ -136,11 +136,11 @@ Dispatchers in `request_gate.rs`: `domain_trust_gate` (middleware entry), `dispa
 
 ## Database Schema
 
-**Current migration version: V23.** `migrations.rs` is the only authority: the highest migration function is `migrate_v22_to_v23`, and the runner in `connection.rs :: WalletDatabase::migrate` gates on `current_version < 23` before stamping `schema_version`.
+**Current migration version: V27.** `migrations.rs` is the only authority: the highest migration function is `migrate_v26_to_v27`, and the runner in `connection.rs :: WalletDatabase::migrate` gates on `current_version < 27` before stamping `schema_version`.
 
-New databases get the fully consolidated `create_schema_v1`; V2–V23 are incremental migrations for pre-existing databases. All migrations are idempotent (existence-checked `ALTER`, `CREATE TABLE IF NOT EXISTS`, `DROP TABLE IF EXISTS`).
+New databases get the fully consolidated `create_schema_v1`; V2–V27 are incremental migrations for pre-existing databases. All migrations are idempotent (existence-checked `ALTER`, `CREATE TABLE IF NOT EXISTS`, `DROP TABLE IF EXISTS`).
 
-**The per-table schema roster and the full V1→V23 migration ledger live in [`src/database/CLAUDE.md`](src/database/CLAUDE.md)** — this doc deliberately does not carry a second copy. Anything below is wallet-layer behavior that reads *from* the schema, not a description of it.
+**The per-table schema roster and the full V1→V27 migration ledger live in [`src/database/CLAUDE.md`](src/database/CLAUDE.md)** — this doc deliberately does not carry a second copy. Anything below is wallet-layer behavior that reads *from* the schema, not a description of it.
 
 Load-bearing points for this layer:
 - V17 added `identity_key_disclosure_allowed` on `domain_permissions` (gates `get_public_key({identityKey:true})` for external domains).
@@ -150,6 +150,9 @@ Load-bearing points for this layer:
 - V21 added `bsv_price_cache` — the persisted price fallback consumed by `price_cache.rs`.
 - V22 added `bundled_scope_grant` on `domain_permissions`.
 - V23 dropped `engine_shadow_log` (Phase 2.6-H cleanup).
+- V24 added `domain_manifest_snapshots` (what a site asked for, as the user approved it); V25 added `settings.default_bundled_scope_grant`.
+- V26 added `header_chain` — WS4 candidate headers per network, re-validated on every load (`HeaderChain::from_stored`), a cache and never an authority.
+- V27 added `pending_proofs` — spv-mode merkle proofs held until the wallet's own header chain can verify them; nothing else reads it.
 
 ### Output Model
 
@@ -199,7 +202,7 @@ A single `status TEXT NOT NULL` column on `transactions` replaced the old dual `
 
 The Monitor (`src/monitor/mod.rs`) is the sole background task scheduler. It runs as a single tokio task with a 30-second tick loop, guarded by `MONITOR_STARTED` against duplicate loops, and gates most tasks behind `db_available()` so a busy DB defers rather than blocks. Intervals come from `TaskSchedule::default()`.
 
-**15 tasks**, one module each in `src/monitor/`:
+**16 scheduled tasks**, one module each in `src/monitor/` (roster of record: `src/monitor/CLAUDE.md`):
 
 | Task | Interval | Purpose |
 |------|----------|---------|
@@ -218,6 +221,9 @@ The Monitor (`src/monitor/mod.rs`) is the sole background task scheduler. It run
 | TaskRetryPeerPayOutbox | 30s | Retry MessageBox delivery for `peerpay_outbox` rows (60s ×10, then 120s ×10, then `exhausted`); actual retry governed by `next_retry_at` |
 | TaskRefreshShipCache | 300s | Keeps `AppState.ship_cache` warm for `tm_identity`. Runs **outside** the `db_available()` gate (pure network + memory) so a busy DB never starves SHIP refresh. |
 | TaskSweepReservations | 300s | Releases `pending-%` UTXO reservations older than `MAX_AGE_SECS` (15 min) that no live `PENDING_TRANSACTIONS` entry claims — the backstop for reservations stranded by a process kill, which the `ReservationGuard` cannot survive. ⛔ **Releases only outpoints positively observed in the on-chain unspent set**; every uncertainty (API down, address not ours, outpoint absent) leaves the reservation standing. Replaced an unconditional, unverified blanket restore that ran at startup and could un-spend a broadcast transaction. |
+| TaskSyncHeaders | 30s | spv mode (WS4): sync the verified header chain from `HODOS_CHAINTRACKS_URL` in bulk, persist new headers (V26 `header_chain`), log reorgs; runs `TaskRecheckProofs` in the same tick (stored proofs re-checked after a reorg). No-op when unset |
+
+Also in `src/monitor/`, not on the schedule: `task_recheck_proofs.rs` (chained after `sync_headers`), and the two spv stream listeners started once at boot, `task_push.rs` (Arcade SSE) and `task_tip_stream.rs` (chaintracks tip stream), which only wake `sync_headers` + `check_for_proofs` early; polling is unchanged.
 
 ### Ghost Transaction Safety Rules
 
