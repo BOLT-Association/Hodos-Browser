@@ -30,6 +30,8 @@ pub const ENV_ARCADE_PUSH: &str = "HODOS_ARCADE_PUSH";
 pub const ENV_TIP_STREAM: &str = "HODOS_TIP_STREAM";
 /// `off` / `0` / `false` / `no` disables zero-conf acceptance of received outputs.
 pub const ENV_ZERO_CONF: &str = "HODOS_ZERO_CONF";
+/// Which chain the verified header chain follows: `regtest` (default) or `teratestnet`.
+pub const ENV_NETWORK: &str = "HODOS_CHAIN_NETWORK";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ChainMode {
@@ -60,6 +62,24 @@ pub fn parse(value: Option<&str>) -> Result<ChainMode, String> {
     }
 }
 
+/// Header-chain rules for `HODOS_CHAIN_NETWORK`. Unset means `regtest` (the local stack).
+pub fn parse_network(value: Option<&str>) -> Result<crate::header_chain::Params, String> {
+    match value.map(|v| v.trim().to_ascii_lowercase()).as_deref() {
+        None | Some("") | Some("regtest") => Ok(crate::header_chain::Params::regtest()),
+        Some("teratestnet") => Ok(crate::header_chain::Params::teratestnet()),
+        Some(other) => Err(format!(
+            "{} = '{}' is not recognised (expected 'regtest' or 'teratestnet')",
+            ENV_NETWORK, other
+        )),
+    }
+}
+
+/// The header-chain rules to verify against. `validate_startup` has already refused an
+/// unrecognised value, so the fallback is never reached by a running wallet.
+pub fn header_params() -> Result<crate::header_chain::Params, String> {
+    parse_network(std::env::var(ENV_NETWORK).ok().as_deref())
+}
+
 /// Current mode, read from the environment each call. Fails closed to `Spv`.
 pub fn current() -> ChainMode {
     parse(std::env::var(ENV_MODE).ok().as_deref()).unwrap_or(ChainMode::Spv)
@@ -76,6 +96,7 @@ fn non_empty_env(name: &str) -> bool {
 /// Check the configuration at startup. `Err` means the wallet must not start.
 pub fn validate_startup() -> Result<ChainMode, String> {
     let mode = parse(std::env::var(ENV_MODE).ok().as_deref())?;
+    header_params()?;
     if mode == ChainMode::Spv {
         let missing: Vec<&str> = [ENV_ARCADE, ENV_CHAINTRACKS]
             .into_iter()
@@ -260,6 +281,27 @@ mod tests {
         for (k, v) in old {
             set(k, v.as_deref());
         }
+    }
+
+    #[test]
+    fn network_values() {
+        assert_eq!(parse_network(None).unwrap().name, "regtest");
+        assert_eq!(parse_network(Some("")).unwrap().name, "regtest");
+        assert_eq!(parse_network(Some(" TeraTestNet ")).unwrap().name, "teratestnet");
+        assert!(parse_network(Some("mainnet")).is_err());
+    }
+
+    #[test]
+    fn unknown_network_refuses_startup() {
+        let _g = ENV_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        let old = std::env::var(ENV_NETWORK).ok();
+        std::env::set_var(ENV_NETWORK, "mainnet");
+        let r = validate_startup();
+        match old {
+            Some(v) => std::env::set_var(ENV_NETWORK, v),
+            None => std::env::remove_var(ENV_NETWORK),
+        }
+        assert!(r.unwrap_err().contains(ENV_NETWORK));
     }
 
     #[test]

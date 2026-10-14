@@ -888,7 +888,9 @@ async fn main() -> std::io::Result<()> {
     // run, so "chaintracks configured" can never fall through to the unverified path.
     // Stored headers are re-validated on load (storage is a cache, not an authority).
     if services::providers::chaintracks::configured_base_url().is_some() {
-        let params = header_chain::Params::regtest();
+        // validate_startup has already refused an unrecognised HODOS_CHAIN_NETWORK.
+        let params = chain_mode::header_params().expect("HODOS_CHAIN_NETWORK validated at startup");
+        let network = params.name;
         let stored = {
             let db = database.lock().unwrap();
             database::HeaderChainRepository::new(db.connection()).load(params.name).unwrap_or_default()
@@ -899,8 +901,8 @@ async fn main() -> std::io::Result<()> {
             .unwrap_or(0);
         let (chain, rejected) = header_chain::HeaderChain::from_stored(params, stored, now);
         log::info!(
-            "✅ Header chain (regtest): {} stored header(s), tip {:?}, {} rejected on reload",
-            chain.len(), chain.tip_height(), rejected
+            "✅ Header chain ({}): {} stored header(s), tip {:?}, {} rejected on reload",
+            network, chain.len(), chain.tip_height(), rejected
         );
         header_sync::init(chain);
     }
