@@ -1386,3 +1386,54 @@ pub fn migrate_v24_to_v25(conn: &Connection) -> Result<()> {
     info!("   ✅ V25 migration applied (default_bundled_scope_grant)");
     Ok(())
 }
+
+/// V25 → V26 — WS4 verified header chain. Owner-approved 2026-10-03.
+///
+/// One additive table; nothing existing is altered. Holds raw 80-byte headers per
+/// network. Height, chainwork and the active chain are NOT stored: they are
+/// recomputed and every header re-validated on load (`HeaderChain::from_stored`),
+/// so this table is a cache of candidate headers, never an authority.
+///
+/// Idempotent: `CREATE TABLE IF NOT EXISTS`.
+pub fn migrate_v25_to_v26(conn: &Connection) -> Result<()> {
+    info!("   Creating header_chain table (V26)...");
+    conn.execute_batch(
+        "CREATE TABLE IF NOT EXISTS header_chain (
+            network TEXT NOT NULL,
+            block_hash TEXT NOT NULL,
+            height INTEGER NOT NULL,
+            header_hex TEXT NOT NULL,
+            created_at INTEGER NOT NULL,
+            PRIMARY KEY (network, block_hash)
+        );
+        CREATE INDEX IF NOT EXISTS idx_header_chain_height ON header_chain(network, height);",
+    )?;
+    info!("   ✅ V26 migration applied (header_chain)");
+    Ok(())
+}
+
+/// V26 → V27 — held (not yet verifiable) merkle proofs. Owner-approved 2026-10-04.
+///
+/// One additive table; nothing existing is altered. A proof Arcade supplies can arrive before the
+/// wallet's own header chain has its block. It is held here, **not** in `proven_txs` (every reader
+/// of `proven_txs` treats a row as a verified proof), until `pending_proofs::resolve_pending` has
+/// verified it, at which point it is stored through the normal path and the held row is deleted.
+/// Nothing but that resolver reads this table.
+///
+/// Idempotent: `CREATE TABLE IF NOT EXISTS`.
+pub fn migrate_v26_to_v27(conn: &Connection) -> Result<()> {
+    info!("   Creating pending_proofs table (V27)...");
+    conn.execute_batch(
+        "CREATE TABLE IF NOT EXISTS pending_proofs (
+            txid TEXT PRIMARY KEY,
+            height INTEGER NOT NULL,
+            bump_hex TEXT NOT NULL,
+            block_hash TEXT NOT NULL DEFAULT '',
+            source TEXT NOT NULL,
+            received_at INTEGER NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS idx_pending_proofs_received ON pending_proofs(received_at);",
+    )?;
+    info!("   ✅ V27 migration applied (pending_proofs)");
+    Ok(())
+}

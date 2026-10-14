@@ -195,7 +195,7 @@ fn classify_spend_str(s: &str) -> ProviderSignal {
 /// Probe WhatsOnChain for a single outpoint's spent status.
 async fn probe_woc_spent(client: &reqwest::Client, txid: &str, vout: u32) -> ProviderSignal {
     let url = format!("{}/tx/{}/{}/spent", WOC_BASE, txid, vout);
-    let resp = match client.get(&url).send().await {
+    let resp = match crate::chain_mode::get(&client, &url).send().await {
         Ok(r) => r,
         Err(_) => return ProviderSignal::NoSignal,
     };
@@ -211,7 +211,7 @@ async fn probe_woc_spent(client: &reqwest::Client, txid: &str, vout: u32) -> Pro
 /// text so a plain-text (non-JSON) reply is still classifiable via shape C.
 async fn probe_gorillapool_spend(client: &reqwest::Client, txid: &str, vout: u32) -> ProviderSignal {
     let url = format!("{}/txo/{}/{}/spend", GORILLAPOOL_BASE, txid, vout);
-    let resp = match client.get(&url).send().await {
+    let resp = match crate::chain_mode::get(&client, &url).send().await {
         Ok(r) => r,
         Err(_) => return ProviderSignal::NoSignal,
     };

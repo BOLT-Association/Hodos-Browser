@@ -1,0 +1,10 @@
+{
+  "name": "hodos-spv-ttn",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "connect": "node connect.mjs",
+    "fund": "node fund.mjs"
+  },
+  "dependencies": { "@bsv/sdk": "1.10.4" }
+}

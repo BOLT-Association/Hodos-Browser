@@ -113,7 +113,7 @@ impl IndexerProvider for ArcGorillaPoolProvider {
         // Convert BUMP→TSC and inject blockHeight (TSC needs it; BUMP carries it inline).
         let status = self.tx_status(txid).await?;
         let bump_hex = status.merkle_path_bump.ok_or(IndexerError::NotFound)?;
-        let mut tsc = crate::beef::parse_bump_hex_to_tsc(&bump_hex).map_err(|e| {
+        let mut tsc = crate::beef::parse_bump_hex_to_tsc_for(&bump_hex, txid).map_err(|e| {
             IndexerError::InvalidResponse {
                 provider: NAME,
                 reason: format!("BUMP parse error: {}", e),
@@ -221,7 +221,8 @@ pub(crate) fn interpret_broadcast_response(
     }
 
     match http_status {
-        200 | 201 => Ok(BroadcastResult {
+        // 202: Arcade's "accepted for processing" answer to a new submission.
+        200 | 201 | 202 => Ok(BroadcastResult {
             provider: NAME,
             txid: arc.txid.clone().unwrap_or_default(),
             tx_status: if tx_status_str.is_empty() {
@@ -274,11 +275,7 @@ pub(crate) fn interpret_broadcast_response(
 }
 
 fn truncate(s: &str, max: usize) -> &str {
-    if s.len() <= max {
-        s
-    } else {
-        &s[..max]
-    }
+    crate::chain_mode::truncate_chars(s, max)
 }
 
 #[cfg(test)]

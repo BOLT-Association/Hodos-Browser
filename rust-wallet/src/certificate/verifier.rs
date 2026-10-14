@@ -476,7 +476,7 @@ pub async fn check_revocation_status(
             ));
         }
     };
-    let response = match client.get(&url).send().await {
+    let response = match crate::chain_mode::get(&client, &url).send().await {
         Ok(resp) => resp,
         Err(e) => {
             log::error!("   Failed to query WhatsOnChain API: {}", e);
