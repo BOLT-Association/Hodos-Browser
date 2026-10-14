@@ -134,7 +134,7 @@ sequenceDiagram
     alt Arcade has never seen it
         W->>A: POST /tx (the same BEEF as Extended Format)
     end
-    W->>W: cache parents; store outputs (unconfirmed)
+    W->>W: cache parents, store outputs as unconfirmed
     W-->>S: 200 {txid, status: unconfirmed}
     Note over W,A: later, polling every 60 s or an SSE MINED event
     A-->>W: MINED + merklePath
