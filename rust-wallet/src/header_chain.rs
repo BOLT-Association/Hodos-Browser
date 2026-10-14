@@ -282,6 +282,15 @@ impl Params {
             genesis_hash: "0f9188f13cb7b2c71f2a335e3a4fc328bf5beb436012afca590b1a11466e2206",
         }
     }
+
+    /// Teranode test network (teratestnet).
+    pub fn teratestnet() -> Params {
+        Params {
+            name: "teratestnet",
+            fixed_bits: 0x1d00_ffff,
+            genesis_hash: "000000000499eabba0a88f5b3747231c74b9191c1a4a04b2c2ea817976b7776d",
+        }
+    }
 }
 
 /// A validated header with its position and cumulative work.
@@ -664,6 +673,80 @@ pub(crate) mod tests {
         let (r, rejected) = HeaderChain::from_stored(params, stored, NOW);
         assert_eq!(r.tip_height(), Some(1));
         assert_eq!(rejected, 2);
+    }
+
+    // -----------------------------------------------------------------------
+    // teratestnet: real headers 0..=700 served by the public Arcade chaintracks
+    // (`/chaintracks/v2/headers?height=0&count=701`). Heights 0-148 carry powLimit,
+    // 149 is the first DAA-computed target, 398/399 are 20-minute min-difficulty blocks.
+    // -----------------------------------------------------------------------
+
+    const TTN_HEADERS: &[u8] = include_bytes!("../tests/fixtures/ttn_headers_0_700.bin");
+
+    fn ttn(height: usize) -> Header {
+        Header::from_hex(&hex::encode(&TTN_HEADERS[height * 80..height * 80 + 80])).unwrap()
+    }
+
+    /// A teratestnet chain holding the real headers `0..=last`.
+    fn ttn_chain(last: usize) -> HeaderChain {
+        let mut c = HeaderChain::new(Params::teratestnet());
+        for h in 0..=last {
+            assert_eq!(c.add_header(ttn(h), NOW), Ok(AddOutcome::Extended), "real header {}", h);
+        }
+        c
+    }
+
+    #[test]
+    fn ttn_genesis_hashes_to_pinned_value() {
+        assert_eq!(ttn(0).hash_hex(), Params::teratestnet().genesis_hash);
+    }
+
+    #[test]
+    fn ttn_real_chain_is_accepted() {
+        let c = ttn_chain(TTN_HEADERS.len() / 80 - 1);
+        assert_eq!(c.tip_height(), Some(700));
+        assert_eq!(c.tip().unwrap().hash, ttn(700).hash_hex());
+    }
+
+    #[test]
+    fn ttn_daa_header_with_other_bits_is_rejected() {
+        let mut c = ttn_chain(148);
+        let mut h = ttn(149);
+        h.bits = 0x1c7f_ff81; // one off the DAA target
+        assert!(matches!(c.add_header(h, NOW), Err(HeaderError::WrongDifficulty { .. })));
+        assert_eq!(c.add_header(ttn(149), NOW), Ok(AddOutcome::Extended));
+    }
+
+    #[test]
+    fn ttn_min_difficulty_needs_more_than_twenty_minutes() {
+        let mut c = ttn_chain(397);
+        let mut h = ttn(398); // powLimit bits, real gap ~20 days
+        h.time = ttn(397).time + 1200; // exactly 2x spacing: not enough
+        assert!(matches!(c.add_header(h, NOW), Err(HeaderError::WrongDifficulty { .. })));
+        assert_eq!(c.add_header(ttn(398), NOW), Ok(AddOutcome::Extended));
+    }
+
+    #[test]
+    fn ttn_pow_limit_bits_at_a_daa_height_are_rejected() {
+        let mut c = ttn_chain(149);
+        let mut h = ttn(150); // 63 s after its parent
+        h.bits = 0x1d00_ffff;
+        assert!(matches!(c.add_header(h, NOW), Err(HeaderError::WrongDifficulty { .. })));
+    }
+
+    #[test]
+    fn regtest_params_reject_the_ttn_genesis() {
+        let mut c = HeaderChain::new(Params::regtest());
+        assert!(matches!(c.add_header(ttn(0), NOW), Err(HeaderError::NotGenesis(_))));
+    }
+
+    #[test]
+    fn ttn_from_stored_revalidates_the_real_chain() {
+        let mut stored: Vec<(u32, String)> = (0..=700u32).map(|h| (h, ttn(h as usize).to_hex())).collect();
+        stored.reverse(); // order in storage does not matter
+        let (c, rejected) = HeaderChain::from_stored(Params::teratestnet(), stored, NOW);
+        assert_eq!(rejected, 0);
+        assert_eq!(c.tip_height(), Some(700));
     }
 
     #[test]
