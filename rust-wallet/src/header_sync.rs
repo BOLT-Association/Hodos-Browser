@@ -346,7 +346,8 @@ mod tests {
         let params = Params {
             name: "test",
             difficulty: crate::header_chain::Difficulty::Fixed(0x207f_ffff),
-            genesis_hash: Box::leak(g.hash_hex().into_boxed_str()),
+            anchor: (0, Box::leak(g.hash_hex().into_boxed_str())),
+            assume_valid_height: 0,
             checkpoints: &[],
         };
         Mutex::new(HeaderChain::new(params))

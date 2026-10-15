@@ -30,7 +30,7 @@ pub enum HeaderError {
     WrongDifficulty { got: u32, want: u32 },
     InsufficientWork,
     UnknownParent(String),
-    NotGenesis(String),
+    NotAnchor(String),
     TimeTooFarInFuture,
     CheckpointMismatch { height: u32, got: String },
     /// The DAA's projected work does not fit in 256 bits (needs 144 blocks of work above 2^246).
@@ -317,8 +317,12 @@ const DAA_MIN_PARENT_HEIGHT: u32 = DAA_WINDOW + 4;
 pub struct Params {
     pub name: &'static str,
     pub difficulty: Difficulty,
-    /// Display-hex hash of the pinned genesis header.
-    pub genesis_hash: &'static str,
+    /// `(height, display-hex hash)` of the first header the chain accepts: the genesis for a full
+    /// chain, a pinned checkpoint for a lite one.
+    pub anchor: (u32, &'static str),
+    /// Below this height the difficulty rule is not checked (its window would lie below the
+    /// anchor); `0` = always checked.
+    pub assume_valid_height: u32,
     /// `(height, display-hex hash)` every chain must pass through.
     pub checkpoints: &'static [(u32, &'static str)],
 }
@@ -329,7 +333,8 @@ impl Params {
         Params {
             name: "regtest",
             difficulty: Difficulty::Fixed(0x207f_ffff),
-            genesis_hash: "0f9188f13cb7b2c71f2a335e3a4fc328bf5beb436012afca590b1a11466e2206",
+            anchor: (0, "0f9188f13cb7b2c71f2a335e3a4fc328bf5beb436012afca590b1a11466e2206"),
+            assume_valid_height: 0,
             checkpoints: &[],
         }
     }
@@ -339,12 +344,24 @@ impl Params {
         Params {
             name: "teratestnet",
             difficulty: Difficulty::Daa { pow_limit_bits: 0x1d00_ffff, spacing_secs: 600, reduce_min_difficulty: true },
-            genesis_hash: "000000000499eabba0a88f5b3747231c74b9191c1a4a04b2c2ea817976b7776d",
+            anchor: (0, "000000000499eabba0a88f5b3747231c74b9191c1a4a04b2c2ea817976b7776d"),
+            assume_valid_height: 0,
             checkpoints: &[
                 (5000, "00000000038392cdae17df19464dfcccadb754b24441d11f3294cc04a90749b8"),
                 (9500, "00000000bd750801352dd82fcb0e675d62a308b38a6486698308ae06fcb3bc10"),
                 (18000, "00000000174095c3c94343b28d29f45010b44bf221e22df5cea6e0ce547a10b5"),
             ],
+        }
+    }
+
+    /// Teranode test network, lite: a verified window from the pinned checkpoint at 18000 to the
+    /// tip. Stub: the anchor is not applied yet.
+    pub fn teratestnet_lite() -> Params {
+        Params {
+            name: "teratestnet-lite",
+            anchor: (18000, "00000000174095c3c94343b28d29f45010b44bf221e22df5cea6e0ce547a10b5"),
+            assume_valid_height: 18000 + 147,
+            ..Params::teratestnet()
         }
     }
 }
@@ -475,8 +492,8 @@ impl HeaderChain {
         // Linkage first: the difficulty rule is a function of the parent's ancestry. The genesis
         // has no parent; it is accepted only as the pinned header.
         let (height, parent_work) = if self.entries.is_empty() {
-            if hash != self.params.genesis_hash {
-                return Err(HeaderError::NotGenesis(hash));
+            if hash != self.params.anchor.1 {
+                return Err(HeaderError::NotAnchor(hash));
             }
             (0, U256::ZERO)
         } else {
@@ -657,7 +674,7 @@ pub(crate) mod tests {
     pub(crate) fn fixture() -> (HeaderChain, Header) {
         let g = mine([0; 32], 0, 0x207f_ffff);
         let ghash: &'static str = Box::leak(g.hash_hex().into_boxed_str());
-        let params = Params { name: "test", difficulty: Difficulty::Fixed(0x207f_ffff), genesis_hash: ghash, checkpoints: &[] };
+        let params = Params { name: "test", difficulty: Difficulty::Fixed(0x207f_ffff), anchor: (0, ghash), assume_valid_height: 0, checkpoints: &[] };
         let mut c = HeaderChain::new(params);
         assert_eq!(c.add_header(g.clone(), NOW), Ok(AddOutcome::Extended));
         (c, g)
@@ -680,7 +697,7 @@ pub(crate) mod tests {
             bits: 545259519,
             nonce: 2,
         };
-        assert_eq!(h.hash_hex(), Params::regtest().genesis_hash);
+        assert_eq!(h.hash_hex(), Params::regtest().anchor.1);
         let mut c = HeaderChain::new(Params::regtest());
         assert_eq!(c.add_header(h, NOW), Ok(AddOutcome::Extended));
     }
@@ -689,7 +706,7 @@ pub(crate) mod tests {
     fn wrong_genesis_is_rejected() {
         let mut c = HeaderChain::new(Params::regtest());
         let h = mine([0; 32], 7, 0x207f_ffff);
-        assert!(matches!(c.add_header(h, NOW), Err(HeaderError::NotGenesis(_))));
+        assert!(matches!(c.add_header(h, NOW), Err(HeaderError::NotAnchor(_))));
     }
 
     #[test]
@@ -829,7 +846,7 @@ pub(crate) mod tests {
 
     #[test]
     fn ttn_genesis_hashes_to_pinned_value() {
-        assert_eq!(ttn(0).hash_hex(), Params::teratestnet().genesis_hash);
+        assert_eq!(ttn(0).hash_hex(), Params::teratestnet().anchor.1);
     }
 
     #[test]
@@ -868,7 +885,7 @@ pub(crate) mod tests {
     #[test]
     fn regtest_params_reject_the_ttn_genesis() {
         let mut c = HeaderChain::new(Params::regtest());
-        assert!(matches!(c.add_header(ttn(0), NOW), Err(HeaderError::NotGenesis(_))));
+        assert!(matches!(c.add_header(ttn(0), NOW), Err(HeaderError::NotAnchor(_))));
     }
 
     #[test]
@@ -878,6 +895,156 @@ pub(crate) mod tests {
         let (c, rejected) = HeaderChain::from_stored(Params::teratestnet(), stored, NOW);
         assert_eq!(rejected, 0);
         assert_eq!(c.tip_height(), Some(700));
+    }
+
+    // -----------------------------------------------------------------------
+    // Lite chain: a window anchored at a pinned checkpoint instead of the genesis. The same real
+    // teratestnet headers, anchored at 300: heights 301..=446 lie below `assume_valid_height`
+    // (the DAA window would reach below the anchor), 447 is the first height with the full rule.
+    // -----------------------------------------------------------------------
+
+    const LITE_ANCHOR: u32 = 300;
+
+    /// teratestnet rules anchored at real header `LITE_ANCHOR`.
+    fn ttn_lite_params() -> Params {
+        let anchor_hash: &'static str = Box::leak(ttn(LITE_ANCHOR as usize).hash_hex().into_boxed_str());
+        Params {
+            name: "ttn-lite-test",
+            anchor: (LITE_ANCHOR, anchor_hash),
+            assume_valid_height: LITE_ANCHOR + 147,
+            ..Params::teratestnet()
+        }
+    }
+
+    fn ttn_lite_chain(last: usize) -> HeaderChain {
+        let mut c = HeaderChain::new(ttn_lite_params());
+        for h in LITE_ANCHOR as usize..=last {
+            assert_eq!(c.add_header(ttn(h), NOW), Ok(AddOutcome::Extended), "real header {}", h);
+        }
+        c
+    }
+
+    #[test]
+    fn lite_chain_starts_at_the_anchor_and_accepts_the_window() {
+        let c = ttn_lite_chain(700);
+        assert_eq!(c.tip_height(), Some(700));
+        assert_eq!(c.len(), 401);
+        assert_eq!(c.header_at_height(LITE_ANCHOR).unwrap().hash, ttn(LITE_ANCHOR as usize).hash_hex());
+        assert_eq!(c.header_at_height(LITE_ANCHOR).unwrap().height, LITE_ANCHOR);
+        assert!(c.header_at_height(LITE_ANCHOR - 1).is_none(), "below the anchor is not the window's to answer");
+        assert!(c.header_at_height(0).is_none());
+        assert!(c.verify_merkle_root(500, &ttn(500).merkle_root_hex()));
+        assert!(!c.verify_merkle_root(500, &ttn(501).merkle_root_hex()));
+        assert!(c.is_active(&ttn(700).hash_hex()));
+    }
+
+    #[test]
+    fn lite_first_header_must_be_the_anchor() {
+        let mut c = HeaderChain::new(ttn_lite_params());
+        for h in [0usize, 299, 301] {
+            assert!(matches!(c.add_header(ttn(h), NOW), Err(HeaderError::NotAnchor(_))), "header {}", h);
+        }
+        assert_eq!(c.add_header(ttn(LITE_ANCHOR as usize), NOW), Ok(AddOutcome::Extended));
+        assert_eq!(c.tip_height(), Some(LITE_ANCHOR));
+    }
+
+    #[test]
+    fn below_assume_valid_pow_is_enforced_but_bits_are_not_compared() {
+        // 300..=349 are accepted although the DAA cannot be computed for them (the window test
+        // above); what is still checked here is the proof-of-work on each header's own bits.
+        let mut c = ttn_lite_chain(349);
+        let mut nonce = ttn(350);
+        nonce.nonce = nonce.nonce.wrapping_add(1);
+        assert_eq!(c.add_header(nonce, NOW), Err(HeaderError::InsufficientWork));
+        let mut off = ttn(350);
+        off.bits = off.bits.wrapping_add(1);
+        assert_eq!(c.add_header(off, NOW), Err(HeaderError::InsufficientWork), "changed bits: the hash no longer meets its own target");
+        let mut easy = ttn(350);
+        easy.bits = 0x1e00_ffff; // easier than teratestnet's powLimit: not a target at all
+        assert_eq!(c.add_header(easy, NOW), Err(HeaderError::BadBits(0x1e00_ffff)));
+        assert_eq!(c.add_header(ttn(350), NOW), Ok(AddOutcome::Extended));
+    }
+
+    #[test]
+    fn the_full_difficulty_rule_resumes_at_assume_valid_height() {
+        let mut c = ttn_lite_chain(446);
+        let mut h = ttn(447);
+        h.bits = h.bits.wrapping_add(1);
+        assert!(matches!(c.add_header(h, NOW), Err(HeaderError::WrongDifficulty { .. })), "447 is the first height whose DAA window lies inside the chain");
+        assert_eq!(c.add_header(ttn(447), NOW), Ok(AddOutcome::Extended));
+    }
+
+    #[test]
+    fn assume_valid_height_must_be_at_least_anchor_plus_147() {
+        // One less and the median-of-3 at `parent - 144` needs the header below the anchor.
+        let mut p = ttn_lite_params();
+        p.assume_valid_height = LITE_ANCHOR + 146;
+        let mut c = HeaderChain::new(p);
+        for h in LITE_ANCHOR..LITE_ANCHOR + 146 {
+            c.add_header(ttn(h as usize), NOW).unwrap();
+        }
+        assert!(matches!(c.add_header(ttn(446), NOW), Err(HeaderError::UnknownParent(_))));
+    }
+
+    #[test]
+    fn teratestnet_lite_is_anchored_at_the_18000_checkpoint() {
+        let full = Params::teratestnet();
+        let lite = Params::teratestnet_lite();
+        assert_eq!(lite.name, "teratestnet-lite");
+        assert_eq!(lite.anchor, (18000, full.checkpoints.iter().find(|(h, _)| *h == 18000).unwrap().1));
+        assert_eq!(lite.assume_valid_height, 18000 + 147);
+        assert_eq!(lite.difficulty, full.difficulty);
+        assert_eq!(lite.checkpoints, full.checkpoints);
+        assert_eq!(full.anchor.0, 0, "the full chain is anchored at its genesis");
+        assert_eq!(full.assume_valid_height, 0);
+        assert_eq!(Params::regtest().anchor.0, 0);
+    }
+
+    #[test]
+    fn lite_from_stored_revalidates_the_window_and_drops_rows_below_the_anchor() {
+        let mut stored: Vec<(u32, String)> = (299..=700u32).map(|h| (h, ttn(h as usize).to_hex())).collect();
+        stored.reverse();
+        let (c, rejected) = HeaderChain::from_stored(ttn_lite_params(), stored, NOW);
+        assert_eq!(rejected, 1, "299 is below the anchor");
+        assert_eq!(c.tip_height(), Some(700));
+        assert_eq!(c.header_at_height(LITE_ANCHOR).unwrap().height, LITE_ANCHOR);
+    }
+
+    #[test]
+    fn reorg_inside_a_lite_chain_forks_at_or_above_the_anchor() {
+        // Regtest-style rules anchored at a mined header at height 5.
+        let anchor = mine([0x55; 32], 0, 0x207f_ffff);
+        let params = Params {
+            name: "lite-test",
+            difficulty: Difficulty::Fixed(0x207f_ffff),
+            anchor: (5, Box::leak(anchor.hash_hex().into_boxed_str())),
+            assume_valid_height: 0,
+            checkpoints: &[],
+        };
+        let mut c = HeaderChain::new(params);
+        assert_eq!(c.add_header(anchor.clone(), NOW), Ok(AddOutcome::Extended));
+        assert_eq!(c.tip_height(), Some(5));
+        let a1 = extend(&mut c, &anchor, 1);
+        let a2 = extend(&mut c, &a1, 2);
+        assert_eq!(c.tip_height(), Some(7));
+        let b1 = mine(anchor.hash(), 11, 0x207f_ffff);
+        assert_eq!(c.add_header(b1.clone(), NOW), Ok(AddOutcome::Fork));
+        let b2 = mine(b1.hash(), 12, 0x207f_ffff);
+        assert_eq!(c.add_header(b2.clone(), NOW), Ok(AddOutcome::Fork));
+        let b3 = mine(b2.hash(), 13, 0x207f_ffff);
+        match c.add_header(b3.clone(), NOW).unwrap() {
+            AddOutcome::Reorg { fork_height, depth, old_tip, new_tip } => {
+                assert_eq!((fork_height, depth), (5, 2));
+                assert_eq!(old_tip, a2.hash_hex());
+                assert_eq!(new_tip, b3.hash_hex());
+            }
+            other => panic!("expected reorg, got {:?}", other),
+        }
+        assert_eq!(c.tip_height(), Some(8));
+        assert_eq!(c.header_at_height(5).unwrap().hash, anchor.hash_hex());
+        assert!(c.is_active(&b1.hash_hex()) && !c.is_active(&a1.hash_hex()));
+        assert!(c.header_at_height(4).is_none());
+        assert!(c.verify_merkle_root(6, &b1.merkle_root_hex()));
     }
 
     #[test]
