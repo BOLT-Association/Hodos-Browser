@@ -1,7 +1,9 @@
 // Connect: the wallet (spv mode, teratestnet) is up, has a wallet, and its own verified header
 // chain has reached the public chaintracks tip and holds the same headers.
 //
-//   node connect.mjs        (wallet started with run-wallet.ps1)
+//   node connect.mjs                (wallet started with run-wallet.ps1)
+//   HEADERS=lite node connect.mjs   (started with -Headers lite: also checks the anchor and the
+//                                    height below it, which the header trackers answer)
 import { wallet, walletGet, until, ok, chaintracksHeight, chaintracksHeaderHex } from './lib.mjs'
 
 ok((await fetch((process.env.WALLET_URL ?? 'http://127.0.0.1:31401') + '/health').catch(() => ({}))).status === 200, 'wallet /health answers')
@@ -14,7 +16,8 @@ if (!status.json.exists) {
   ok(!status.json.locked, 'wallet exists and is unlocked')
 }
 
-// First run syncs ~36k headers (about a minute); later runs only the new ones.
+// First run syncs ~36k headers (about a minute; lite: ~18k from the 18000 checkpoint); later runs
+// only the new ones.
 const serverTip = await chaintracksHeight()
 let last = -1
 const tip = await until(`wallet header chain reaches ${serverTip - 2}`, async () => {
@@ -28,5 +31,12 @@ ok(true, `wallet verified headers to ${tip} (chaintracks tip ${serverTip})`)
 for (const h of [0, 18000, tip - 1]) {
   const mine = await wallet('/getHeaderForHeight', { height: h })
   ok(mine.status === 200 && mine.json.header === await chaintracksHeaderHex(h), `header ${h} matches chaintracks`)
+}
+if (process.env.HEADERS === 'lite') {
+  // 18000 is the anchor (the window's first header); 17999 is below it and comes from the trackers.
+  for (const h of [17999, 18000]) {
+    const mine = await wallet('/getHeaderForHeight', { height: h })
+    ok(mine.status === 200 && mine.json.header === await chaintracksHeaderHex(h), `lite: header ${h} (${h < 18000 ? 'header trackers' : 'anchor'}) matches chaintracks`)
+  }
 }
 console.log('PASS connect')
