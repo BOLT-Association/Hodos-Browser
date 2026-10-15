@@ -726,6 +726,26 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn spv_mode_keeps_tx_lookups_off_public_indexers_whatever_the_network() {
+        // The header trackers may ask WhatsOnChain for a header on mainnet; nothing else may ask
+        // a public indexer for anything. The raw-tx chain answers at once with the spv refusal.
+        for network in [None, Some("teratestnet"), Some("mainnet")] {
+            let r = with_env_async(Some("spv"), || async {
+                let old = std::env::var(ENV_NETWORK).ok();
+                match network { Some(n) => std::env::set_var(ENV_NETWORK, n), None => std::env::remove_var(ENV_NETWORK) }
+                let r = crate::services::WalletServices::new().get_raw_tx("ab").await;
+                match old { Some(v) => std::env::set_var(ENV_NETWORK, v), None => std::env::remove_var(ENV_NETWORK) }
+                r
+            })
+            .await;
+            match r {
+                Err(crate::services::IndexerError::InvalidResponse { reason, .. }) => assert!(reason.contains("spv mode"), "{}", reason),
+                other => panic!("{:?}: {:?}", network, other.map(|b| b.len())),
+            }
+        }
+    }
+
+    #[tokio::test]
     async fn blocked_request_fails_as_a_transport_error_without_leaving_the_machine() {
         let c = Client::new();
         let blocked = with_env_async(Some("spv"), || async {

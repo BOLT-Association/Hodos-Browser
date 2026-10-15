@@ -21,8 +21,9 @@ use std::sync::{Arc, Mutex};
 use async_trait::async_trait;
 
 use crate::header_chain::Header;
-use crate::services::providers::ChaintracksProvider;
+use crate::services::providers::{ChaintracksProvider, WhatsOnChainProvider};
 use crate::services::{BlockKey, IndexerError, IndexerProvider};
+use crate::services::BlockHeader;
 
 /// Sources asked at once for one height. Chaintracks is cheap; a rate-limited public source
 /// (mainnet, later) is not, and a BEEF with many BUMPs must not burst.
@@ -188,6 +189,36 @@ impl HeaderTrackers {
     }
 }
 
+/// What one tracker's `get_block_header` result means to the agreement: a header is an answer,
+/// a 404 is an abstention, anything else is a failure to report. Stub: never answers.
+fn answer_from(name: &str, result: Result<BlockHeader, IndexerError>) -> Result<Option<Answer>, String> {
+    let _ = result;
+    Err(format!("stub: {}", name))
+}
+
+/// WhatsOnChain as a tracker (mainnet only: the provider's base URL is the mainnet API). A header
+/// below the verified window is the one thing spv mode asks a public indexer for.
+pub struct WhatsOnChainTracker {
+    provider: WhatsOnChainProvider,
+}
+
+impl WhatsOnChainTracker {
+    pub fn new(client: reqwest::Client) -> Self {
+        WhatsOnChainTracker { provider: WhatsOnChainProvider::new(client) }
+    }
+}
+
+#[async_trait]
+impl TrackerSource for WhatsOnChainTracker {
+    fn name(&self) -> &str {
+        "whatsonchain"
+    }
+
+    async fn header_at(&self, height: u32) -> Result<Option<Answer>, String> {
+        answer_from(self.name(), self.provider.get_block_header(BlockKey::Height(height)).await)
+    }
+}
+
 /// An Arcade chaintracks server as a tracker.
 pub struct ChaintracksTracker {
     name: String,
@@ -291,6 +322,17 @@ pub(crate) mod tests {
 
     fn leak(s: String) -> &'static str {
         Box::leak(s.into_boxed_str())
+    }
+
+    #[test]
+    fn a_trackers_result_maps_to_answer_abstention_or_failure() {
+        let h = hdr(1);
+        let bh = BlockHeader { block_hash: h.hash_hex(), height: 5, header_hex: h.to_hex() };
+        assert_eq!(answer_from("x", Ok(bh)), Ok(Some(answer("x", &h))));
+        assert_eq!(answer_from("x", Err(IndexerError::NotFound)), Ok(None), "404 abstains");
+        let e = answer_from("x", Err(IndexerError::Transport("refused".into()))).unwrap_err();
+        assert!(e.contains("refused"), "{}", e);
+        assert_eq!(WhatsOnChainTracker::new(reqwest::Client::new()).name(), "whatsonchain");
     }
 
     #[test]

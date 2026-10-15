@@ -274,6 +274,20 @@ impl Header {
         })
     }
 
+    /// Assemble a header from its fields as block explorers report them: display-order hex for
+    /// the two hashes, `bits` as the compact integer. Stub: never.
+    pub fn from_fields(
+        version: u32,
+        prev_hash_display_hex: &str,
+        merkle_root_display_hex: &str,
+        time: u32,
+        bits: u32,
+        nonce: u32,
+    ) -> Result<Header, HeaderError> {
+        let _ = (version, prev_hash_display_hex, merkle_root_display_hex, time, bits, nonce);
+        Err(HeaderError::BadHex("stub".into()))
+    }
+
     pub fn to_bytes(&self) -> [u8; 80] {
         let mut o = [0u8; 80];
         o[0..4].copy_from_slice(&self.version.to_le_bytes());
@@ -1214,6 +1228,16 @@ pub(crate) mod tests {
         let b2 = mine(a1.hash(), 22, 0x207f_ffff);
         assert!(matches!(c.add_header(b2, NOW), Err(HeaderError::CheckpointMismatch { height: 2, .. })));
         assert_eq!(c.add_header(a2, NOW), Ok(AddOutcome::Extended));
+    }
+
+    #[test]
+    fn from_fields_rebuilds_a_header_from_explorer_fields() {
+        let h = ttn(5);
+        let rebuilt = Header::from_fields(h.version, &display_hex(&h.prev_hash), &h.merkle_root_hex(), h.time, h.bits, h.nonce).unwrap();
+        assert_eq!(rebuilt, h);
+        assert_eq!(rebuilt.hash_hex(), h.hash_hex());
+        assert!(matches!(Header::from_fields(1, "zz", &h.merkle_root_hex(), 0, 0, 0), Err(HeaderError::BadHex(_))));
+        assert!(matches!(Header::from_fields(1, "abcd", &h.merkle_root_hex(), 0, 0, 0), Err(HeaderError::BadLength(2))));
     }
 
     #[test]

@@ -476,3 +476,70 @@ mod tests {
         assert!(parse_woc_utxos(&j, address).is_err());
     }
 }
+
+/// The 80-byte header rebuilt from WhatsOnChain's block JSON (`/block/height/{h}` and
+/// `/block/hash/{hash}` carry `version`, `previousblockhash`, `merkleroot`, `time`, `bits`,
+/// `nonce`, `height`, `hash`), accepted only when it hashes to `hash`. `bits` arrives as a hex
+/// string (as Bitcoin's RPC reports it) or a number; the genesis block has no
+/// `previousblockhash`, which means zeros. Stub: never.
+pub(crate) fn parse_block_json(v: &Value) -> Result<BlockHeader, String> {
+    let _ = v;
+    Err("stub".to_string())
+}
+
+#[cfg(test)]
+mod block_json_tests {
+    use super::*;
+    use serde_json::json;
+
+    /// WhatsOnChain's block JSON shape with the fields of the spv-testnet block at height 5 (the
+    /// chaintracks tests use the same block).
+    fn woc_block() -> Value {
+        json!({
+            "hash": "5ee1c44ffb4c19f3526a5c4fdd9049234123609d1252cb7cf7d5efac215eb6a0",
+            "confirmations": 1000, "size": 200, "height": 5, "version": 536870912, "versionHex": "20000000",
+            "merkleroot": "9d34d4193f6fa3a62e872d4832cd4b16a579541b05daeadee9cbd12a406f1146",
+            "time": 1791033023, "mediantime": 1791032000, "nonce": 3, "bits": "207fffff", "difficulty": 4.6565e-10,
+            "previousblockhash": "231deda25164376fdb28cc5490770f35f02ad27919e48903a74bc0ae88f00c0c",
+            "nextblockhash": "00", "nTx": 1
+        })
+    }
+
+    #[test]
+    fn block_json_rebuilds_the_header_and_checks_its_hash() {
+        let h = parse_block_json(&woc_block()).unwrap();
+        assert_eq!(
+            (h.height, h.block_hash.as_str(), h.header_hex.len()),
+            (5, "5ee1c44ffb4c19f3526a5c4fdd9049234123609d1252cb7cf7d5efac215eb6a0", 160)
+        );
+        let mut numeric = woc_block();
+        numeric["bits"] = json!(545259519u64);
+        assert_eq!(parse_block_json(&numeric).unwrap().header_hex, h.header_hex, "bits as a number is accepted too");
+    }
+
+    #[test]
+    fn block_json_with_a_tampered_or_missing_field_is_rejected() {
+        let mut j = woc_block();
+        j["nonce"] = json!(4);
+        assert!(parse_block_json(&j).unwrap_err().contains("hash"));
+        let mut j = woc_block();
+        j.as_object_mut().unwrap().remove("merkleroot");
+        assert!(parse_block_json(&j).unwrap_err().contains("merkleroot"));
+        let mut j = woc_block();
+        j["bits"] = json!("not hex");
+        assert!(parse_block_json(&j).unwrap_err().contains("bits"));
+    }
+
+    #[test]
+    fn the_genesis_block_has_no_previousblockhash() {
+        // The genesis as regtest serves it (height 0): the field is absent and means zeros.
+        let g = json!({
+            "hash": "0f9188f13cb7b2c71f2a335e3a4fc328bf5beb436012afca590b1a11466e2206", "height": 0, "version": 1,
+            "merkleroot": "4a5e1e4baab89f3a32518a88c31bc87f618f76673e2cc77ab2127b7afdeda33b",
+            "time": 1296688602, "nonce": 2, "bits": "207fffff"
+        });
+        let h = parse_block_json(&g).unwrap();
+        assert_eq!(h.height, 0);
+        assert!(h.header_hex[8..72].chars().all(|c| c == '0'), "prev_hash is all zeros");
+    }
+}
