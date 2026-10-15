@@ -58,14 +58,20 @@ pub struct BlockHeader {
 /// A `BlockHeader` from explorer-reported fields, accepted only when the assembled 80 bytes hash
 /// to `expected_hash` (display hex, any case). Shared by every provider that rebuilds a header
 /// from JSON, so a server whose fields disagree with its own hash is rejected the same way
-/// everywhere. Stub: never.
+/// everywhere.
 pub(crate) fn verified_block_header(
     height: u32,
     header: crate::header_chain::Header,
     expected_hash: &str,
 ) -> Result<BlockHeader, String> {
-    let _ = (height, header);
-    Err(format!("stub: {}", expected_hash))
+    let computed = header.hash_hex();
+    if !computed.eq_ignore_ascii_case(expected_hash) {
+        return Err(format!(
+            "header fields hash to {} but the server reported {}",
+            computed, expected_hash
+        ));
+    }
+    Ok(BlockHeader { block_hash: computed, height, header_hex: header.to_hex() })
 }
 
 #[cfg(test)]

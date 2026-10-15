@@ -257,6 +257,18 @@ pub fn display_hex(wire: &[u8; 32]) -> String {
     hex::encode(r)
 }
 
+/// Wire-order bytes from display-order hex, as explorers report a hash.
+fn wire_hash(display: &str) -> Result<[u8; 32], HeaderError> {
+    let b = hex::decode(display).map_err(|e| HeaderError::BadHex(e.to_string()))?;
+    if b.len() != 32 {
+        return Err(HeaderError::BadLength(b.len()));
+    }
+    let mut wire = [0u8; 32];
+    wire.copy_from_slice(&b);
+    wire.reverse();
+    Ok(wire)
+}
+
 impl Header {
     pub fn from_hex(s: &str) -> Result<Header, HeaderError> {
         let b = hex::decode(s).map_err(|e| HeaderError::BadHex(e.to_string()))?;
@@ -275,7 +287,7 @@ impl Header {
     }
 
     /// Assemble a header from its fields as block explorers report them: display-order hex for
-    /// the two hashes, `bits` as the compact integer. Stub: never.
+    /// the two hashes, `bits` as the compact integer.
     pub fn from_fields(
         version: u32,
         prev_hash_display_hex: &str,
@@ -284,8 +296,14 @@ impl Header {
         bits: u32,
         nonce: u32,
     ) -> Result<Header, HeaderError> {
-        let _ = (version, prev_hash_display_hex, merkle_root_display_hex, time, bits, nonce);
-        Err(HeaderError::BadHex("stub".into()))
+        Ok(Header {
+            version,
+            prev_hash: wire_hash(prev_hash_display_hex)?,
+            merkle_root: wire_hash(merkle_root_display_hex)?,
+            time,
+            bits,
+            nonce,
+        })
     }
 
     pub fn to_bytes(&self) -> [u8; 80] {

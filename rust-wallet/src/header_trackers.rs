@@ -22,11 +22,10 @@ use async_trait::async_trait;
 
 use crate::header_chain::Header;
 use crate::services::providers::{ChaintracksProvider, WhatsOnChainProvider};
-use crate::services::{BlockKey, IndexerError, IndexerProvider};
-use crate::services::BlockHeader;
+use crate::services::{BlockHeader, BlockKey, IndexerError, IndexerProvider};
 
 /// Sources asked at once for one height. Chaintracks is cheap; a rate-limited public source
-/// (mainnet, later) is not, and a BEEF with many BUMPs must not burst.
+/// (WhatsOnChain, on mainnet) is not, and a BEEF with many BUMPs must not burst.
 const IN_FLIGHT: usize = 2;
 
 /// One tracker's answer for a height.
@@ -190,10 +189,13 @@ impl HeaderTrackers {
 }
 
 /// What one tracker's `get_block_header` result means to the agreement: a header is an answer,
-/// a 404 is an abstention, anything else is a failure to report. Stub: never answers.
+/// a 404 is an abstention, anything else is a failure to report.
 fn answer_from(name: &str, result: Result<BlockHeader, IndexerError>) -> Result<Option<Answer>, String> {
-    let _ = result;
-    Err(format!("stub: {}", name))
+    match result {
+        Ok(h) => Ok(Some(Answer { source: name.to_string(), header_hex: h.header_hex, block_hash: h.block_hash })),
+        Err(IndexerError::NotFound) => Ok(None),
+        Err(e) => Err(e.to_string()),
+    }
 }
 
 /// WhatsOnChain as a tracker (mainnet only: the provider's base URL is the mainnet API). A header
@@ -239,11 +241,7 @@ impl TrackerSource for ChaintracksTracker {
     }
 
     async fn header_at(&self, height: u32) -> Result<Option<Answer>, String> {
-        match self.provider.get_block_header(BlockKey::Height(height)).await {
-            Ok(h) => Ok(Some(Answer { source: self.name.clone(), header_hex: h.header_hex, block_hash: h.block_hash })),
-            Err(IndexerError::NotFound) => Ok(None),
-            Err(e) => Err(e.to_string()),
-        }
+        answer_from(&self.name, self.provider.get_block_header(BlockKey::Height(height)).await)
     }
 }
 

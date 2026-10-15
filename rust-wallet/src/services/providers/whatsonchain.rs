@@ -6,10 +6,11 @@
 use async_trait::async_trait;
 use serde_json::Value;
 
+use crate::header_chain::Header;
 use crate::services::collection::ProviderCollection;
 use crate::services::provider::{
-    BlockHeader, BlockKey, BroadcastResult, IndexerError, IndexerProvider, OutspendStatus,
-    ProviderOp, TxState, TxStatus,
+    verified_block_header, BlockHeader, BlockKey, BroadcastResult, IndexerError, IndexerProvider,
+    OutspendStatus, ProviderOp, TxState, TxStatus,
 };
 use crate::utxo_fetcher::UTXO;
 
@@ -98,47 +99,32 @@ impl IndexerProvider for WhatsOnChainProvider {
     }
 
     async fn get_block_header(&self, key: BlockKey) -> Result<BlockHeader, IndexerError> {
-        // Two-hop:
-        //   - If by Height: /block/height/{h} → hash, then /block/hash/{hash}/header → header hex
-        //   - If by Hash:   /block/hash/{hash}/header → header hex, plus we still need height
-        //                   which comes from /block/hash/{hash}
-        let (block_hash, height) = match &key {
-            BlockKey::Height(h) => {
-                let info = self.get_json(&format!("/block/height/{}", h)).await?;
-                let hash = info
-                    .get("hash")
-                    .and_then(|v| v.as_str())
-                    .ok_or(IndexerError::InvalidResponse {
-                        provider: NAME,
-                        reason: "missing 'hash' in block/height response".into(),
-                    })?
-                    .to_string();
-                (hash, *h)
-            }
-            BlockKey::Hash(hash) => {
-                let info = self.get_json(&format!("/block/hash/{}", hash)).await?;
-                let height = info
-                    .get("height")
-                    .and_then(|v| v.as_u64())
-                    .ok_or(IndexerError::InvalidResponse {
-                        provider: NAME,
-                        reason: "missing 'height' in block/hash response".into(),
-                    })? as u32;
-                (hash.clone(), height)
-            }
+        // One hop: `/block/height/{h}` and `/block/hash/{hash}` carry the header fields, and the
+        // 80 bytes are rebuilt from them and must hash to the reported hash (`parse_block_json`).
+        // The former second hop, `/block/hash/{hash}/header`, is no longer served (404 since
+        // 2026-10).
+        let path = match &key {
+            BlockKey::Height(h) => format!("/block/height/{}", h),
+            BlockKey::Hash(hash) => format!("/block/hash/{}", hash),
         };
-
-        let header_hex = self
-            .get_text(&format!("/block/hash/{}/header", block_hash))
-            .await?
-            .trim()
-            .to_string();
-
-        Ok(BlockHeader {
-            block_hash,
-            height,
-            header_hex,
-        })
+        let json = self.get_json(&path).await?;
+        let header = parse_block_json(&json)
+            .map_err(|reason| IndexerError::InvalidResponse { provider: NAME, reason })?;
+        // The answer must be the block that was asked for.
+        let asked_ok = match &key {
+            BlockKey::Height(h) => header.height == *h,
+            BlockKey::Hash(hash) => header.block_hash.eq_ignore_ascii_case(hash),
+        };
+        if !asked_ok {
+            return Err(IndexerError::InvalidResponse {
+                provider: NAME,
+                reason: format!(
+                    "answered {:?} with header {} at height {}",
+                    key, header.block_hash, header.height
+                ),
+            });
+        }
+        Ok(header)
     }
 
     async fn tx_status(&self, txid: &str) -> Result<TxStatus, IndexerError> {
@@ -481,10 +467,38 @@ mod tests {
 /// `/block/hash/{hash}` carry `version`, `previousblockhash`, `merkleroot`, `time`, `bits`,
 /// `nonce`, `height`, `hash`), accepted only when it hashes to `hash`. `bits` arrives as a hex
 /// string (as Bitcoin's RPC reports it) or a number; the genesis block has no
-/// `previousblockhash`, which means zeros. Stub: never.
+/// `previousblockhash`, which means zeros.
 pub(crate) fn parse_block_json(v: &Value) -> Result<BlockHeader, String> {
-    let _ = v;
-    Err("stub".to_string())
+    let str_field = |field: &str| -> Result<&str, String> {
+        v.get(field)
+            .and_then(|x| x.as_str())
+            .ok_or_else(|| format!("missing '{}'", field))
+    };
+    let u32_field = |field: &str| -> Result<u32, String> {
+        v.get(field)
+            .and_then(|x| x.as_u64())
+            .and_then(|x| u32::try_from(x).ok())
+            .ok_or_else(|| format!("missing or out-of-range '{}'", field))
+    };
+    let bits = match v.get("bits") {
+        Some(Value::String(s)) => u32::from_str_radix(s.trim(), 16)
+            .map_err(|e| format!("bad hex in 'bits' {:?}: {}", s, e))?,
+        _ => u32_field("bits")?,
+    };
+    let prev_hash = match v.get("previousblockhash") {
+        None | Some(Value::Null) => "00".repeat(32),
+        Some(_) => str_field("previousblockhash")?.to_string(),
+    };
+    let header = Header::from_fields(
+        u32_field("version")?,
+        &prev_hash,
+        str_field("merkleroot")?,
+        u32_field("time")?,
+        bits,
+        u32_field("nonce")?,
+    )
+    .map_err(|e| format!("block JSON: {}", e))?;
+    verified_block_header(u32_field("height")?, header, str_field("hash")?)
 }
 
 #[cfg(test)]

@@ -11,9 +11,11 @@
 
 use async_trait::async_trait;
 use serde_json::Value;
-use sha2::{Digest, Sha256};
 
-use crate::services::provider::{BlockHeader, BlockKey, IndexerError, IndexerProvider, ProviderOp};
+use crate::header_chain::Header;
+use crate::services::provider::{
+    verified_block_header, BlockHeader, BlockKey, IndexerError, IndexerProvider, ProviderOp,
+};
 
 const NAME: &str = "chaintracks";
 pub const ENV_URL: &str = "HODOS_CHAINTRACKS_URL";
@@ -161,17 +163,10 @@ impl IndexerProvider for ChaintracksProvider {
     }
 }
 
-fn hash_wire_bytes(v: &Value, field: &str) -> Result<Vec<u8>, String> {
-    let s = v
-        .get(field)
+fn str_field<'a>(v: &'a Value, field: &str) -> Result<&'a str, String> {
+    v.get(field)
         .and_then(|x| x.as_str())
-        .ok_or(format!("missing '{}'", field))?;
-    let mut b = hex::decode(s).map_err(|e| format!("bad hex in '{}': {}", field, e))?;
-    if b.len() != 32 {
-        return Err(format!("'{}' is {} bytes, expected 32", field, b.len()));
-    }
-    b.reverse(); // display order -> wire order
-    Ok(b)
+        .ok_or(format!("missing '{}'", field))
 }
 
 fn u32_field(v: &Value, field: &str) -> Result<u32, String> {
@@ -183,33 +178,16 @@ fn u32_field(v: &Value, field: &str) -> Result<u32, String> {
 
 /// Rebuild the 80-byte header from chaintracks JSON and verify it hashes to `hash`.
 pub(crate) fn parse_header(v: &Value) -> Result<BlockHeader, String> {
-    let mut raw = Vec::with_capacity(80);
-    raw.extend_from_slice(&u32_field(v, "version")?.to_le_bytes());
-    raw.extend_from_slice(&hash_wire_bytes(v, "previousHash")?);
-    raw.extend_from_slice(&hash_wire_bytes(v, "merkleRoot")?);
-    raw.extend_from_slice(&u32_field(v, "time")?.to_le_bytes());
-    raw.extend_from_slice(&u32_field(v, "bits")?.to_le_bytes());
-    raw.extend_from_slice(&u32_field(v, "nonce")?.to_le_bytes());
-    let height = u32_field(v, "height")?;
-
-    let mut computed: Vec<u8> = Sha256::digest(Sha256::digest(&raw)).to_vec();
-    computed.reverse();
-    let computed_hex = hex::encode(computed);
-    let reported = v
-        .get("hash")
-        .and_then(|x| x.as_str())
-        .ok_or("missing 'hash'")?;
-    if !computed_hex.eq_ignore_ascii_case(reported) {
-        return Err(format!(
-            "header fields hash to {} but server reported {}",
-            computed_hex, reported
-        ));
-    }
-    Ok(BlockHeader {
-        block_hash: computed_hex,
-        height,
-        header_hex: hex::encode(raw),
-    })
+    let header = Header::from_fields(
+        u32_field(v, "version")?,
+        str_field(v, "previousHash")?,
+        str_field(v, "merkleRoot")?,
+        u32_field(v, "time")?,
+        u32_field(v, "bits")?,
+        u32_field(v, "nonce")?,
+    )
+    .map_err(|e| format!("chaintracks header: {}", e))?;
+    verified_block_header(u32_field(v, "height")?, header, str_field(v, "hash")?)
 }
 
 #[cfg(test)]
