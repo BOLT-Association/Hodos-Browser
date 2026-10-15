@@ -1,10 +1,24 @@
 # spv-lite on mainnet: the second half
 
-> **Status 2026-10-15 — plan only, nothing built.** The first half (the verified window, the anchored
-> sync, `header_trackers.rs`, `HODOS_HEADERS=lite`) landed on branch `spv-lite` and is PR #5 into
-> `spv-testnet`, proven on teratestnet. This document is the remainder: what makes the same machinery
-> run against Bitcoin SV mainnet. It supersedes the mainnet-specific rows of
-> `PLAN_spv_lite_mainnet.md`, whose network-agnostic rows are done.
+> **Status 2026-10-15 — built on branch `spv-lite` (PR #5 into `spv-testnet`), unit-tested, not yet run
+> live.** Steps 1–5 landed as red/green commit pairs: `Params::mainnet_lite()` (38 checkpoints, anchor
+> 945000), `Header::from_fields` + `verified_block_header` + the WoC block-JSON rebuild and
+> `WhatsOnChainTracker`, `HashConfirmer` / `JungleBusConfirmer`, `HODOS_CHAIN_NETWORK=mainnet` with
+> the roster by network, and the harness (`run-wallet.ps1 -Network mainnet`, `mainnet-anchor.mjs`,
+> `connect.mjs`, `proof.mjs`). **Deviations from the plan below, all because the build container could
+> not reach the chain hosts:** (a) step 0 did not run — the anchor is the newest checkpoint the BSVA
+> node's own `go-chaincfg` `MainNetParams` pins (945000), cross-checked against bitcoin-sv
+> `chainparams.cpp` on the 12 shared heights, and `mainnet-anchor.mjs` now re-reads every pin from the
+> EU + US chaintracks and WhatsOnChain and is the first thing to run on a machine that can; (b) no
+> mainnet header fixture exists yet (`mainnet-anchor.mjs --fixture` writes it) — the mainnet-rule tests
+> run the teratestnet headers under `Params::mainnet_lite`'s rule instead, which is what pins
+> `reduce_min_difficulty: false`; (c) step 3's "a confirmer that abstains (404) → `Ok`" became **a
+> contradiction**: the trackers serve only heights far below the tip, so a JungleBus that does not know
+> the hash is evidence against it, not lag (unreachable still abstains). Owner to confirm (c). The
+> first half (the verified window, the anchored sync, `header_trackers.rs`, `HODOS_HEADERS=lite`) was
+> proven on teratestnet; this document is the remainder: what makes the same machinery run against
+> Bitcoin SV mainnet. It supersedes the mainnet-specific rows of `PLAN_spv_lite_mainnet.md`, whose
+> network-agnostic rows are done.
 
 ## What is already there
 

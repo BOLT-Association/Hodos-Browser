@@ -8,12 +8,13 @@
 > fewer; the wallet warns at startup), because the public testnet has one tracker. Steps 1–3 landed
 > network-agnostic (`Params::anchor` / `assume_valid_height`, the anchored sync with "unavailable",
 > `header_trackers.rs` (this plan's `header_quorum`, renamed at the owner's request) + `HeaderService::ensure_header` + the caller prefetches), step 4 as
-> `HODOS_HEADERS` / `HODOS_HEADER_TRACKERS`, step 5 as `run-wallet.ps1 -Headers lite`. **Still to do
-> for mainnet:** `Params::mainnet()` with its verified anchor and checkpoints, the WoC
-> `get_block_header` rebuild, the JungleBus hash-only confirmer, `HODOS_CHAIN_NETWORK=mainnet`,
-> `network_name()`, and trackers that insist on two — planned in `PLAN_spv_mainnet.md`. One addition the plan did not have: a header's
-> target may never be easier than the network's powLimit (`BadBits`), which is what keeps an
-> assume-valid header from being free.
+> `HODOS_HEADERS` / `HODOS_HEADER_TRACKERS`, step 5 as `run-wallet.ps1 -Headers lite`. **The mainnet
+> half is built too (2026-10-15, same branch):** `Params::mainnet_lite()` anchored at the 945000
+> checkpoint, the WoC `get_block_header` rebuild and `WhatsOnChainTracker`, the JungleBus hash-only
+> confirmer, `HODOS_CHAIN_NETWORK=mainnet`, `network_name()`, and `min_agreeing` that never drops to one
+> on mainnet — per `PLAN_spv_mainnet.md`, whose status note records what has not yet been run live. One
+> addition this plan did not have: a header's target may never be easier than the network's powLimit
+> (`BadBits`), which is what keeps an assume-valid header from being free.
 
 ## Context
 
