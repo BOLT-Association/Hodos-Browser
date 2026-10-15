@@ -217,6 +217,11 @@ pub async fn verify_tsc_proof_against_block(
     // wallet's own verified header chain and never against a third-party API. A
     // configured-but-uninitialised chain is an ERROR, not a fall-through to WoC.
     if crate::services::providers::chaintracks::configured_base_url().is_some() {
+        // spv-lite: a height below the verified window is fetched from the header trackers first
+        // (cached after the first time); the sync check then answers from it.
+        if let (Some(svc), Some(height)) = (crate::header_sync::global(), tsc["height"].as_u64().filter(|h| *h > 0)) {
+            svc.ensure_header(height as u32).await.map_err(CacheError::Api)?;
+        }
         return verify_tsc_proof_against_header_chain(txid, tsc);
     }
 

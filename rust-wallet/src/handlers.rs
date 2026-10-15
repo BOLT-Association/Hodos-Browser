@@ -13185,6 +13185,19 @@ pub async fn internalize_action(
         // match the wallet's own chain (and each proven tx must be a leaf of its BUMP).
         // "Cannot verify" (no header at that height yet) rejects: it is not a pass.
         if beef.has_proofs() && crate::services::providers::chaintracks::configured_base_url().is_some() {
+            // spv-lite: a BUMP below the verified window needs its header from the trackers first.
+            // One retry, because "cannot verify" rejects below and a transient source failure
+            // must not reject a payment the sender may never resend.
+            if let Some(svc) = crate::header_sync::global() {
+                let heights: Vec<u32> = beef.bumps.iter().map(|b| b.block_height).collect();
+                if let Err(e) = svc.ensure_headers(&heights).await {
+                    log::warn!("   header trackers: {}; retrying once", e);
+                    tokio::time::sleep(std::time::Duration::from_millis(750)).await;
+                    if let Err(e) = svc.ensure_headers(&heights).await {
+                        log::warn!("   header trackers: {} (the BUMP check below rejects what it cannot verify)", e);
+                    }
+                }
+            }
             let verdict = crate::beef::verify_beef_bumps(beef, &|height, root| {
                 crate::header_sync::global()
                     .ok_or_else(|| "header chain configured but not initialised".to_string())?
@@ -18489,10 +18502,15 @@ pub async fn get_header_for_height(
     // spv mode: answer only from the verified header chain. The block_headers cache
     // below holds unverified third-party answers and is deliberately not consulted.
     if crate::chain_mode::is_spv() {
-        return match crate::header_sync::global().and_then(|s| s.header_hex_at_height(req.height)) {
-            Some(header) => HttpResponse::Ok().json(serde_json::json!({ "header": header })),
-            None => HttpResponse::NotFound().json(serde_json::json!({
-                "error": format!("no verified header at height {}", req.height)
+        // A lite chain fetches a height below its window from the header trackers (cached after).
+        let answer = match crate::header_sync::global() {
+            Some(s) => s.header_hex_at_height_or_fetch(req.height).await,
+            None => Err("header chain not initialised".to_string()),
+        };
+        return match answer {
+            Ok(header) => HttpResponse::Ok().json(serde_json::json!({ "header": header })),
+            Err(e) => HttpResponse::NotFound().json(serde_json::json!({
+                "error": format!("no verified header at height {}: {}", req.height, e)
             })),
         };
     }

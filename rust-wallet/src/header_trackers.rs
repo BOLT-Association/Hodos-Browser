@@ -67,10 +67,47 @@ pub trait TrackerSource: Send + Sync {
     async fn header_at(&self, height: u32) -> Result<Option<Answer>, String>;
 }
 
-/// Decide one height from the answers that came back. Pure. Stub: never decides.
+/// Decide one height from the answers that came back. Pure. An answer is usable when its bytes
+/// parse, hash to the hash it claims, and (where one is pinned) equal the checkpoint; usable
+/// answers must all name the same header and there must be at least `min_agreeing` of them.
 pub fn decide(height: u32, answers: &[Answer], checkpoint: Option<&str>, min_agreeing: usize) -> Result<Header, AgreementError> {
-    let _ = (answers, checkpoint);
-    Err(AgreementError::InsufficientAnswers { height, usable: 0, need: min_agreeing.max(1) })
+    let need = min_agreeing.max(1);
+    let mut usable: Vec<(String, Header)> = Vec::with_capacity(answers.len());
+    for a in answers {
+        let header = match Header::from_hex(&a.header_hex) {
+            Ok(h) => h,
+            Err(e) => {
+                log::warn!("   header trackers: {} at {} discarded: {}", a.source, height, e);
+                continue;
+            }
+        };
+        let hash = header.hash_hex();
+        if !hash.eq_ignore_ascii_case(&a.block_hash) {
+            log::warn!(
+                "   header trackers: {} at {} discarded: bytes hash to {} but it claimed {}",
+                a.source, height, hash, a.block_hash
+            );
+            continue;
+        }
+        if let Some(cp) = checkpoint {
+            if !hash.eq_ignore_ascii_case(cp) {
+                log::warn!(
+                    "   header trackers: {} at {} discarded: {} contradicts the pinned checkpoint {} (wrong chain, or a reset server)",
+                    a.source, height, hash, cp
+                );
+                continue;
+            }
+        }
+        usable.push((hash, header));
+    }
+    let distinct: BTreeSet<&str> = usable.iter().map(|(h, _)| h.as_str()).collect();
+    if distinct.len() > 1 {
+        return Err(AgreementError::Disagree { height, hashes: distinct.into_iter().map(String::from).collect() });
+    }
+    if usable.len() < need {
+        return Err(AgreementError::InsufficientAnswers { height, usable: usable.len(), need });
+    }
+    Ok(usable.swap_remove(0).1)
 }
 
 pub struct HeaderTrackers {
@@ -99,13 +136,39 @@ impl HeaderTrackers {
     }
 
     /// The accepted header at `height`: from the cache, else from the sources (at most
-    /// `IN_FLIGHT` asked at once). `Err` = cannot say. Stub: never fetches.
+    /// `IN_FLIGHT` asked at once). `Err` = cannot say; nothing is cached then.
     pub async fn header_at(&self, height: u32) -> Result<Header, String> {
         if let Some(h) = self.cached(height) {
             return Ok(h);
         }
-        let _ = self.checkpoints;
-        Err(decide(height, &[], None, self.min_agreeing).unwrap_err().to_string())
+        let mut answers: Vec<Answer> = Vec::new();
+        let mut failures: Vec<String> = Vec::new();
+        for pair in self.sources.chunks(IN_FLIGHT) {
+            let results: Vec<(&str, Result<Option<Answer>, String>)> = match pair {
+                [a] => vec![(a.name(), a.header_at(height).await)],
+                [a, b] => {
+                    let (ra, rb) = tokio::join!(a.header_at(height), b.header_at(height));
+                    vec![(a.name(), ra), (b.name(), rb)]
+                }
+                _ => unreachable!("chunks of {}", IN_FLIGHT),
+            };
+            for (name, r) in results {
+                match r {
+                    Ok(Some(a)) => answers.push(a),
+                    Ok(None) => log::debug!("   header trackers: {} has no header at {}", name, height),
+                    Err(e) => failures.push(format!("{}: {}", name, e)),
+                }
+            }
+        }
+        let checkpoint = self.checkpoints.iter().find(|(h, _)| *h == height).map(|(_, hash)| *hash);
+        match decide(height, &answers, checkpoint, self.min_agreeing) {
+            Ok(header) => {
+                self.cache.lock().unwrap().insert(height, header.clone());
+                Ok(header)
+            }
+            Err(e) if failures.is_empty() => Err(e.to_string()),
+            Err(e) => Err(format!("{}; source failure(s): {}", e, failures.join("; "))),
+        }
     }
 
     /// Make every height answerable, each fetched at most once (duplicates and cached heights are

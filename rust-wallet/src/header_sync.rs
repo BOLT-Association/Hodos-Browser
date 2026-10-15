@@ -267,32 +267,88 @@ impl HeaderService {
         self.chain.lock().unwrap().tip_height()
     }
 
-    /// 80-byte header hex at `height` on the active verified chain.
+    /// A header the window does not hold, if the trackers have fetched it (heights below the anchor).
+    fn tracker_header(&self, height: u32) -> Option<Header> {
+        self.trackers.as_ref().and_then(|q| q.cached(height))
+    }
+
+    /// 80-byte header hex at `height`: the active verified chain, or a tracker-accepted header
+    /// below its anchor that has already been fetched (`ensure_header`).
     pub fn header_hex_at_height(&self, height: u32) -> Option<String> {
-        self.chain.lock().unwrap().header_at_height(height).map(|e| e.header.to_hex())
+        let from_window = self.chain.lock().unwrap().header_at_height(height).map(|e| e.header.to_hex());
+        from_window.or_else(|| self.tracker_header(height).map(|h| h.to_hex()))
     }
 
-    /// Block hash (display hex) at `height` on the active verified chain, computed from the
-    /// header itself. Use this instead of a hash an indexer or push event claims.
+    /// `header_hex_at_height`, fetching from the trackers first when the height is below the window.
+    pub async fn header_hex_at_height_or_fetch(&self, height: u32) -> Result<String, String> {
+        self.ensure_header(height).await?;
+        self.header_hex_at_height(height).ok_or_else(|| format!("no header at height {} after fetch", height))
+    }
+
+    /// Block hash (display hex) at `height`, computed from the header itself (the verified chain,
+    /// or a fetched tracker header below its anchor). Use this instead of a hash an indexer or push
+    /// event claims.
     pub fn block_hash_at_height(&self, height: u32) -> Option<String> {
-        self.chain.lock().unwrap().header_at_height(height).map(|e| e.header.hash_hex())
+        let from_window = self.chain.lock().unwrap().header_at_height(height).map(|e| e.header.hash_hex());
+        from_window.or_else(|| self.tracker_header(height).map(|h| h.hash_hex()))
     }
 
-    /// Make `height` answerable. Stub: never.
+    /// Make `height` answerable by `check_merkle_root`: a height the window holds already is; a
+    /// height below the anchor is asked of the trackers (once; the answer is cached); a height
+    /// inside the window but above the tip waits for the sync. `Err` = cannot say, never a verdict.
     pub async fn ensure_header(&self, height: u32) -> Result<(), String> {
-        Err(format!("stub: height {} not ensured", height))
+        let (held, anchor, tip) = {
+            let c = self.chain.lock().unwrap();
+            (c.header_at_height(height).is_some(), c.params().anchor.0, c.tip_height())
+        };
+        if held {
+            return Ok(());
+        }
+        if height < anchor {
+            return match &self.trackers {
+                Some(q) => q.header_at(height).await.map(|_| ()),
+                None => Err(format!(
+                    "height {} is below the verified window's anchor {} and no header trackers are configured",
+                    height, anchor
+                )),
+            };
+        }
+        Err(format!("header chain has no header at height {} (tip {:?}); sync pending", height, tip))
     }
 
-    /// Make every height answerable, each fetched at most once. Stub: never.
+    /// `ensure_header` for several heights, each asked for at most once; the first failure is
+    /// returned after the rest were still attempted.
     pub async fn ensure_headers(&self, heights: &[u32]) -> Result<(), String> {
-        Err(format!("stub: {} height(s) not ensured", heights.len()))
+        let wanted: std::collections::BTreeSet<u32> = heights.iter().copied().collect();
+        let mut first_err = None;
+        for h in wanted {
+            if let Err(e) = self.ensure_header(h).await {
+                first_err.get_or_insert(e);
+            }
+        }
+        match first_err {
+            None => Ok(()),
+            Some(e) => Err(e),
+        }
     }
 
-    /// `Ok(true/false)` = verdict against the verified chain; `Err` = we cannot say
-    /// (no header at that height yet), which callers must not treat as a verdict.
+    /// `Ok(true/false)` = verdict against the verified chain (or, below its anchor, against the
+    /// tracker-accepted header once fetched); `Err` = we cannot say (no header at that height yet),
+    /// which callers must not treat as a verdict.
     pub fn check_merkle_root(&self, height: u32, root_hex: &str) -> Result<bool, String> {
         let c = self.chain.lock().unwrap();
         if c.header_at_height(height).is_none() {
+            let anchor = c.params().anchor.0;
+            if height < anchor {
+                // Below the window there are no competing branches: the accepted header decides.
+                return match self.tracker_header(height) {
+                    Some(h) => Ok(h.merkle_root_hex().eq_ignore_ascii_case(root_hex)),
+                    None => Err(format!(
+                        "height {} is below the verified window (anchor {}) and has not been fetched from the header trackers",
+                        height, anchor
+                    )),
+                };
+            }
             return Err(format!(
                 "header chain has no header at height {} (tip {:?}); sync pending",
                 height,
