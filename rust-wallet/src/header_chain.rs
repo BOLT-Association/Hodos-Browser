@@ -14,11 +14,12 @@
 //! lies below the anchor) and is not checked; proof-of-work on the header's own bits, bounded by
 //! the network's powLimit, linkage, time and checkpoints still are.
 //!
-//! Networks: **regtest** (fixed difficulty) and **teratestnet** (cw-144 DAA plus the testnet
+//! Networks: **regtest** (fixed difficulty), **teratestnet** (cw-144 DAA plus the testnet
 //! 20-minute minimum-difficulty rule, ported from Teranode `services/blockchain/Difficulty.go`
 //! and `go-chaincfg` `TeraTestNetParams`), full from the genesis or lite from the 18000
-//! checkpoint. `Params` has no mainnet constructor on purpose so nothing can silently run under
-//! a mainnet name. Median-time-past is not enforced yet.
+//! checkpoint, and **mainnet**, lite only (`Params::mainnet_lite`: the same DAA without the
+//! minimum-difficulty rule, anchored at the 945000 checkpoint). A full mainnet chain is not
+//! offered: it would need the pre-DAA difficulty regimes. Median-time-past is not enforced yet.
 
 use std::collections::HashMap;
 
@@ -330,7 +331,56 @@ pub struct Params {
     pub assume_valid_height: u32,
     /// `(height, display-hex hash)` every chain must pass through.
     pub checkpoints: &'static [(u32, &'static str)],
+    /// Real coins. Decides what `getNetwork` answers and that the header trackers must agree
+    /// two-to-one; every test network is `false`.
+    pub is_mainnet: bool,
 }
+
+/// Bitcoin SV mainnet checkpoints: the union of bitcoin-sv `src/chainparams.cpp`
+/// `checkpointData` (16, up to 530359) and `bsv-blockchain/go-chaincfg` `MainNetParams`
+/// (34, up to 945000), both fetched from GitHub master on 2026-10-15; the twelve heights they
+/// share carry identical hashes. Pinned from these two node configurations; the live cross-check
+/// against chaintracks and WhatsOnChain (`tests/spv-ttn/mainnet-anchor.mjs`) is still owed.
+const MAINNET_CHECKPOINTS: &[(u32, &str)] = &[
+                (11111, "0000000069e244f73d78e8fd29ba2fd2ed618bd6fa2ee92559f542fdb26e7c1d"),
+                (33333, "000000002dd5588a74784eaa7ab0507a18ad16a236e7b1ce69f00d7ddfb5d0a6"),
+                (74000, "0000000000573993a3c9e41ce34471c079dcf5f52a0e824a81e7f953b8661a20"),
+                (105000, "00000000000291ce28027faea320c8d2b054b2e0fe44a773f3eefb151d6bdc97"),
+                (134444, "00000000000005b12ffd4cd315cd34ffd4a594f430ac814c91184a0d42d2b0fe"),
+                (168000, "000000000000099e61ea72015e79632f216fe6cb33d7899acb35b75c8303b763"),
+                (193000, "000000000000059f452a5f7340de6682a977387c17010ff6e6c3bd83ca8b1317"),
+                (210000, "000000000000048b95347e83192f69cf0366076336c639f9b7228e9ba171342e"),
+                (216116, "00000000000001b4f4b433e81ee46494af945cf96014816a4e2370f11b23df4e"),
+                (225430, "00000000000001c108384350f74090433e7fcf79a606b8e797f065b130575932"),
+                (250000, "000000000000003887df1f29024b06fc2200b55f8af8f35453d7be294df2d214"),
+                (267300, "000000000000000a83fbd660e918f218bf37edd92b748ad940483c7c116179ac"),
+                (279000, "0000000000000001ae8c72a0b0c301f67e3afca10e819efa9041e458e9bd7e40"),
+                (295000, "00000000000000004d9b4ef50f0f9d686fd69db2e03af35a100370c64632a983"),
+                (300255, "0000000000000000162804527c6e9b9f0563a280525f9d08c12041def0a0f3b2"),
+                (319400, "000000000000000021c6052e9becade189495d1c539aa37c58917305fd15f13b"),
+                (343185, "0000000000000000072b8bf361d01a6ba7d445dd024203fafc78768ed4368554"),
+                (352940, "000000000000000010755df42dba556bb72be6a32f3ce0b6941ce4430152c9ff"),
+                (382320, "00000000000000000a8dc6ed5b133d0eb2fd6af56203e4159789b092defd8ab2"),
+                (400000, "000000000000000004ec466ce4732fe6f1ed1cddc2ed4b328fff5224276e3f6f"),
+                (430000, "000000000000000001868b2bb3a285f3cc6b33ea234eb70facf4dcdf22186b87"),
+                (470000, "0000000000000000006c539c722e280a0769abd510af0073430159d71e6d7589"),
+                (478558, "0000000000000000011865af4122fe3b144e2cbeea86142e8ff2fb4107352d43"),
+                (504031, "0000000000000000011ebf65b60d0a3de80b8175be709d653b4c1a1beeb6ab9c"),
+                (510000, "00000000000000000367922b6457e21d591ef86b360d78a598b14c2f1f6b0e04"),
+                (530359, "0000000000000000011ada8bd08f46074f44a8f155396f43e38acf9501c49103"),
+                (552979, "0000000000000000015648768ac1b788a83187d706f858919fcc5c096b76fbf2"),
+                (556767, "000000000000000001d956714215d96ffc00e0afda4cd0a96c96f8d802b1662b"),
+                (600000, "00000000000000000866448ef293f900812d4af8e08cbe7ef62888eee9d29c4c"),
+                (650000, "00000000000000000310c17bbb4f3f8e5371a41ec2cee36a39876042019b725b"),
+                (700000, "00000000000000000e155235fd83a8757c44c6299e63104fb12632368f3f0cc9"),
+                (750000, "000000000000000006296f1e5437dd6c01b9b5471691a89a9c7d8e9f06920da5"),
+                (800000, "000000000000000000ad9056924410005d91b57f100bce345944e5caf56e8565"),
+                (850000, "0000000000000000039302a65227ab75fd93904ebe2e62421d1c66b15808b23b"),
+                (868500, "00000000000000000a4c8747ee369c2f4645cf7b55db534851fdc1a040f74de4"),
+                (900000, "000000000000000002feb6a36e1b8bf81409d0252e285449e3d0ef2388c5506a"),
+                (938000, "000000000000000002616a5ad2413acf7cf122c5aa27fbd29bfa0e8c12dd455b"),
+                (945000, "00000000000000000c39d94e19d6a55cfb0454918df1814fbcd919353a6e1f82")
+];
 
 impl Params {
     /// Teranode / Bitcoin regtest: no retargeting, easy PoW.
@@ -341,6 +391,7 @@ impl Params {
             anchor: (0, "0f9188f13cb7b2c71f2a335e3a4fc328bf5beb436012afca590b1a11466e2206"),
             assume_valid_height: 0,
             checkpoints: &[],
+            is_mainnet: false,
         }
     }
 
@@ -356,6 +407,24 @@ impl Params {
                 (9500, "00000000bd750801352dd82fcb0e675d62a308b38a6486698308ae06fcb3bc10"),
                 (18000, "00000000174095c3c94343b28d29f45010b44bf221e22df5cea6e0ce547a10b5"),
             ],
+            is_mainnet: false,
+        }
+    }
+
+    /// Bitcoin SV mainnet, **lite only**: a verified window from the 945000 checkpoint (the
+    /// newest in `go-chaincfg`) to the tip. The rule is the cw-144 DAA above the DAA fork at
+    /// 504031 (`go-chaincfg` `DaaForkHeight`), **without** the testnet minimum-difficulty rule
+    /// (`ReduceMinDifficulty: false`), powLimit `0x1d00ffff`, 600 s spacing. The full rule
+    /// resumes at anchor + 147; below it PoW is still enforced. Heights below the anchor are the
+    /// header trackers' to answer, and on mainnet two of them must agree.
+    pub fn mainnet_lite() -> Params {
+        Params {
+            name: "mainnet-lite",
+            difficulty: Difficulty::Daa { pow_limit_bits: 0x1d00_ffff, spacing_secs: 600, reduce_min_difficulty: false },
+            anchor: (945000, "00000000000000000c39d94e19d6a55cfb0454918df1814fbcd919353a6e1f82"),
+            assume_valid_height: 945000 + 147,
+            checkpoints: MAINNET_CHECKPOINTS,
+            is_mainnet: true,
         }
     }
 
@@ -705,7 +774,7 @@ pub(crate) mod tests {
     pub(crate) fn fixture() -> (HeaderChain, Header) {
         let g = mine([0; 32], 0, 0x207f_ffff);
         let ghash: &'static str = Box::leak(g.hash_hex().into_boxed_str());
-        let params = Params { name: "test", difficulty: Difficulty::Fixed(0x207f_ffff), anchor: (0, ghash), assume_valid_height: 0, checkpoints: &[] };
+        let params = Params { name: "test", difficulty: Difficulty::Fixed(0x207f_ffff), anchor: (0, ghash), assume_valid_height: 0, checkpoints: &[], is_mainnet: false };
         let mut c = HeaderChain::new(params);
         assert_eq!(c.add_header(g.clone(), NOW), Ok(AddOutcome::Extended));
         (c, g)
@@ -1031,6 +1100,59 @@ pub(crate) mod tests {
         assert_eq!(Params::regtest().anchor.0, 0);
     }
 
+    // -----------------------------------------------------------------------
+    // Mainnet, lite only.
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn mainnet_lite_is_anchored_at_the_newest_pinned_checkpoint_with_the_mainnet_rule() {
+        let m = Params::mainnet_lite();
+        assert_eq!(m.name, "mainnet-lite");
+        assert!(m.is_mainnet);
+        assert_eq!(
+            m.difficulty,
+            Difficulty::Daa { pow_limit_bits: 0x1d00_ffff, spacing_secs: 600, reduce_min_difficulty: false },
+            "the cw-144 DAA without the testnet minimum-difficulty rule"
+        );
+        let newest = m.checkpoints.iter().max_by_key(|(h, _)| *h).unwrap();
+        assert_eq!(m.anchor, (newest.0, newest.1), "anchored at the newest checkpoint");
+        assert_eq!(m.anchor.0, 945000);
+        assert_eq!(m.assume_valid_height, m.anchor.0 + 147);
+        assert!(m.anchor.0 > 504031, "above the DAA fork: no pre-DAA difficulty regime is ever evaluated");
+        assert!(m.checkpoints.windows(2).all(|w| w[0].0 < w[1].0), "ascending, no duplicates");
+        assert!(m.checkpoints.iter().any(|(h, _)| *h == 504031), "the DAA fork block is pinned");
+        for (h, hash) in m.checkpoints {
+            assert_eq!(hash.len(), 64, "checkpoint {}", h);
+            assert!(hash.starts_with("00000000"), "a mainnet block hash: checkpoint {}", h);
+            assert!(hash.chars().all(|c| c.is_ascii_hexdigit()), "checkpoint {}", h);
+        }
+        for p in [Params::regtest(), Params::teratestnet(), Params::teratestnet_lite()] {
+            assert!(!p.is_mainnet, "{}", p.name);
+        }
+    }
+
+    #[test]
+    fn the_mainnet_rule_has_no_minimum_difficulty_exception_the_testnet_rule_has() {
+        // Real teratestnet header 398 carries powLimit bits about 20 days after its parent: the
+        // testnet rule allows that, the mainnet rule does not. Both chains are anchored at 200 so
+        // that 398 lies above assume-valid (347) and the rule is actually consulted.
+        let anchor: &'static str = Box::leak(ttn(200).hash_hex().into_boxed_str());
+        let testnet_rule = Params { name: "ttn-rule", anchor: (200, anchor), assume_valid_height: 347, ..Params::teratestnet() };
+        let mainnet_rule = Params { name: "main-rule", difficulty: Params::mainnet_lite().difficulty, ..testnet_rule.clone() };
+        let mut t = HeaderChain::new(testnet_rule);
+        let mut m = HeaderChain::new(mainnet_rule);
+        for h in 200..=397 {
+            assert_eq!(t.add_header(ttn(h), NOW), Ok(AddOutcome::Extended), "testnet rule, header {}", h);
+            assert_eq!(m.add_header(ttn(h), NOW), Ok(AddOutcome::Extended), "mainnet rule, header {}", h);
+        }
+        assert_eq!(ttn(398).bits, 0x1d00_ffff, "398 is a minimum-difficulty block");
+        assert_eq!(t.add_header(ttn(398), NOW), Ok(AddOutcome::Extended), "testnet: allowed after 20 minutes");
+        assert!(
+            matches!(m.add_header(ttn(398), NOW), Err(HeaderError::WrongDifficulty { got: 0x1d00_ffff, .. })),
+            "mainnet: the DAA target is required whatever the gap"
+        );
+    }
+
     #[test]
     fn lite_from_stored_revalidates_the_window_and_drops_rows_below_the_anchor() {
         let mut stored: Vec<(u32, String)> = (299..=700u32).map(|h| (h, ttn(h as usize).to_hex())).collect();
@@ -1051,6 +1173,7 @@ pub(crate) mod tests {
             anchor: (5, Box::leak(anchor.hash_hex().into_boxed_str())),
             assume_valid_height: 0,
             checkpoints: &[],
+            is_mainnet: false,
         };
         let mut c = HeaderChain::new(params);
         assert_eq!(c.add_header(anchor.clone(), NOW), Ok(AddOutcome::Extended));

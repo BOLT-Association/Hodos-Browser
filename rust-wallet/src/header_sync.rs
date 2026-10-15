@@ -453,6 +453,7 @@ mod tests {
             anchor: (0, Box::leak(g.hash_hex().into_boxed_str())),
             assume_valid_height: 0,
             checkpoints: &[],
+            is_mainnet: false,
         };
         Mutex::new(HeaderChain::new(params))
     }
@@ -627,6 +628,7 @@ mod tests {
             anchor: (h, Box::leak(g.hash_hex().into_boxed_str())),
             assume_valid_height: 0,
             checkpoints: &[],
+            is_mainnet: false,
         };
         Mutex::new(HeaderChain::new(params))
     }
