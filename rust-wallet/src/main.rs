@@ -40,7 +40,8 @@ mod zero_conf;  // spv mode: received outputs spendable once seen on the network
 mod arcade_push;  // spv mode: Arcade SSE wake-up for the proof task (polling stays the safety net)  // HODOS_CHAIN_MODE: public | spv (Arcade + verified headers only)
 mod tip_stream;  // spv mode: chaintracks tip stream, a wake-up for the header sync (the 30 s sync stays)
 mod header_chain;
-mod header_sync;  // WS4: header sync + process-wide HeaderService  // Wallet-Hardening WS4: verified header chain (PoW, linkage, most-work, reorg)
+mod header_sync;  // WS4: header sync + process-wide HeaderService
+mod header_trackers;  // spv-lite: headers below the verified window, from the configured trackers  // Wallet-Hardening WS4: verified header chain (PoW, linkage, most-work, reorg)
 mod reconcile;  // Wallet-Hardening WS1: spent-input reconcile primitives (c1 check_outpoint_spent; c2/c3 dormant)
 
 // Re-export for monitor tasks (avoids rust-analyzer resolution issues when only lib is checked)
@@ -907,7 +908,7 @@ async fn main() -> std::io::Result<()> {
             "✅ Header chain ({}): {} stored header(s), tip {:?}, {} rejected on reload",
             network, chain.len(), chain.tip_height(), rejected
         );
-        header_sync::init(chain);
+        header_sync::init(chain, None);
     }
 
     // Initialize fee rate cache (fetches from ARC /v1/policy)

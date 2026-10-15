@@ -15,6 +15,7 @@ use std::sync::{Arc, Mutex, OnceLock};
 use async_trait::async_trait;
 
 use crate::header_chain::{AddOutcome, Entry, Header, HeaderChain};
+use crate::header_trackers::HeaderTrackers;
 use crate::services::providers::ChaintracksProvider;
 use crate::services::{BlockKey, IndexerProvider};
 
@@ -217,6 +218,8 @@ fn add_one(
 /// legacy behaviour", never "verified".
 pub struct HeaderService {
     pub chain: Mutex<HeaderChain>,
+    /// Lite chains only: headers below the window's anchor, from the configured trackers.
+    pub trackers: Option<HeaderTrackers>,
 }
 
 static SERVICE: OnceLock<Arc<HeaderService>> = OnceLock::new();
@@ -248,8 +251,8 @@ pub fn request_startup_recheck_once() {
     }
 }
 
-pub fn init(chain: HeaderChain) -> Arc<HeaderService> {
-    let svc = Arc::new(HeaderService { chain: Mutex::new(chain) });
+pub fn init(chain: HeaderChain, trackers: Option<HeaderTrackers>) -> Arc<HeaderService> {
+    let svc = Arc::new(HeaderService { chain: Mutex::new(chain), trackers });
     let _ = SERVICE.set(svc.clone());
     svc
 }
@@ -273,6 +276,16 @@ impl HeaderService {
     /// header itself. Use this instead of a hash an indexer or push event claims.
     pub fn block_hash_at_height(&self, height: u32) -> Option<String> {
         self.chain.lock().unwrap().header_at_height(height).map(|e| e.header.hash_hex())
+    }
+
+    /// Make `height` answerable. Stub: never.
+    pub async fn ensure_header(&self, height: u32) -> Result<(), String> {
+        Err(format!("stub: height {} not ensured", height))
+    }
+
+    /// Make every height answerable, each fetched at most once. Stub: never.
+    pub async fn ensure_headers(&self, heights: &[u32]) -> Result<(), String> {
+        Err(format!("stub: {} height(s) not ensured", heights.len()))
     }
 
     /// `Ok(true/false)` = verdict against the verified chain; `Err` = we cannot say
@@ -630,6 +643,97 @@ mod tests {
         assert_eq!(chain.lock().unwrap().tip_height(), Some(103), "chain untouched");
     }
 
+    // -----------------------------------------------------------------------
+    // HeaderService on a lite chain: the window answers what it holds, the trackers answer
+    // heights below the anchor (fetched once, then cached), and anything neither can say is an
+    // error, never `Ok(false)`.
+    // -----------------------------------------------------------------------
+
+    use crate::header_trackers::{tests::FakeSource, HeaderTrackers, TrackerSource};
+    use std::sync::atomic::Ordering;
+
+    /// A lite chain anchored at 100 (the fixture genesis as the anchor) holding 100..=103.
+    fn lite_chain_100_103(g: &Header) -> (HeaderChain, Vec<Header>) {
+        let headers = chain_of(g, 3, 700);
+        let mut c = empty_anchored_at(100, g).into_inner().unwrap();
+        for h in &headers {
+            c.add_header(h.clone(), NOW).unwrap();
+        }
+        assert_eq!(c.tip_height(), Some(103));
+        (c, headers)
+    }
+
+    fn lite_service(c: HeaderChain, sources: Vec<Arc<dyn TrackerSource>>, min: usize) -> HeaderService {
+        HeaderService { chain: Mutex::new(c), trackers: Some(HeaderTrackers::new(sources, min, &[])) }
+    }
+
+    #[tokio::test]
+    async fn inside_the_window_the_trackers_are_never_asked() {
+        let (_, g) = fixture();
+        let (c, headers) = lite_chain_100_103(&g);
+        let src = Arc::new(FakeSource::new("a", &[]));
+        let svc = lite_service(c, vec![src.clone()], 1);
+        assert_eq!(svc.ensure_header(101).await, Ok(()));
+        assert_eq!(svc.ensure_headers(&[100, 103, 103]).await, Ok(()));
+        assert_eq!(svc.check_merkle_root(101, &headers[1].merkle_root_hex()), Ok(true));
+        assert_eq!(src.calls.load(Ordering::SeqCst), 0);
+    }
+
+    #[tokio::test]
+    async fn below_the_anchor_the_trackers_answer_once_and_are_cached() {
+        let (_, g) = fixture();
+        let (c, _) = lite_chain_100_103(&g);
+        let h50 = mine([7; 32], 50, 0x207f_ffff);
+        let src = Arc::new(FakeSource::new("a", &[(50, h50.clone())]));
+        let svc = lite_service(c, vec![src.clone()], 1);
+        assert!(svc.check_merkle_root(50, &h50.merkle_root_hex()).is_err(), "not fetched yet: cannot say, never false");
+        assert_eq!(svc.block_hash_at_height(50), None);
+        assert_eq!(svc.ensure_header(50).await, Ok(()));
+        assert_eq!(src.calls.load(Ordering::SeqCst), 1);
+        assert_eq!(svc.check_merkle_root(50, &h50.merkle_root_hex()), Ok(true));
+        assert_eq!(svc.check_merkle_root(50, &"ff".repeat(32)), Ok(false));
+        assert_eq!(svc.block_hash_at_height(50), Some(h50.hash_hex()));
+        assert_eq!(svc.header_hex_at_height(50), Some(h50.to_hex()));
+        assert_eq!(svc.ensure_headers(&[50, 50, 101]).await, Ok(()));
+        assert_eq!(src.calls.load(Ordering::SeqCst), 1, "cached and in-window heights are not fetched again");
+    }
+
+    #[tokio::test]
+    async fn a_tracker_failure_is_cannot_say_never_a_verdict() {
+        let (_, g) = fixture();
+        let (c, _) = lite_chain_100_103(&g);
+        let src = Arc::new(FakeSource::failing("a", "connection refused"));
+        let svc = lite_service(c, vec![src], 1);
+        let e = svc.ensure_header(50).await.unwrap_err();
+        assert!(e.contains("connection refused"), "{}", e);
+        assert!(svc.check_merkle_root(50, &"ff".repeat(32)).is_err());
+        assert_eq!(svc.block_hash_at_height(50), None);
+        assert_eq!(svc.header_hex_at_height(50), None);
+    }
+
+    #[tokio::test]
+    async fn above_the_tip_is_sync_pending_not_a_tracker_question() {
+        let (_, g) = fixture();
+        let (c, _) = lite_chain_100_103(&g);
+        let src = Arc::new(FakeSource::new("a", &[(104, mine([8; 32], 104, 0x207f_ffff))]));
+        let svc = lite_service(c, vec![src.clone()], 1);
+        let e = svc.ensure_header(104).await.unwrap_err();
+        assert!(e.contains("sync pending"), "{}", e);
+        assert_eq!(src.calls.load(Ordering::SeqCst), 0, "the window, not the trackers, own heights at and above the anchor");
+        assert!(svc.check_merkle_root(104, &"ff".repeat(32)).is_err());
+    }
+
+    #[tokio::test]
+    async fn without_trackers_a_height_below_the_anchor_cannot_be_answered() {
+        let (_, g) = fixture();
+        let (c, _) = lite_chain_100_103(&g);
+        let svc = HeaderService { chain: Mutex::new(c), trackers: None };
+        let e = svc.ensure_header(50).await.unwrap_err();
+        assert!(e.contains("trackers"), "{}", e);
+        assert!(svc.check_merkle_root(50, &"ff".repeat(32)).is_err());
+        assert_eq!(svc.ensure_header(101).await, Ok(()), "the window still answers");
+    }
+
     /// Live: sync the real spv-testnet chain from genesis with the real regtest rules.
     /// `cargo test --lib header_sync_live -- --ignored --nocapture`
     #[tokio::test]
@@ -737,13 +841,13 @@ mod tests {
     #[test]
     fn cwi_accessors_come_from_the_verified_chain_only() {
         let (mut c, g) = fixture();
-        let svc0 = HeaderService { chain: Mutex::new(HeaderChain::new(crate::header_chain::Params::regtest())) };
+        let svc0 = HeaderService { chain: Mutex::new(HeaderChain::new(crate::header_chain::Params::regtest())), trackers: None };
         assert_eq!(svc0.tip_height(), None, "unsynced chain has no height to report");
         assert_eq!(svc0.header_hex_at_height(0), None);
 
         let a1 = mine(g.hash(), 1, 0x207f_ffff);
         c.add_header(a1.clone(), NOW).unwrap();
-        let svc = HeaderService { chain: Mutex::new(c) };
+        let svc = HeaderService { chain: Mutex::new(c), trackers: None };
         assert_eq!(svc.tip_height(), Some(1));
         assert_eq!(svc.header_hex_at_height(1), Some(a1.to_hex()));
         assert_eq!(svc.header_hex_at_height(2), None);
@@ -754,7 +858,7 @@ mod tests {
         let (mut c, g) = fixture();
         let a1 = mine(g.hash(), 1, 0x207f_ffff);
         c.add_header(a1.clone(), NOW).unwrap();
-        let svc = HeaderService { chain: Mutex::new(c) };
+        let svc = HeaderService { chain: Mutex::new(c), trackers: None };
         assert_eq!(svc.block_hash_at_height(1), Some(a1.hash_hex()));
         assert_eq!(svc.block_hash_at_height(0), Some(g.hash_hex()));
         assert_eq!(svc.block_hash_at_height(2), None);
@@ -771,7 +875,7 @@ mod tests {
         assert_ne!(a1.merkle_root_hex(), b1.merkle_root_hex(), "fixture must give distinct roots");
         c.add_header(a1.clone(), NOW).unwrap();
         assert_eq!(c.add_header(b1.clone(), NOW).unwrap(), AddOutcome::Fork);
-        let svc = HeaderService { chain: Mutex::new(c) };
+        let svc = HeaderService { chain: Mutex::new(c), trackers: None };
         assert_eq!(svc.check_merkle_root(1, &a1.merkle_root_hex()), Ok(true));
         assert!(svc.check_merkle_root(1, &b1.merkle_root_hex()).is_err(), "competing branch: cannot say yet");
         assert_eq!(svc.check_merkle_root(1, &"ff".repeat(32)), Ok(false), "a root no branch has is still false");
@@ -786,7 +890,7 @@ mod tests {
     #[test]
     fn check_merkle_root_distinguishes_unknown_from_mismatch() {
         let (c, g) = fixture();
-        let svc = HeaderService { chain: Mutex::new(c) };
+        let svc = HeaderService { chain: Mutex::new(c), trackers: None };
         assert_eq!(svc.check_merkle_root(0, &g.merkle_root_hex()), Ok(true));
         assert_eq!(svc.check_merkle_root(0, &"ff".repeat(32)), Ok(false));
         assert!(svc.check_merkle_root(5, &g.merkle_root_hex()).is_err());

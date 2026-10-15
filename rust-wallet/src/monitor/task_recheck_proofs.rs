@@ -225,7 +225,7 @@ mod tests {
         // Branch A: height 1 carries the proof's root.
         let a1 = mine_with_root(g.hash(), &root, 1);
         chain.add_header(a1.clone(), NOW).unwrap();
-        let svc = HeaderService { chain: Mutex::new(chain) };
+        let svc = HeaderService { chain: Mutex::new(chain), trackers: None };
         let conn = db_with_proof(&txid, 1, &[&sib]);
 
         assert_eq!(find_orphaned(&conn, &svc, 0).unwrap(), vec![], "proof matches active chain");
@@ -250,7 +250,7 @@ mod tests {
     fn proof_above_the_synced_tip_is_skipped_not_flagged() {
         let txid = "33".repeat(32);
         let (chain, _) = fixture();
-        let svc = HeaderService { chain: Mutex::new(chain) };
+        let svc = HeaderService { chain: Mutex::new(chain), trackers: None };
         let conn = db_with_proof(&txid, 50, &[&"44".repeat(32)]);
         assert!(find_orphaned(&conn, &svc, 0).unwrap().is_empty());
     }
@@ -327,7 +327,7 @@ mod tests {
         std::env::set_var("HODOS_CHAINTRACKS_URL", "http://localhost:8083/chaintracks/v2");
         let http = reqwest::Client::new();
         let now = || std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_secs() as u32;
-        let svc = crate::header_sync::init(HeaderChain::new(crate::header_chain::Params::regtest()));
+        let svc = crate::header_sync::init(HeaderChain::new(crate::header_chain::Params::regtest()), None);
         let src = ChaintracksSource(ChaintracksProvider::new(http.clone(), "http://localhost:8083/chaintracks/v2".into()));
         sync_once(&svc.chain, &src, now(), &mut |_| {}).await.expect("initial sync");
 
@@ -434,7 +434,7 @@ mod tests {
     fn find_orphaned_never_modifies_the_database() {
         let txid = "55".repeat(32);
         let (chain, _) = fixture();
-        let svc = HeaderService { chain: Mutex::new(chain) };
+        let svc = HeaderService { chain: Mutex::new(chain), trackers: None };
         let conn = db_with_proof(&txid, 0, &[&"66".repeat(32)]);
         let before: i64 = conn.query_row("SELECT COUNT(*) FROM proven_txs", [], |r| r.get(0)).unwrap();
         let _ = HeaderChain::new(crate::header_chain::Params::regtest());
