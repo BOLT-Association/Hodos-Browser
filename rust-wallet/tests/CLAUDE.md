@@ -2,7 +2,7 @@
 
 > 780+ integration tests validating cryptography, transaction handling, BEEF format, certificates, and storage against known-answer vectors (NIST, RFC, BIP, BRC specs). 55 `#[test]` functions accumulate ~686 `check!` assertions across 12 files.
 
-> `tests/spv-ttn/` (Node, live, not run by `cargo test`): a throwaway wallet in spv mode on the public Teranode testnet — `connect.mjs` (header chain verified to the tip) and `fund.mjs` (faucet payout internalized, tampered BUMP rejected, `--wait-mined` proof verified). See its README.
+> `tests/spv-ttn/` (Node, live, not run by `cargo test`): a throwaway wallet in spv mode on the public Teranode testnet — `connect.mjs` (header chain verified to the tip; `HEADERS=lite` also checks the 18000 anchor and the tracker-answered height below it) and `fund.mjs` (faucet payout internalized, tampered BUMP rejected, `--wait-mined` proof verified). `run-wallet.ps1 -Headers lite` runs the lite window; its README lists the negative controls. See its README.
 
 > `tests/migrate_copy.rs` (ignored): opens, and so migrates, the DB file named by `HODOS_MIGRATE_DB`. Run it on a COPY of a real wallet DB, then compare table row counts from outside; never point it at a live DB.
 

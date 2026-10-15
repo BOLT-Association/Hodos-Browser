@@ -111,6 +111,23 @@ Two networks are supported, selected by `HODOS_CHAIN_NETWORK`:
 | Checkpoints | none | 5000 / 9500 / 18000 |
 | Sync | per height | bulk `/headers?height=&count=`, 2000 per request; ~36k headers in about a minute |
 
+**Lite (`HODOS_HEADERS=lite`, teratestnet only for now).** The chain is anchored at the pinned 18000
+checkpoint instead of the genesis (`Params::teratestnet_lite`): the first header must be the
+anchor, the window runs from there to the tip (~18k headers, half the chain, about 30 s), and
+reorgs work exactly as above with the fork at or above the anchor. The difficulty rule needs 147
+headers below a height (median-of-3 at the parent and at `parent - 144`), so it is enforced from
+anchor + 147 (`assume_valid_height`, the exact minimum, pinned by a test); below that a header's
+own `bits` stand, still proven by its hash and bounded by the network's powLimit (a target easier
+than powLimit is not a target at all, as in Bitcoin Core `CheckProofOfWork`). A height **below**
+the anchor is not the chain's to answer: `header_trackers.rs` asks the configured trackers
+(`HODOS_CHAINTRACKS_URL`, then `HODOS_HEADER_TRACKERS`), discards an answer whose bytes do not hash
+to the hash it claims or that contradicts a pinned checkpoint (5000 / 9500 still apply here),
+requires two identical answers when two or more sources exist, and caches the result for the
+process. A source whose tip is below the anchor, or far behind ours (the public-chaintracks reset
+of 2026-10-14), is *unavailable*, never a reorg. Everything that checks a merkle root first makes
+the height answerable (`HeaderService::ensure_header`), so a proof below the window is held, never
+judged, until the trackers have answered.
+
 ### 3.2 Money arrives inside BEEFs, not by address
 
 There is no address lookup in spv mode (`fetch_utxos`, `get_raw_tx`, `outspend` hold only
@@ -178,6 +195,16 @@ What the model does **not** cover yet: median-time-past is not enforced (timesta
 backdated within a branch, which affects nothing while most-work wins), and a 51% attacker on a
 test network is not a threat this wallet is meant to resist.
 
+**Lite changes one thing.** Inside the window the statement above holds unchanged. Below the
+window the wallet has no chain of its own, and a header there is what the trackers say it is: a
+forged old header needs the trackers' operators to collude when two must agree, and needs only
+one tracker when the wallet runs on one, which is what it does on teratestnet today (the single
+public tracker; the wallet says so at startup). That is the one-trusted-tracker model of the SDK
+`ChainTracker` / wallet-toolbox, accepted by the owner for test networks on 2026-10-15 and not
+for mainnet. Two things still bound it: the pinned checkpoints below the anchor are enforced on
+every tracker answer, and the verified window catches a tracker that lies about recent blocks,
+which is where the money is.
+
 ## 4. Operating it
 
 | Variable | Meaning |
@@ -241,10 +268,16 @@ Two caveats that shape the design:
    genesis means three difficulty regimes (2016-block retarget, the 2017 Emergency Difficulty
    Adjustment from 478558, then the DAA from 504031), or an **assume-valid checkpoint** near the
    tip with full rules only after it. The second is the normal wallet answer and the cheaper one;
-   the chaintracks data supports either.
+   the chaintracks data supports either. **The assume-valid path now exists** (`Params::anchor`,
+   `assume_valid_height`, `HODOS_HEADERS=lite`, section 3.1), proven on teratestnet from the
+   18000 checkpoint. Mainnet still needs its own `Params` (the DAA without the minimum-difficulty
+   rule, an anchor and checkpoints verified against two independent sources) and at
+   least two trackers (`HODOS_HEADER_TRACKERS`; `min_agreeing` must not drop to one there), per
+   `development-docs/spv-mainnet/PLAN_spv_lite_mainnet.md`.
 2. **Scale.** ~971k headers: the in-memory chain (`HashMap<String, Entry>` with hex strings) is
    a few MB for 36k and roughly 200 MB at mainnet size; the per-header ancestor walk for the DAA
    is fine, the `side_branch_has_root` scan over every entry is not. Both need a pass before a
-   mainnet switch, not after.
+   mainnet switch, not after. Lite sidesteps this for the window (anchor + 147 is the minimum, a
+   few hundred headers at the tip is plenty); the figures stand for a later full-chain mode.
 
 Everything else in section 3 transfers as is.

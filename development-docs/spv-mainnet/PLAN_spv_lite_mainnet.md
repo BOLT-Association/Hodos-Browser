@@ -1,5 +1,20 @@
 # Mainnet spv-lite for PR #3 (`spv-testnet`)
 
+> **Status 2026-10-15 — enacted first on teratestnet, on branch `spv-lite` (from `spv-testnet`).**
+> Owner decisions that reshaped it: lite is **opt-in** (`HODOS_HEADERS=lite`, full stays the
+> default); the teratestnet window is anchored at the **existing 18000 checkpoint** (nothing new to
+> trust; a recent anchor is a one-line change once a hash is verified against two sources); and a
+> **a single tracker is allowed on test networks** (`min_agreeing` = two, or every source when
+> fewer; the wallet warns at startup), because the public testnet has one tracker. Steps 1–3 landed
+> network-agnostic (`Params::anchor` / `assume_valid_height`, the anchored sync with "unavailable",
+> `header_trackers.rs` (this plan's `header_quorum`, renamed at the owner's request) + `HeaderService::ensure_header` + the caller prefetches), step 4 as
+> `HODOS_HEADERS` / `HODOS_HEADER_TRACKERS`, step 5 as `run-wallet.ps1 -Headers lite`. **Still to do
+> for mainnet:** `Params::mainnet()` with its verified anchor and checkpoints, the WoC
+> `get_block_header` rebuild, the JungleBus hash-only confirmer, `HODOS_CHAIN_NETWORK=mainnet`,
+> `network_name()`, and trackers that insist on two. One addition the plan did not have: a header's
+> target may never be easier than the network's powLimit (`BadBits`), which is what keeps an
+> assume-valid header from being free.
+
 ## Context
 
 PR #3 gives the wallet an spv mode (Arcade + a header chain it verifies itself) on regtest and the
