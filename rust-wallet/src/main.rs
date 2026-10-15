@@ -890,8 +890,9 @@ async fn main() -> std::io::Result<()> {
     // Stored headers are re-validated on load (storage is a cache, not an authority).
     if services::providers::chaintracks::configured_base_url().is_some() {
         // validate_startup has already refused an unrecognised HODOS_CHAIN_NETWORK.
-        let params = chain_mode::header_params().expect("HODOS_CHAIN_NETWORK validated at startup");
+        let params = chain_mode::header_params().expect("HODOS_CHAIN_NETWORK and HODOS_HEADERS validated at startup");
         let network = params.name;
+        let (anchor_height, checkpoints) = (params.anchor.0, params.checkpoints);
         if let Some(hint) = chain_mode::regtest_hint() {
             log::warn!("⚠️  {}", hint);
         }
@@ -908,7 +909,31 @@ async fn main() -> std::io::Result<()> {
             "✅ Header chain ({}): {} stored header(s), tip {:?}, {} rejected on reload",
             network, chain.len(), chain.tip_height(), rejected
         );
-        header_sync::init(chain, None);
+        // spv-lite: heights below the window's anchor are answered by the configured trackers.
+        let trackers = if anchor_height > 0 {
+            let urls = chain_mode::tracker_urls().expect("HODOS_HEADER_TRACKERS validated at startup");
+            let client = reqwest::Client::builder()
+                .timeout(services::CallClass::IndexerAsync.timeout())
+                .build()
+                .unwrap_or_else(|_| reqwest::Client::new());
+            let sources: Vec<Arc<dyn header_trackers::TrackerSource>> = urls
+                .iter()
+                .map(|u| Arc::new(header_trackers::ChaintracksTracker::new(client.clone(), u)) as Arc<dyn header_trackers::TrackerSource>)
+                .collect();
+            let min = chain_mode::min_agreeing(sources.len());
+            if min < 2 {
+                log::warn!(
+                    "⚠️  Only one header tracker ({}): headers below the verified window (anchor {}) rest on it. Add a second chaintracks URL to {} when one exists",
+                    urls.join(", "), anchor_height, chain_mode::ENV_HEADER_TRACKERS
+                );
+            } else {
+                log::info!("✅ Header trackers: {} configured, {} must agree, for heights below {}", urls.len(), min, anchor_height);
+            }
+            Some(header_trackers::HeaderTrackers::new(sources, min, checkpoints))
+        } else {
+            None
+        };
+        header_sync::init(chain, trackers);
     }
 
     // Initialize fee rate cache (fetches from ARC /v1/policy)

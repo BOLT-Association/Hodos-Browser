@@ -77,10 +77,16 @@ pub fn parse(value: Option<&str>) -> Result<ChainMode, String> {
     }
 }
 
-/// `HODOS_HEADERS`: unset or `full` is full, `lite` is lite. Stub: always full.
+/// `HODOS_HEADERS`: unset or `full` is full, `lite` is lite; anything else refuses startup.
 pub fn parse_headers_mode(value: Option<&str>) -> Result<HeadersMode, String> {
-    let _ = value;
-    Ok(HeadersMode::Full)
+    match value.map(|v| v.trim().to_ascii_lowercase()).as_deref() {
+        None | Some("") | Some("full") => Ok(HeadersMode::Full),
+        Some("lite") => Ok(HeadersMode::Lite),
+        Some(other) => Err(format!(
+            "{} = '{}' is not recognised (expected 'full' or 'lite')",
+            ENV_HEADERS, other
+        )),
+    }
 }
 
 pub fn headers_mode() -> Result<HeadersMode, String> {
@@ -89,14 +95,18 @@ pub fn headers_mode() -> Result<HeadersMode, String> {
 
 /// Header-chain rules for `HODOS_CHAIN_NETWORK` at the given depth. Unset means `teratestnet`
 /// (the public Teranode testnet); the local regtest stack must ask for `regtest` explicitly.
-/// `lite` exists for teratestnet only: regtest has no pinned checkpoint to anchor at. Stub: the
-/// depth is ignored.
+/// `lite` exists for teratestnet only: regtest has no pinned checkpoint to anchor at.
 pub fn parse_network(value: Option<&str>, mode: HeadersMode) -> Result<crate::header_chain::Params, String> {
-    let _ = mode;
-    match value.map(|v| v.trim().to_ascii_lowercase()).as_deref() {
-        None | Some("") | Some("teratestnet") => Ok(crate::header_chain::Params::teratestnet()),
-        Some("regtest") => Ok(crate::header_chain::Params::regtest()),
-        Some(other) => Err(format!(
+    use crate::header_chain::Params;
+    match (value.map(|v| v.trim().to_ascii_lowercase()).as_deref(), mode) {
+        (None | Some("") | Some("teratestnet"), HeadersMode::Full) => Ok(Params::teratestnet()),
+        (None | Some("") | Some("teratestnet"), HeadersMode::Lite) => Ok(Params::teratestnet_lite()),
+        (Some("regtest"), HeadersMode::Full) => Ok(Params::regtest()),
+        (Some("regtest"), HeadersMode::Lite) => Err(format!(
+            "{}=lite is not available for regtest: there is no pinned checkpoint to anchor a window at (use {}=full)",
+            ENV_HEADERS, ENV_HEADERS
+        )),
+        (Some(other), _) => Err(format!(
             "{} = '{}' is not recognised (expected 'regtest' or 'teratestnet')",
             ENV_NETWORK, other
         )),
@@ -121,10 +131,25 @@ pub fn names_public_indexer(url: &str) -> bool {
 /// The header trackers' URLs, in order: `primary` (`HODOS_CHAINTRACKS_URL`), then each entry
 /// of `extra` (`HODOS_HEADER_TRACKERS`), trimmed, without trailing slashes, empties and duplicates
 /// dropped. A public-indexer host is refused: the list is for trackers, not for the indexers
-/// spv mode exists to avoid. Stub: the extras are ignored.
+/// spv mode exists to avoid.
 pub fn parse_tracker_urls(primary: &str, extra: Option<&str>) -> Result<Vec<String>, String> {
-    let _ = extra;
-    Ok(vec![primary.trim().trim_end_matches('/').to_string()])
+    let mut out: Vec<String> = Vec::new();
+    for raw in std::iter::once(primary).chain(extra.unwrap_or("").split(',')) {
+        let url = raw.trim().trim_end_matches('/');
+        if url.is_empty() {
+            continue;
+        }
+        if names_public_indexer(url) {
+            return Err(format!(
+                "{} entry {} points at a public indexer, which the header trackers do not include",
+                ENV_HEADER_TRACKERS, url
+            ));
+        }
+        if !out.iter().any(|u| u == url) {
+            out.push(url.to_string());
+        }
+    }
+    Ok(out)
 }
 
 /// The configured tracker URLs (spv mode; `HODOS_CHAINTRACKS_URL` must be set).
@@ -135,10 +160,9 @@ pub fn tracker_urls() -> Result<Vec<String>, String> {
 
 /// How many trackers must agree: two, or every configured source when fewer exist. A
 /// single tracker is allowed because the test networks, the only networks spv mode has, have one
-/// public tracker; a mainnet `Params` must insist on two. Never zero. Stub: always two.
+/// public tracker; a mainnet `Params` must insist on two. Never zero.
 pub fn min_agreeing(sources: usize) -> usize {
-    let _ = sources;
-    2
+    sources.clamp(1, 2)
 }
 
 /// The BRC-100 `getNetwork` answer: `mainnet` in public mode, `testnet` in spv mode (both
@@ -182,8 +206,12 @@ fn non_empty_env(name: &str) -> bool {
 /// Check the configuration at startup. `Err` means the wallet must not start.
 pub fn validate_startup() -> Result<ChainMode, String> {
     let mode = parse(std::env::var(ENV_MODE).ok().as_deref())?;
-    header_params()?;
+    let params = header_params()?;
     if mode == ChainMode::Spv {
+        // A lite chain needs its header trackers; refuse a public indexer in the list up front.
+        if params.anchor.0 > 0 {
+            tracker_urls()?;
+        }
         let missing: Vec<&str> = [ENV_ARCADE, ENV_CHAINTRACKS]
             .into_iter()
             .filter(|n| !non_empty_env(n))
