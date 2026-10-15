@@ -160,8 +160,9 @@ pub fn tracker_urls() -> Result<Vec<String>, String> {
 
 /// How many trackers must agree: two, or every configured source when fewer exist. A
 /// single tracker is allowed because the test networks, the only networks spv mode has, have one
-/// public tracker; a mainnet `Params` must insist on two. Never zero.
-pub fn min_agreeing(sources: usize) -> usize {
+/// public tracker; a mainnet `Params` must insist on two. Never zero. Stub: ignores the network.
+pub fn min_agreeing(params: &crate::header_chain::Params, sources: usize) -> usize {
+    let _ = params;
     sources.clamp(1, 2)
 }
 
@@ -403,7 +404,13 @@ mod tests {
         assert_eq!(parse_network(Some(""), HeadersMode::Full).unwrap().name, "teratestnet");
         assert_eq!(parse_network(Some(" TeraTestNet "), HeadersMode::Full).unwrap().name, "teratestnet");
         assert_eq!(parse_network(Some("regtest"), HeadersMode::Full).unwrap().name, "regtest");
-        assert!(parse_network(Some("mainnet"), HeadersMode::Full).is_err());
+        // mainnet: lite only, anchored at the newest pinned checkpoint; full is refused, not deferred.
+        let main = parse_network(Some("mainnet"), HeadersMode::Lite).unwrap();
+        assert_eq!((main.name, main.anchor.0, main.is_mainnet), ("mainnet-lite", 945_000, true));
+        let e = parse_network(Some("mainnet"), HeadersMode::Full).unwrap_err();
+        assert!(e.contains(ENV_HEADERS) && e.contains("lite"), "{}", e);
+        let e = parse_network(Some("testnet3"), HeadersMode::Full).unwrap_err();
+        assert!(e.contains(ENV_NETWORK) && e.contains("mainnet"), "the unknown-value message names every network: {}", e);
         // lite: a window from the 18000 checkpoint on teratestnet; regtest has nothing to anchor at.
         let lite = parse_network(None, HeadersMode::Lite).unwrap();
         assert_eq!((lite.name, lite.anchor.0), ("teratestnet-lite", 18000));
@@ -472,11 +479,45 @@ mod tests {
     }
 
     #[test]
-    fn min_agreeing_is_two_or_every_source_when_fewer() {
-        assert_eq!(min_agreeing(0), 1);
-        assert_eq!(min_agreeing(1), 1);
-        assert_eq!(min_agreeing(2), 2);
-        assert_eq!(min_agreeing(5), 2);
+    fn min_agreeing_is_two_or_every_source_when_fewer_and_always_two_on_mainnet() {
+        use crate::header_chain::Params;
+        let ttn = Params::teratestnet_lite();
+        assert_eq!(min_agreeing(&ttn, 0), 1);
+        assert_eq!(min_agreeing(&ttn, 1), 1);
+        assert_eq!(min_agreeing(&ttn, 2), 2);
+        assert_eq!(min_agreeing(&ttn, 5), 2);
+        let main = Params::mainnet_lite();
+        for n in [0, 1, 2, 5] {
+            assert_eq!(min_agreeing(&main, n), 2, "mainnet never rests on one tracker ({} configured)", n);
+        }
+    }
+
+    #[test]
+    fn mainnet_needs_lite_headers_and_a_chaintracks_that_is_not_on_this_machine() {
+        with_env(Some("spv"), Some("https://arcade.example"), Some("https://arcade.example/chaintracks/v2"), || {
+            with_vars(&[(ENV_HEADERS, None), (ENV_NETWORK, Some("mainnet"))], || {
+                let e = validate_startup().unwrap_err();
+                assert!(e.contains(ENV_HEADERS) && e.contains("lite"), "full is refused on mainnet: {}", e);
+            });
+            with_vars(&[(ENV_HEADERS, Some("lite")), (ENV_NETWORK, Some("mainnet")), (ENV_HEADER_TRACKERS, None)], || {
+                assert_eq!(validate_startup(), Ok(ChainMode::Spv));
+                assert_eq!(header_params().unwrap().name, "mainnet-lite");
+                assert_eq!(
+                    tracker_urls().unwrap(),
+                    vec!["https://arcade.example/chaintracks/v2"],
+                    "WhatsOnChain is added by main.rs on mainnet, never through the list"
+                );
+            });
+        });
+        with_env(Some("spv"), Some("http://localhost:8080"), Some("http://localhost:8083/chaintracks/v2"), || {
+            with_vars(&[(ENV_HEADERS, Some("lite")), (ENV_NETWORK, Some("mainnet"))], || {
+                let e = validate_startup().unwrap_err();
+                assert!(e.contains("localhost") && e.contains("regtest"), "the regtest trap, inverted: {}", e);
+            });
+            with_vars(&[(ENV_HEADERS, Some("lite")), (ENV_NETWORK, None)], || {
+                assert_eq!(validate_startup(), Ok(ChainMode::Spv), "a local stack on a test network is the normal harness");
+            });
+        });
     }
 
     #[test]
@@ -500,7 +541,7 @@ mod tests {
     fn unknown_network_refuses_startup() {
         let _g = ENV_LOCK.lock().unwrap_or_else(|e| e.into_inner());
         let old = std::env::var(ENV_NETWORK).ok();
-        std::env::set_var(ENV_NETWORK, "mainnet");
+        std::env::set_var(ENV_NETWORK, "testnet3");
         let r = validate_startup();
         match old {
             Some(v) => std::env::set_var(ENV_NETWORK, v),
@@ -525,6 +566,12 @@ mod tests {
         });
         with_env(Some("spv"), Some("https://arcade.example"), Some("https://arcade.example/chaintracks/v2"), || {
             assert!(regtest_hint().is_none(), "remote chaintracks: no hint");
+            with_vars(&[(ENV_HEADERS, Some("lite")), (ENV_NETWORK, Some("mainnet"))], || {
+                assert_eq!(network_name(), "mainnet", "real coins: a dApp must be told so");
+            });
+            with_vars(&[(ENV_HEADERS, Some("lite")), (ENV_NETWORK, None)], || {
+                assert_eq!(network_name(), "testnet", "lite on teratestnet is still a test network");
+            });
         });
     }
 

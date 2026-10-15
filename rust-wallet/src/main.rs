@@ -893,6 +893,7 @@ async fn main() -> std::io::Result<()> {
         let params = chain_mode::header_params().expect("HODOS_CHAIN_NETWORK and HODOS_HEADERS validated at startup");
         let network = params.name;
         let (anchor_height, checkpoints) = (params.anchor.0, params.checkpoints);
+        let tracker_params = params.clone();
         if let Some(hint) = chain_mode::regtest_hint() {
             log::warn!("⚠️  {}", hint);
         }
@@ -920,7 +921,7 @@ async fn main() -> std::io::Result<()> {
                 .iter()
                 .map(|u| Arc::new(header_trackers::ChaintracksTracker::new(client.clone(), u)) as Arc<dyn header_trackers::TrackerSource>)
                 .collect();
-            let min = chain_mode::min_agreeing(sources.len());
+            let min = chain_mode::min_agreeing(&tracker_params, sources.len());
             if min < 2 {
                 log::warn!(
                     "⚠️  Only one header tracker ({}): headers below the verified window (anchor {}) rest on it. Add a second chaintracks URL to {} when one exists",
