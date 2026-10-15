@@ -11,7 +11,7 @@
 > `HODOS_HEADERS` / `HODOS_HEADER_TRACKERS`, step 5 as `run-wallet.ps1 -Headers lite`. **Still to do
 > for mainnet:** `Params::mainnet()` with its verified anchor and checkpoints, the WoC
 > `get_block_header` rebuild, the JungleBus hash-only confirmer, `HODOS_CHAIN_NETWORK=mainnet`,
-> `network_name()`, and trackers that insist on two. One addition the plan did not have: a header's
+> `network_name()`, and trackers that insist on two — planned in `PLAN_spv_mainnet.md`. One addition the plan did not have: a header's
 > target may never be easier than the network's powLimit (`BadBits`), which is what keeps an
 > assume-valid header from being free.
 
