@@ -4,7 +4,10 @@
 //!
 //! Sync walks back from the shorter of (our tip, server tip) until it finds a height
 //! where both sides agree, then adds forward from there. A server that reorged shows
-//! up as `AddOutcome::Reorg`; one that lies fails `add_header` validation.
+//! up as `AddOutcome::Reorg`; one that lies fails `add_header` validation. The walk never
+//! goes below the chain's anchor (a lite chain's pinned checkpoint), and a source whose tip
+//! is below the anchor or more than `MAX_WALK_BACK` behind ours is *unavailable*: an error
+//! that leaves the chain untouched, never a reorg and never a silent "synced".
 
 use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 use std::sync::{Arc, Mutex, OnceLock};
@@ -109,11 +112,30 @@ async fn sync_into(
     persist: &mut (dyn FnMut(&Entry) + Send),
     report: &mut SyncReport,
 ) -> Result<(), String> {
+    let (anchor_height, local_tip) = {
+        let c = chain.lock().unwrap();
+        (c.params().anchor.0, c.tip_height())
+    };
     let server_tip = source.tip_height().await?;
 
-    // Find the highest height where our active chain and the source agree.
-    let local_tip = chain.lock().unwrap().tip_height();
-    let mut start: u32 = 0;
+    // A source that cannot serve our window is unavailable, never a reorg. A public chaintracks
+    // that reset and is re-bootstrapping from genesis still answers for the low heights it has,
+    // which the walk-back would read as agreement and report as a successful sync.
+    if server_tip < anchor_height {
+        return Err(format!("source unavailable: its tip {} is below our anchor {}", server_tip, anchor_height));
+    }
+    if let Some(lt) = local_tip {
+        if server_tip.saturating_add(MAX_WALK_BACK) < lt {
+            return Err(format!(
+                "source unavailable: its tip {} is more than {} behind ours ({})",
+                server_tip, MAX_WALK_BACK, lt
+            ));
+        }
+    }
+
+    // Find the highest height where our active chain and the source agree. The anchor is
+    // pinned: a source that differs there is on another chain, and nothing below it is asked for.
+    let mut start: u32 = anchor_height;
     if let Some(lt) = local_tip {
         let mut h = lt.min(server_tip);
         let mut walked = 0;
@@ -126,8 +148,8 @@ async fn sync_into(
                 start = h + 1;
                 break;
             }
-            if h == 0 {
-                return Err("source genesis differs from ours".to_string());
+            if h == anchor_height {
+                return Err(format!("source anchor at height {} differs from ours", anchor_height));
             }
             walked += 1;
             if walked > MAX_WALK_BACK {
