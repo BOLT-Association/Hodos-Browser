@@ -305,21 +305,33 @@ mod tests {
     struct Fake {
         by_height: Mutex<HashMap<u32, String>>,
         tip: Mutex<u32>,
+        /// Every height asked for, in order.
+        asked: Mutex<Vec<u32>>,
     }
 
     impl Fake {
         fn from_chain(headers: &[Header]) -> Fake {
-            let f = Fake { by_height: Mutex::new(HashMap::new()), tip: Mutex::new(0) };
-            f.set(headers);
+            Fake::from_chain_at(0, headers)
+        }
+        /// Serves `headers` at heights `start..`.
+        fn from_chain_at(start: u32, headers: &[Header]) -> Fake {
+            let f = Fake { by_height: Mutex::new(HashMap::new()), tip: Mutex::new(0), asked: Mutex::new(Vec::new()) };
+            f.set_at(start, headers);
             f
         }
         fn set(&self, headers: &[Header]) {
+            self.set_at(0, headers)
+        }
+        fn set_at(&self, start: u32, headers: &[Header]) {
             let mut m = self.by_height.lock().unwrap();
             m.clear();
             for (i, h) in headers.iter().enumerate() {
-                m.insert(i as u32, h.to_hex());
+                m.insert(start + i as u32, h.to_hex());
             }
-            *self.tip.lock().unwrap() = headers.len() as u32 - 1;
+            *self.tip.lock().unwrap() = start + headers.len() as u32 - 1;
+        }
+        fn lowest_asked(&self) -> Option<u32> {
+            self.asked.lock().unwrap().iter().copied().min()
         }
     }
 
@@ -329,6 +341,7 @@ mod tests {
             Ok(*self.tip.lock().unwrap())
         }
         async fn header_hex_at(&self, h: u32) -> Result<String, String> {
+            self.asked.lock().unwrap().push(h);
             self.by_height.lock().unwrap().get(&h).cloned().ok_or(format!("no header {}", h))
         }
     }
@@ -507,6 +520,92 @@ mod tests {
         let server = Fake::from_chain(&chain_of(&other, 2, 100));
         let chain = empty_with_genesis_of(&g);
         assert!(sync_once(&chain, &server, NOW, &mut |_| {}).await.is_err());
+    }
+
+    // -----------------------------------------------------------------------
+    // Lite chains: the sync starts at the anchor, never asks the source below it, and treats a
+    // source that cannot serve the window (tip below the anchor, or far behind ours after a
+    // reset) as unavailable rather than as a reorg or a silent no-op.
+    // -----------------------------------------------------------------------
+
+    /// Empty chain anchored at height `h` with `g` as its anchor header (fixed difficulty).
+    fn empty_anchored_at(h: u32, g: &Header) -> Mutex<HeaderChain> {
+        let params = Params {
+            name: "lite-test",
+            difficulty: crate::header_chain::Difficulty::Fixed(0x207f_ffff),
+            anchor: (h, Box::leak(g.hash_hex().into_boxed_str())),
+            assume_valid_height: 0,
+            checkpoints: &[],
+        };
+        Mutex::new(HeaderChain::new(params))
+    }
+
+    #[tokio::test]
+    async fn a_lite_chain_syncs_from_its_anchor_and_never_asks_below_it() {
+        let (_, g) = fixture();
+        let server = Fake::from_chain_at(100, &chain_of(&g, 10, 300)); // serves 100..=110
+        let chain = empty_anchored_at(100, &g);
+        let mut persisted = Vec::new();
+        let r = sync_once(&chain, &server, NOW, &mut |e| persisted.push(e.height)).await.unwrap();
+        assert_eq!((r.added, r.tip_height), (11, Some(110)));
+        assert_eq!(persisted, (100..=110).collect::<Vec<_>>());
+        assert!(server.lowest_asked().unwrap_or(u32::MAX) >= 100, "asked {:?}", server.lowest_asked());
+        let r2 = sync_once(&chain, &server, NOW, &mut |_| panic!("nothing new")).await.unwrap();
+        assert_eq!(r2.added, 0);
+        assert!(server.lowest_asked().unwrap() >= 100);
+    }
+
+    #[tokio::test]
+    async fn a_source_whose_tip_is_below_our_anchor_is_unavailable() {
+        let (_, g) = fixture();
+        let server = Fake::from_chain(&chain_of(&g, 50, 300)); // tip 50
+        let chain = empty_anchored_at(100, &g);
+        let (report, result) = sync_once_reporting(&chain, &server, NOW, &mut |_| panic!("nothing stored")).await;
+        let e = result.unwrap_err();
+        assert!(e.contains("unavailable"), "{}", e);
+        assert!(report.reorgs.is_empty());
+        assert_eq!(chain.lock().unwrap().tip_height(), None, "chain untouched");
+    }
+
+    #[tokio::test]
+    async fn a_source_far_behind_ours_is_unavailable_not_a_silent_no_op() {
+        // The public chaintracks reset case: a server that restarted from genesis still answers
+        // for the low heights it has, so the old walk-back found agreement and reported success.
+        let (_, g) = fixture();
+        let headers = chain_of(&g, 10_200, 2_000);
+        let chain = empty_with_genesis_of(&g);
+        sync_once(&chain, &Fake::from_chain(&headers), NOW, &mut |_| {}).await.unwrap();
+        assert_eq!(chain.lock().unwrap().tip_height(), Some(10_200));
+
+        let reset = Fake::from_chain(&headers[..=100]); // tip 100, more than MAX_WALK_BACK behind
+        let (report, result) = sync_once_reporting(&chain, &reset, NOW, &mut |_| panic!("nothing stored")).await;
+        let e = result.unwrap_err();
+        assert!(e.contains("unavailable"), "{}", e);
+        assert!(report.reorgs.is_empty());
+        assert_eq!(chain.lock().unwrap().tip_height(), Some(10_200), "chain untouched");
+
+        // Merely behind (within the bound) is still fine: nothing to add, no error.
+        let behind = Fake::from_chain(&headers[..=9_000]);
+        let r = sync_once(&chain, &behind, NOW, &mut |_| panic!("nothing stored")).await.unwrap();
+        assert_eq!((r.added, r.tip_height), (0, Some(10_200)));
+    }
+
+    #[tokio::test]
+    async fn a_walk_back_that_reaches_the_anchor_without_agreement_is_an_error_not_a_reorg() {
+        let (_, g) = fixture();
+        let chain = empty_anchored_at(100, &g);
+        sync_once(&chain, &Fake::from_chain_at(100, &chain_of(&g, 3, 300)), NOW, &mut |_| {}).await.unwrap();
+        assert_eq!(chain.lock().unwrap().tip_height(), Some(103));
+
+        // Another chain that also starts at height 100, from a different anchor.
+        let other = mine([0; 32], 78, 0x207f_ffff);
+        let server = Fake::from_chain_at(100, &chain_of(&other, 4, 500)); // tip 104
+        let (report, result) = sync_once_reporting(&chain, &server, NOW, &mut |_| panic!("nothing stored")).await;
+        let e = result.unwrap_err();
+        assert!(e.contains("anchor"), "{}", e);
+        assert!(report.reorgs.is_empty());
+        assert!(server.lowest_asked().unwrap() >= 100, "never asked below the anchor: {:?}", server.lowest_asked());
+        assert_eq!(chain.lock().unwrap().tip_height(), Some(103), "chain untouched");
     }
 
     /// Live: sync the real spv-testnet chain from genesis with the real regtest rules.
