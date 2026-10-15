@@ -8,12 +8,17 @@
 //! Enforced per header: 80-byte layout, proof-of-work (`hash <= target(bits)`),
 //! `bits` equal to what the network's difficulty rule requires, parent known,
 //! `height = parent + 1`, timestamp no more than 2 h in the future, and the pinned hash at
-//! every checkpoint height. The first header must be the pinned genesis.
+//! every checkpoint height. The first header must be the pinned **anchor**: the genesis for a
+//! full chain, or a pinned checkpoint for a **lite** chain that verifies only a window at the tip.
+//! Below a lite chain's `assume_valid_height` the difficulty rule cannot be computed (its window
+//! lies below the anchor) and is not checked; proof-of-work on the header's own bits, bounded by
+//! the network's powLimit, linkage, time and checkpoints still are.
 //!
 //! Networks: **regtest** (fixed difficulty) and **teratestnet** (cw-144 DAA plus the testnet
 //! 20-minute minimum-difficulty rule, ported from Teranode `services/blockchain/Difficulty.go`
-//! and `go-chaincfg` `TeraTestNetParams`). `Params` has no mainnet constructor on purpose so
-//! nothing can silently run under a mainnet name. Median-time-past is not enforced yet.
+//! and `go-chaincfg` `TeraTestNetParams`), full from the genesis or lite from the 18000
+//! checkpoint. `Params` has no mainnet constructor on purpose so nothing can silently run under
+//! a mainnet name. Median-time-past is not enforced yet.
 
 use std::collections::HashMap;
 
@@ -354,8 +359,11 @@ impl Params {
         }
     }
 
-    /// Teranode test network, lite: a verified window from the pinned checkpoint at 18000 to the
-    /// tip. Stub: the anchor is not applied yet.
+    /// Teranode test network, **lite**: a verified window from the pinned checkpoint at 18000
+    /// (`go-chaincfg` `TeraTestNetParams`, confirmed by a full live sync on 2026-10-14) to the
+    /// tip. Heights below the anchor are not this chain's to answer. The full difficulty rule
+    /// resumes at anchor + 147, the first height whose DAA window (median-of-3 at `parent` and at
+    /// `parent - 144`) lies inside the chain; below it PoW is still enforced.
     pub fn teratestnet_lite() -> Params {
         Params {
             name: "teratestnet-lite",
@@ -431,8 +439,18 @@ impl HeaderChain {
         self.entries.len()
     }
 
+    /// Index of `height` in `active` (the anchor is index 0); `None` below the anchor.
+    fn idx(&self, height: u32) -> Option<usize> {
+        height.checked_sub(self.params.anchor.0).map(|i| i as usize)
+    }
+
+    /// Hash of the active header at `height`, if the chain has one.
+    fn active_at(&self, height: u32) -> Option<&String> {
+        self.idx(height).and_then(|i| self.active.get(i))
+    }
+
     pub fn header_at_height(&self, height: u32) -> Option<&Entry> {
-        self.active.get(height as usize).and_then(|h| self.entries.get(h))
+        self.active_at(height).and_then(|h| self.entries.get(h))
     }
 
     pub fn get(&self, hash: &str) -> Option<&Entry> {
@@ -442,7 +460,7 @@ impl HeaderChain {
     pub fn is_active(&self, hash: &str) -> bool {
         self.entries
             .get(hash)
-            .map(|e| self.active.get(e.height as usize).map(|h| h == hash).unwrap_or(false))
+            .map(|e| self.active_at(e.height).map(|h| h == hash).unwrap_or(false))
             .unwrap_or(false)
     }
 
@@ -474,7 +492,7 @@ impl HeaderChain {
                 }
             }
             if cur.height == height
-                && self.active.get(height as usize).map(|h| h != &cur.hash).unwrap_or(true)
+                && self.active_at(height).map(|h| h != &cur.hash).unwrap_or(true)
                 && cur.header.merkle_root_hex().eq_ignore_ascii_case(merkle_root_hex)
             {
                 return true;
@@ -489,27 +507,40 @@ impl HeaderChain {
             return Ok(AddOutcome::Known);
         }
 
-        // Linkage first: the difficulty rule is a function of the parent's ancestry. The genesis
-        // has no parent; it is accepted only as the pinned header.
+        // Linkage first: the difficulty rule is a function of the parent's ancestry. The anchor
+        // (the genesis, or a lite chain's pinned checkpoint) has no parent here; it is accepted
+        // only as the pinned header, at its pinned height.
         let (height, parent_work) = if self.entries.is_empty() {
             if hash != self.params.anchor.1 {
                 return Err(HeaderError::NotAnchor(hash));
             }
-            (0, U256::ZERO)
+            (self.params.anchor.0, U256::ZERO)
         } else {
             let prev = display_hex(&header.prev_hash);
             let Some(p) = self.entries.get(&prev) else {
                 return Err(HeaderError::UnknownParent(prev));
             };
-            let want = self.required_bits(p, header.time)?;
-            if header.bits != want {
-                return Err(HeaderError::WrongDifficulty { got: header.bits, want });
+            let height = p.height + 1;
+            // Below `assume_valid_height` the rule's window would reach below the anchor, so the
+            // header's own bits stand: bounded by powLimit and proven by its hash, below.
+            if height >= self.params.assume_valid_height {
+                let want = self.required_bits(p, header.time)?;
+                if header.bits != want {
+                    return Err(HeaderError::WrongDifficulty { got: header.bits, want });
+                }
             }
-            (p.height + 1, p.chainwork)
+            (height, p.chainwork)
         };
 
-        // Proof-of-work.
+        // Proof-of-work. A target easier than the network's powLimit is not a target at all
+        // (Bitcoin Core `CheckProofOfWork`); on a lite chain this is what bounds how cheap a
+        // header below `assume_valid_height` can be.
         let target = compact_to_target(header.bits)?;
+        if let Difficulty::Daa { pow_limit_bits, .. } = self.params.difficulty {
+            if target > compact_to_target(pow_limit_bits)? {
+                return Err(HeaderError::BadBits(header.bits));
+            }
+        }
         let mut h = header.hash();
         h.reverse(); // to big-endian for numeric comparison
         if U256::from_be_bytes(h) > target {
@@ -622,23 +653,23 @@ impl HeaderChain {
 
     fn reorg_to(&mut self, new_tip: &str) -> AddOutcome {
         let old_tip = self.active.last().cloned().unwrap_or_default();
-        let old_height = self.active.len() as u32 - 1;
+        let old_height = self.params.anchor.0 + self.active.len() as u32 - 1;
         // Walk the new branch back until it meets the active chain.
         let mut branch: Vec<String> = Vec::new();
         let mut cur = new_tip.to_string();
         loop {
             let e = &self.entries[&cur];
-            if self.active.get(e.height as usize).map(|h| h == &cur).unwrap_or(false) {
+            if self.active_at(e.height).map(|h| h == &cur).unwrap_or(false) {
                 break;
             }
             branch.push(cur.clone());
-            if e.height == 0 {
+            if e.height == self.params.anchor.0 {
                 break;
             }
             cur = display_hex(&e.header.prev_hash);
         }
         let fork_height = self.entries[&cur].height;
-        self.active.truncate(fork_height as usize + 1);
+        self.active.truncate(self.idx(fork_height).unwrap_or(0) + 1);
         branch.reverse();
         self.active.extend(branch);
         AddOutcome::Reorg {

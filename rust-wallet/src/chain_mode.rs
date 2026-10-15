@@ -90,7 +90,7 @@ pub fn network_name() -> &'static str {
 
 /// A hint for the regtest trap: spv mode, no `HODOS_CHAIN_NETWORK`, and chaintracks on this
 /// machine. The default (`teratestnet`) then rejects every header of the local stack as
-/// `NotGenesis`, which is loud in the log but never fatal, so say what to set.
+/// `NotAnchor`, which is loud in the log but never fatal, so say what to set.
 pub fn regtest_hint() -> Option<String> {
     if !is_spv() || non_empty_env(ENV_NETWORK) {
         return None;
