@@ -21,7 +21,7 @@ use std::sync::{Arc, Mutex};
 use async_trait::async_trait;
 
 use crate::header_chain::Header;
-use crate::services::providers::{ChaintracksProvider, WhatsOnChainProvider};
+use crate::services::providers::{ChaintracksProvider, JungleBusProvider, WhatsOnChainProvider};
 use crate::services::{BlockHeader, BlockKey, IndexerError, IndexerProvider};
 
 /// Sources asked at once for one height. Chaintracks is cheap; a rate-limited public source
@@ -44,6 +44,8 @@ pub enum AgreementError {
     InsufficientAnswers { height: u32, usable: usize, need: usize },
     /// Usable answers name different headers.
     Disagree { height: u32, hashes: Vec<String> },
+    /// A confirmer places the agreed header's hash at another height, or does not know it.
+    Unconfirmed { height: u32, hash: String, confirmer: String, found: Option<u32> },
 }
 
 impl std::fmt::Display for AgreementError {
@@ -55,6 +57,13 @@ impl std::fmt::Display for AgreementError {
             AgreementError::Disagree { height, hashes } => {
                 write!(f, "header trackers at height {}: sources disagree ({})", height, hashes.join(", "))
             }
+            AgreementError::Unconfirmed { height, hash, confirmer, found } => {
+                write!(f, "header trackers at height {}: {} does not place {} at this height (", height, confirmer, hash)?;
+                match found {
+                    Some(h) => write!(f, "it has it at {})", h),
+                    None => write!(f, "it does not know the hash)"),
+                }
+            }
         }
     }
 }
@@ -65,6 +74,25 @@ pub trait TrackerSource: Send + Sync {
     fn name(&self) -> &str;
     /// `Ok(None)` = the source does not have this height (it abstains).
     async fn header_at(&self, height: u32) -> Result<Option<Answer>, String>;
+}
+
+/// A source asked to confirm that a block hash sits at a height, rather than for the header:
+/// JungleBus serves a block by hash only. Consulted after the trackers agree; see `confirm`.
+#[async_trait]
+pub trait HashConfirmer: Send + Sync {
+    fn name(&self) -> &str;
+    /// The height the confirmer has this block hash at. `Ok(None)` = it does not know the hash.
+    async fn height_of(&self, block_hash: &str) -> Result<Option<u32>, String>;
+}
+
+/// Judge the confirmers' verdicts on the header the trackers agreed at `height`. Pure. A
+/// confirmer that places the hash at this height confirms; one that places it elsewhere or does
+/// not know it contradicts (the trackers serve only heights far below the tip, so "not indexed
+/// yet" is not a reading); one that failed abstains, with a warning. No confirmers = confirmed.
+/// Stub: never confirms.
+pub fn confirm(height: u32, hash: &str, verdicts: &[(String, Result<Option<u32>, String>)]) -> Result<(), AgreementError> {
+    let _ = verdicts;
+    Err(AgreementError::Unconfirmed { height, hash: hash.to_string(), confirmer: "stub".into(), found: None })
 }
 
 /// Decide one height from the answers that came back. Pure. An answer is usable when its bytes
@@ -112,6 +140,7 @@ pub fn decide(height: u32, answers: &[Answer], checkpoint: Option<&str>, min_agr
 
 pub struct HeaderTrackers {
     sources: Vec<Arc<dyn TrackerSource>>,
+    confirmers: Vec<Arc<dyn HashConfirmer>>,
     min_agreeing: usize,
     checkpoints: &'static [(u32, &'static str)],
     cache: Mutex<HashMap<u32, Header>>,
@@ -119,11 +148,27 @@ pub struct HeaderTrackers {
 
 impl HeaderTrackers {
     pub fn new(sources: Vec<Arc<dyn TrackerSource>>, min_agreeing: usize, checkpoints: &'static [(u32, &'static str)]) -> Self {
-        HeaderTrackers { sources, min_agreeing: min_agreeing.max(1), checkpoints, cache: Mutex::new(HashMap::new()) }
+        HeaderTrackers {
+            sources,
+            confirmers: Vec::new(),
+            min_agreeing: min_agreeing.max(1),
+            checkpoints,
+            cache: Mutex::new(HashMap::new()),
+        }
+    }
+
+    /// Confirmers asked, after the trackers agree, whether the hash sits at the height.
+    pub fn with_confirmers(mut self, confirmers: Vec<Arc<dyn HashConfirmer>>) -> Self {
+        self.confirmers = confirmers;
+        self
     }
 
     pub fn source_names(&self) -> Vec<String> {
         self.sources.iter().map(|s| s.name().to_string()).collect()
+    }
+
+    pub fn confirmer_names(&self) -> Vec<String> {
+        self.confirmers.iter().map(|c| c.name().to_string()).collect()
     }
 
     pub fn min_agreeing(&self) -> usize {
@@ -245,6 +290,38 @@ impl TrackerSource for ChaintracksTracker {
     }
 }
 
+/// What a by-hash `get_block_header` result means to a confirmer: the height it reports is its
+/// verdict, a 404 is "does not know the hash", anything else is a failure to report. Stub: never
+/// answers.
+fn height_from(result: Result<BlockHeader, IndexerError>) -> Result<Option<u32>, String> {
+    let _ = result;
+    Err("stub".to_string())
+}
+
+/// JungleBus as a confirmer (mainnet only: the provider's base URL is the mainnet API). It serves
+/// a block by hash, without the parent hash, so it cannot be a tracker; it can say at which
+/// height it has the hash the trackers agreed on.
+pub struct JungleBusConfirmer {
+    provider: JungleBusProvider,
+}
+
+impl JungleBusConfirmer {
+    pub fn new(client: reqwest::Client) -> Self {
+        JungleBusConfirmer { provider: JungleBusProvider::new(client) }
+    }
+}
+
+#[async_trait]
+impl HashConfirmer for JungleBusConfirmer {
+    fn name(&self) -> &str {
+        "junglebus"
+    }
+
+    async fn height_of(&self, block_hash: &str) -> Result<Option<u32>, String> {
+        height_from(self.provider.get_block_header(BlockKey::Hash(block_hash.to_string())).await)
+    }
+}
+
 #[cfg(test)]
 pub(crate) mod tests {
     use super::*;
@@ -307,6 +384,44 @@ pub(crate) mod tests {
                 return Err(e.clone());
             }
             Ok(self.headers.get(&height).map(|h| answer(&self.name, h)))
+        }
+    }
+
+    /// A confirmer that knows some hashes' heights, or fails.
+    pub(crate) struct FakeConfirmer {
+        name: String,
+        heights: HashMap<String, u32>,
+        fail: Option<String>,
+        pub calls: AtomicUsize,
+    }
+
+    impl FakeConfirmer {
+        pub(crate) fn knowing(name: &str, at: &[(&str, u32)]) -> Self {
+            FakeConfirmer {
+                name: name.to_string(),
+                heights: at.iter().map(|(h, n)| (h.to_string(), *n)).collect(),
+                fail: None,
+                calls: AtomicUsize::new(0),
+            }
+        }
+        pub(crate) fn failing(name: &str, err: &str) -> Self {
+            let mut c = FakeConfirmer::knowing(name, &[]);
+            c.fail = Some(err.to_string());
+            c
+        }
+    }
+
+    #[async_trait]
+    impl HashConfirmer for FakeConfirmer {
+        fn name(&self) -> &str {
+            &self.name
+        }
+        async fn height_of(&self, block_hash: &str) -> Result<Option<u32>, String> {
+            self.calls.fetch_add(1, Ordering::SeqCst);
+            if let Some(e) = &self.fail {
+                return Err(e.clone());
+            }
+            Ok(self.heights.get(block_hash).copied())
         }
     }
 
@@ -491,5 +606,80 @@ pub(crate) mod tests {
         assert_eq!(src.header_at(6).await, Ok(None), "404 is an abstention");
         let down = ChaintracksTracker::new(reqwest::Client::new(), "http://127.0.0.1:1");
         assert!(down.header_at(5).await.is_err(), "a refused connection is a failure, not an abstention");
+    }
+
+    #[test]
+    fn confirm_is_pure_over_the_confirmers_verdicts() {
+        let hash = hdr(1).hash_hex();
+        let v = |name: &str, r: Result<Option<u32>, &str>| (name.to_string(), r.map_err(String::from));
+        assert_eq!(confirm(5, &hash, &[]), Ok(()), "no confirmers configured");
+        assert_eq!(confirm(5, &hash, &[v("j", Ok(Some(5)))]), Ok(()));
+        assert_eq!(
+            confirm(5, &hash, &[v("j", Ok(Some(6)))]),
+            Err(AgreementError::Unconfirmed { height: 5, hash: hash.clone(), confirmer: "j".into(), found: Some(6) })
+        );
+        assert_eq!(
+            confirm(5, &hash, &[v("j", Ok(None))]),
+            Err(AgreementError::Unconfirmed { height: 5, hash: hash.clone(), confirmer: "j".into(), found: None }),
+            "a hash the confirmer does not know is a contradiction, not an abstention"
+        );
+        assert_eq!(confirm(5, &hash, &[v("j", Err("down"))]), Ok(()), "a failed confirmer abstains");
+        assert!(confirm(5, &hash, &[v("j", Ok(Some(5))), v("k", Ok(Some(4)))]).is_err(), "one contradiction is enough");
+        let shown = confirm(5, &hash, &[v("j", Ok(Some(6)))]).unwrap_err().to_string();
+        assert!(shown.contains("j does not place") && shown.contains("at 6"), "{}", shown);
+    }
+
+    #[tokio::test]
+    async fn the_confirmer_is_asked_about_the_agreed_hash_and_a_contradiction_caches_nothing() {
+        let h = hdr(1);
+        let a = Arc::new(FakeSource::new("a", &[(5, h.clone())]));
+        let b = Arc::new(FakeSource::new("b", &[(5, h.clone())]));
+        let trackers = || HeaderTrackers::new(vec![a.clone(), b.clone()], 2, &[]);
+
+        let yes = Arc::new(FakeConfirmer::knowing("yes", &[(&h.hash_hex(), 5)]));
+        let q = trackers().with_confirmers(vec![yes.clone()]);
+        assert_eq!(q.confirmer_names(), vec!["yes".to_string()]);
+        assert_eq!(q.header_at(5).await, Ok(h.clone()));
+        assert_eq!(q.cached(5), Some(h.clone()));
+        assert_eq!(yes.calls.load(Ordering::SeqCst), 1);
+        assert_eq!(q.header_at(5).await, Ok(h.clone()));
+        assert_eq!(yes.calls.load(Ordering::SeqCst), 1, "a cached header is not re-confirmed");
+
+        let elsewhere = Arc::new(FakeConfirmer::knowing("elsewhere", &[(&h.hash_hex(), 6)]));
+        let q = trackers().with_confirmers(vec![elsewhere]);
+        let e = q.header_at(5).await.unwrap_err();
+        assert!(e.contains("elsewhere") && e.contains("at 6"), "{}", e);
+        assert_eq!(q.cached(5), None, "nothing cached when the confirmer contradicts");
+
+        let unknown = Arc::new(FakeConfirmer::knowing("unknown", &[]));
+        let q = trackers().with_confirmers(vec![unknown]);
+        assert!(q.header_at(5).await.unwrap_err().contains("does not know"));
+        assert_eq!(q.cached(5), None);
+
+        let down = Arc::new(FakeConfirmer::failing("down", "refused"));
+        let q = trackers().with_confirmers(vec![down]);
+        assert_eq!(q.header_at(5).await, Ok(h.clone()), "a failed confirmer abstains");
+        assert_eq!(q.cached(5), Some(h));
+    }
+
+    #[tokio::test]
+    async fn the_confirmer_is_not_asked_when_the_trackers_do_not_agree() {
+        let (h, other) = (hdr(1), hdr(2));
+        let a = Arc::new(FakeSource::new("a", &[(5, h.clone())]));
+        let b = Arc::new(FakeSource::new("b", &[(5, other)]));
+        let c = Arc::new(FakeConfirmer::knowing("c", &[(&h.hash_hex(), 5)]));
+        let q = HeaderTrackers::new(vec![a, b], 2, &[]).with_confirmers(vec![c.clone()]);
+        assert!(q.header_at(5).await.is_err());
+        assert_eq!(c.calls.load(Ordering::SeqCst), 0, "nothing to confirm");
+    }
+
+    #[test]
+    fn a_junglebus_result_maps_to_a_height_abstention_or_failure() {
+        let bh = BlockHeader { block_hash: "ab".into(), height: 945_000, header_hex: String::new() };
+        assert_eq!(height_from(Ok(bh)), Ok(Some(945_000)));
+        assert_eq!(height_from(Err(IndexerError::NotFound)), Ok(None), "404: it does not know the hash");
+        let e = height_from(Err(IndexerError::Transport("refused".into()))).unwrap_err();
+        assert!(e.contains("refused"), "{}", e);
+        assert_eq!(JungleBusConfirmer::new(reqwest::Client::new()).name(), "junglebus");
     }
 }
