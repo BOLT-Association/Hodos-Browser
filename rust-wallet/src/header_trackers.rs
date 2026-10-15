@@ -14,6 +14,12 @@
 //! blocks. On a test network a single tracker is allowed (`min_agreeing` of 1) because no second
 //! one exists; that is the one-trusted-tracker model of the SDK `ChainTracker` / wallet-toolbox,
 //! and the wallet says so at startup. Mainnet must keep 2.
+//!
+//! A *confirmer* (`HashConfirmer`) is a source that serves a block by hash only, so it cannot be
+//! a tracker (no parent hash, no header to check); once the trackers agree it is asked at which
+//! height it has that hash. JungleBus is one on mainnet. The hash it is asked about is not a
+//! cheap claim: it is the double-SHA256 of 80 bytes two trackers served and the wallet rebuilt,
+//! so a third party agreeing on the height is a third independent reading of the same block.
 
 use std::collections::{BTreeSet, HashMap};
 use std::sync::{Arc, Mutex};
@@ -89,10 +95,25 @@ pub trait HashConfirmer: Send + Sync {
 /// confirmer that places the hash at this height confirms; one that places it elsewhere or does
 /// not know it contradicts (the trackers serve only heights far below the tip, so "not indexed
 /// yet" is not a reading); one that failed abstains, with a warning. No confirmers = confirmed.
-/// Stub: never confirms.
 pub fn confirm(height: u32, hash: &str, verdicts: &[(String, Result<Option<u32>, String>)]) -> Result<(), AgreementError> {
-    let _ = verdicts;
-    Err(AgreementError::Unconfirmed { height, hash: hash.to_string(), confirmer: "stub".into(), found: None })
+    for (confirmer, verdict) in verdicts {
+        match verdict {
+            Ok(Some(h)) if *h == height => {}
+            Ok(found) => {
+                return Err(AgreementError::Unconfirmed {
+                    height,
+                    hash: hash.to_string(),
+                    confirmer: confirmer.clone(),
+                    found: *found,
+                })
+            }
+            Err(e) => log::warn!(
+                "   header trackers: confirmer {} could not be asked about {} at {}: {} (accepted on the trackers alone)",
+                confirmer, hash, height, e
+            ),
+        }
+    }
+    Ok(())
 }
 
 /// Decide one height from the answers that came back. Pure. An answer is usable when its bytes
@@ -206,7 +227,19 @@ impl HeaderTrackers {
             }
         }
         let checkpoint = self.checkpoints.iter().find(|(h, _)| *h == height).map(|(_, hash)| *hash);
-        match decide(height, &answers, checkpoint, self.min_agreeing) {
+        let agreed = decide(height, &answers, checkpoint, self.min_agreeing);
+        let confirmed = match &agreed {
+            Ok(header) => {
+                let hash = header.hash_hex();
+                let mut verdicts = Vec::with_capacity(self.confirmers.len());
+                for c in &self.confirmers {
+                    verdicts.push((c.name().to_string(), c.height_of(&hash).await));
+                }
+                confirm(height, &hash, &verdicts)
+            }
+            Err(_) => Ok(()),
+        };
+        match agreed.and_then(|header| confirmed.map(|()| header)) {
             Ok(header) => {
                 self.cache.lock().unwrap().insert(height, header.clone());
                 Ok(header)
@@ -291,11 +324,13 @@ impl TrackerSource for ChaintracksTracker {
 }
 
 /// What a by-hash `get_block_header` result means to a confirmer: the height it reports is its
-/// verdict, a 404 is "does not know the hash", anything else is a failure to report. Stub: never
-/// answers.
+/// verdict, a 404 is "does not know the hash", anything else is a failure to report.
 fn height_from(result: Result<BlockHeader, IndexerError>) -> Result<Option<u32>, String> {
-    let _ = result;
-    Err("stub".to_string())
+    match result {
+        Ok(h) => Ok(Some(h.height)),
+        Err(IndexerError::NotFound) => Ok(None),
+        Err(e) => Err(e.to_string()),
+    }
 }
 
 /// JungleBus as a confirmer (mainnet only: the provider's base URL is the mainnet API). It serves
