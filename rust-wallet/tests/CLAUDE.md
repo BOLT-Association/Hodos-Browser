@@ -2,7 +2,7 @@
 
 > 780+ integration tests validating cryptography, transaction handling, BEEF format, certificates, and storage against known-answer vectors (NIST, RFC, BIP, BRC specs). 55 `#[test]` functions accumulate ~686 `check!` assertions across 12 files.
 
-> `tests/spv-ttn/` (Node, live, not run by `cargo test`): a throwaway wallet in spv mode on the public Teranode testnet — `connect.mjs` (header chain verified to the tip) and `fund.mjs` (faucet payout internalized, tampered BUMP rejected, `--wait-mined` proof verified). See its README.
+> `tests/spv-ttn/` (Node, live, not run by `cargo test`): a throwaway wallet in spv mode on the public Teranode testnet — `connect.mjs` (header chain verified to the tip; `HEADERS=lite` also checks the 18000 anchor and the tracker-answered height below it) and `fund.mjs` (faucet payout internalized, tampered BUMP rejected, `--wait-mined` proof verified). `run-wallet.ps1 -Headers lite` runs the lite window; `-Network mainnet` runs mainnet (lite only), with `mainnet-anchor.mjs` (pre-flight: every pinned hash agreed by EU + US chaintracks and WhatsOnChain; `--negative-control`) and `proof.mjs` (a stranger's mined tx below the window: tampered BUMP `ERR_PROOF_NOT_VERIFIED`, genuine one verified through the trackers then `ERR_NO_OUTPUTS_OWNED`; written 2026-10-15, not yet run live). Its README lists the negative controls and the residue.
 
 > `tests/migrate_copy.rs` (ignored): opens, and so migrates, the DB file named by `HODOS_MIGRATE_DB`. Run it on a COPY of a real wallet DB, then compare table row counts from outside; never point it at a live DB.
 

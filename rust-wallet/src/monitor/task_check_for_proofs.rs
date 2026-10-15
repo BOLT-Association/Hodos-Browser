@@ -727,12 +727,23 @@ const HELD_PROOF_MAX_AGE_SECS: i64 = 6 * 3600;
 /// Verify every held proof the header chain can now judge (spv mode). A verified one goes through
 /// `store_proof` (the same path as a polled proof), the tx is marked confirmed and its held row is
 /// removed; a wrong or stale one is dropped; the rest keep waiting. Called after each header sync.
-pub fn resolve_held(state: &web::Data<AppState>) {
+pub async fn resolve_held(state: &web::Data<AppState>) {
     let Some(svc) = crate::header_sync::global() else { return };
     let now = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .map(|d| d.as_secs() as i64)
         .unwrap_or(0);
+    // spv-lite: a held proof below the verified window needs its header from the trackers first.
+    let heights: Vec<u32> = {
+        let Ok(db) = state.database.lock() else { return };
+        crate::database::PendingProofRepository::new(db.connection())
+            .list()
+            .map(|held| held.iter().map(|p| p.height).collect())
+            .unwrap_or_default()
+    };
+    if let Err(e) = svc.ensure_headers(&heights).await {
+        log::debug!("   held proofs: a height could not be fetched yet: {}", e);
+    }
     let results = {
         let Ok(db) = state.database.lock() else { return };
         match crate::pending_proofs::resolve_pending(

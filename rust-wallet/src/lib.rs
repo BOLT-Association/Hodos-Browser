@@ -32,6 +32,7 @@ pub mod zero_conf;
 pub mod pending_proofs;
 pub mod header_chain;
 pub mod header_sync;
+pub mod header_trackers;
 
 // Re-export commonly used modules for convenience
 pub use crypto::brc2;

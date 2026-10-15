@@ -59,7 +59,7 @@ pub async fn run(state: &web::Data<AppState>) -> Result<(), String> {
 
     result?;
     // The chain may now be able to judge proofs that were held waiting for these headers.
-    super::task_check_for_proofs::resolve_held(state);
+    super::task_check_for_proofs::resolve_held(state).await;
     header_sync::request_startup_recheck_once();
     if report.added > 0 {
         info!("🔗 Header chain: +{} header(s), tip {:?}", report.added, report.tip_height);

@@ -55,6 +55,42 @@ pub struct BlockHeader {
     pub header_hex: String,
 }
 
+/// A `BlockHeader` from explorer-reported fields, accepted only when the assembled 80 bytes hash
+/// to `expected_hash` (display hex, any case). Shared by every provider that rebuilds a header
+/// from JSON, so a server whose fields disagree with its own hash is rejected the same way
+/// everywhere.
+pub(crate) fn verified_block_header(
+    height: u32,
+    header: crate::header_chain::Header,
+    expected_hash: &str,
+) -> Result<BlockHeader, String> {
+    let computed = header.hash_hex();
+    if !computed.eq_ignore_ascii_case(expected_hash) {
+        return Err(format!(
+            "header fields hash to {} but the server reported {}",
+            computed, expected_hash
+        ));
+    }
+    Ok(BlockHeader { block_hash: computed, height, header_hex: header.to_hex() })
+}
+
+#[cfg(test)]
+mod header_rebuild_tests {
+    use super::*;
+    use crate::header_chain::tests::mine;
+
+    #[test]
+    fn verified_block_header_accepts_the_right_hash_and_rejects_a_wrong_one() {
+        let h = mine([0; 32], 1, 0x207f_ffff);
+        let ok = verified_block_header(7, h.clone(), &h.hash_hex()).unwrap();
+        assert_eq!((ok.height, ok.block_hash.clone(), ok.header_hex.clone()), (7, h.hash_hex(), h.to_hex()));
+        let upper = h.hash_hex().to_uppercase();
+        assert_eq!(verified_block_header(7, h.clone(), &upper).unwrap().block_hash, h.hash_hex(), "case-insensitive, normalised");
+        let e = verified_block_header(7, h, &"ff".repeat(32)).unwrap_err();
+        assert!(e.contains("hash"), "{}", e);
+    }
+}
+
 /// Cross-provider normalized tx status. ARC's status vocabulary is the richest;
 /// other providers compute their best-effort mapping into `TxState`.
 #[derive(Debug, Clone)]

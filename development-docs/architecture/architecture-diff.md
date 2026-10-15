@@ -102,14 +102,37 @@ one with the most cumulative work, never the one a server calls its tip. Storage
 table) is a cache: every stored header is re-validated on load, and garbage is dropped and
 counted.
 
-Two networks are supported, selected by `HODOS_CHAIN_NETWORK`:
+Three networks are supported, selected by `HODOS_CHAIN_NETWORK`:
 
-| | `regtest` (local stack) | `teratestnet` (public Teranode testnet, **default**) |
-|---|---|---|
-| Difficulty | fixed `0x207fffff` | cw-144 DAA + 20-minute minimum-difficulty rule, ported from Teranode `Difficulty.go` |
-| Genesis | pinned | pinned (`go-chaincfg` `TeraTestNetParams`) |
-| Checkpoints | none | 5000 / 9500 / 18000 |
-| Sync | per height | bulk `/headers?height=&count=`, 2000 per request; ~36k headers in about a minute |
+| | `regtest` (local stack) | `teratestnet` (public Teranode testnet, **default**) | `mainnet` (lite only) |
+|---|---|---|---|
+| Difficulty | fixed `0x207fffff` | cw-144 DAA + 20-minute minimum-difficulty rule, ported from Teranode `Difficulty.go` | the same cw-144 DAA **without** the minimum-difficulty rule (bitcoin-sv `pow.cpp`; `reduce_min_difficulty: false`, pinned by a test that mainnet rejects a 20-minute powLimit header teratestnet accepts) |
+| Genesis | pinned | pinned (`go-chaincfg` `TeraTestNetParams`) | not synced: the window starts at the anchor |
+| Checkpoints | none | 5000 / 9500 / 18000 | 38: bitcoin-sv `chainparams.cpp` ∪ `go-chaincfg` `MainNetParams` (the 12 shared heights agree), the newest, **945000**, being the anchor |
+| Sync | per height | bulk `/headers?height=&count=`, 2000 per request; ~36k headers in about a minute | bulk, from 945000 to the tip (~26k headers and growing) |
+
+**Lite (`HODOS_HEADERS=lite`; the only depth on mainnet, where `full` refuses to start).** The chain
+is anchored at a pinned checkpoint instead of the genesis (`Params::teratestnet_lite` at 18000,
+`Params::mainnet_lite` at 945000): the first header must be the anchor, the window runs from there
+to the tip (teratestnet: ~18k headers, half the chain, about 30 s), and reorgs work exactly as above
+with the fork at or above the anchor. The difficulty rule needs 147
+headers below a height (median-of-3 at the parent and at `parent - 144`), so it is enforced from
+anchor + 147 (`assume_valid_height`, the exact minimum, pinned by a test); below that a header's
+own `bits` stand, still proven by its hash and bounded by the network's powLimit (a target easier
+than powLimit is not a target at all, as in Bitcoin Core `CheckProofOfWork`). A height **below**
+the anchor is not the chain's to answer: `header_trackers.rs` asks the configured trackers
+(`HODOS_CHAINTRACKS_URL`, then `HODOS_HEADER_TRACKERS`), discards an answer whose bytes do not hash
+to the hash it claims or that contradicts a pinned checkpoint (5000 / 9500 still apply here),
+requires two identical answers when two or more sources exist, and caches the result for the
+process. On mainnet the trackers are the chaintracks list **plus WhatsOnChain** (`WhatsOnChainTracker`:
+the 80 bytes rebuilt from its block JSON and accepted only when they hash to the reported hash),
+two must agree whatever is configured (`min_agreeing` never drops to one there), and after they agree
+**JungleBus** is asked at which height it has that hash (`HashConfirmer`; it serves a block by hash
+only, so it cannot be a tracker): another height, or not knowing the hash, contradicts and nothing is
+cached; unreachable abstains with a warning. A source whose tip is below the anchor, or far behind
+ours (the public-chaintracks reset of 2026-10-14), is *unavailable*, never a reorg. Everything that checks a merkle root first makes
+the height answerable (`HeaderService::ensure_header`), so a proof below the window is held, never
+judged, until the trackers have answered.
 
 ### 3.2 Money arrives inside BEEFs, not by address
 
@@ -159,7 +182,7 @@ What this changes, concern by concern:
 | Spend a received, unmined output | after confirmation | zero-conf: spendable once Arcade reports it `SEEN_ON_NETWORK` with no conflict (`HODOS_ZERO_CONF=off` to disable) |
 | Proof latency | 60 s polling | SSE push wakes the proof check within seconds; polling stays as the safety net |
 | MessageBox / PeerPay | on | off: polling is a no-op, `/wallet/peerpay/send` refused with 503 before anything is broadcast |
-| `/getNetwork` | `mainnet` | `testnet` |
+| `/getNetwork` | `mainnet` | `testnet` on teratestnet and regtest; `mainnet` on mainnet |
 | Re-broadcast of a tx Arcade has not seen | bare raw tx | the Atomic BEEF (Arcade needs the parents for Extended Format); this fix applies to public mode too |
 
 ### 3.3 The trust model, stated plainly
@@ -178,6 +201,25 @@ What the model does **not** cover yet: median-time-past is not enforced (timesta
 backdated within a branch, which affects nothing while most-work wins), and a 51% attacker on a
 test network is not a threat this wallet is meant to resist.
 
+**Lite changes one thing.** Inside the window the statement above holds unchanged. Below the
+window the wallet has no chain of its own, and a header there is what the trackers say it is: a
+forged old header needs the trackers' operators to collude when two must agree, and needs only
+one tracker when the wallet runs on one, which is what it does on teratestnet today (the single
+public tracker; the wallet says so at startup). That is the one-trusted-tracker model of the SDK
+`ChainTracker` / wallet-toolbox, accepted by the owner for test networks on 2026-10-15 and not
+for mainnet. Two things still bound it: the pinned checkpoints below the anchor are enforced on
+every tracker answer, and the verified window catches a tracker that lies about recent blocks,
+which is where the money is.
+
+**Mainnet keeps two.** A header below the window is accepted only when an Arcade chaintracks and
+WhatsOnChain, operators that do not share infrastructure, serve the same 80 bytes, and JungleBus
+places their hash at that height. A single compromised or broken source can therefore **delay** (it
+disagrees, the proof stays held, the wallet says which source) but never **forge**; forging an old
+header needs the two tracker operators to collude and JungleBus to go along or be unreachable. The
+38 pinned checkpoints, agreed by bitcoin-sv's and the BSVA node's own configuration, bound even
+that below 945000, and the window at the tip is the wallet's own work as before. Not yet shown
+live: the pins against the live sources (`tests/spv-ttn/mainnet-anchor.mjs`, written, not run).
+
 ## 4. Operating it
 
 | Variable | Meaning |
@@ -194,8 +236,10 @@ Harnesses: `rust-wallet/tests/spv-ttn/` (public testnet, faucet-funded; `connect
 
 ## 5. Where this stops: mainnet
 
-Mainnet spv is **not** a configuration change. The service side exists (checked live,
-2026-10-14); the wallet side has two pieces of real work.
+Mainnet spv **is now a configuration change**, for the lite depth: `HODOS_CHAIN_NETWORK=mainnet`
+(sections 3.1 and 3.3; `tests/spv-ttn/run-wallet.ps1 -Network mainnet`). The service side was
+checked live on 2026-10-14; the wallet side's two pieces of real work are recorded below with
+what became of them.
 
 ### 5.1 The public mainnet Arcade (exists; verified)
 
@@ -237,14 +281,20 @@ Two caveats that shape the design:
 
 ### 5.2 Still to build in the wallet
 
-1. **Mainnet header rules.** `Params` deliberately has no mainnet constructor. Verifying from
-   genesis means three difficulty regimes (2016-block retarget, the 2017 Emergency Difficulty
-   Adjustment from 478558, then the DAA from 504031), or an **assume-valid checkpoint** near the
-   tip with full rules only after it. The second is the normal wallet answer and the cheaper one;
-   the chaintracks data supports either.
+1. **Mainnet header rules — done as lite (2026-10-15).** Verifying from genesis means three
+   difficulty regimes (2016-block retarget, the 2017 Emergency Difficulty Adjustment from 478558,
+   then the DAA from 504031), or an **assume-valid checkpoint** near the tip with full rules only
+   after it. The wallet takes the second: `Params::mainnet_lite()` (section 3.1) is anchored at the
+   945000 checkpoint, so only the DAA regime is ever evaluated, with 38 pinned checkpoints and two
+   trackers that must agree plus a confirmer (section 3.3). `HODOS_HEADERS=full` on mainnet refuses
+   to start rather than attempt the regimes below 504031. What is **not** done live yet: the pins
+   have not been re-read from the live sources (`mainnet-anchor.mjs`), and no mainnet run of the
+   harness has happened; `development-docs/spv-mainnet/PLAN_spv_mainnet.md` carries the status.
 2. **Scale.** ~971k headers: the in-memory chain (`HashMap<String, Entry>` with hex strings) is
    a few MB for 36k and roughly 200 MB at mainnet size; the per-header ancestor walk for the DAA
-   is fine, the `side_branch_has_root` scan over every entry is not. Both need a pass before a
-   mainnet switch, not after.
+   is fine, the `side_branch_has_root` scan over every entry is not. Lite sidesteps this (the
+   window is ~26k headers at the tip); the figures stand for a later full-chain mode, which is why
+   `full` is refused on mainnet today.
 
-Everything else in section 3 transfers as is.
+Everything else in section 3 transfers as is. Still outside the model on every network:
+median-time-past, and a reorg deeper than the window.

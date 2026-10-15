@@ -4,7 +4,10 @@
 //!
 //! Sync walks back from the shorter of (our tip, server tip) until it finds a height
 //! where both sides agree, then adds forward from there. A server that reorged shows
-//! up as `AddOutcome::Reorg`; one that lies fails `add_header` validation.
+//! up as `AddOutcome::Reorg`; one that lies fails `add_header` validation. The walk never
+//! goes below the chain's anchor (a lite chain's pinned checkpoint), and a source whose tip
+//! is below the anchor or more than `MAX_WALK_BACK` behind ours is *unavailable*: an error
+//! that leaves the chain untouched, never a reorg and never a silent "synced".
 
 use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 use std::sync::{Arc, Mutex, OnceLock};
@@ -12,6 +15,7 @@ use std::sync::{Arc, Mutex, OnceLock};
 use async_trait::async_trait;
 
 use crate::header_chain::{AddOutcome, Entry, Header, HeaderChain};
+use crate::header_trackers::HeaderTrackers;
 use crate::services::providers::ChaintracksProvider;
 use crate::services::{BlockKey, IndexerProvider};
 
@@ -109,11 +113,30 @@ async fn sync_into(
     persist: &mut (dyn FnMut(&Entry) + Send),
     report: &mut SyncReport,
 ) -> Result<(), String> {
+    let (anchor_height, local_tip) = {
+        let c = chain.lock().unwrap();
+        (c.params().anchor.0, c.tip_height())
+    };
     let server_tip = source.tip_height().await?;
 
-    // Find the highest height where our active chain and the source agree.
-    let local_tip = chain.lock().unwrap().tip_height();
-    let mut start: u32 = 0;
+    // A source that cannot serve our window is unavailable, never a reorg. A public chaintracks
+    // that reset and is re-bootstrapping from genesis still answers for the low heights it has,
+    // which the walk-back would read as agreement and report as a successful sync.
+    if server_tip < anchor_height {
+        return Err(format!("source unavailable: its tip {} is below our anchor {}", server_tip, anchor_height));
+    }
+    if let Some(lt) = local_tip {
+        if server_tip.saturating_add(MAX_WALK_BACK) < lt {
+            return Err(format!(
+                "source unavailable: its tip {} is more than {} behind ours ({})",
+                server_tip, MAX_WALK_BACK, lt
+            ));
+        }
+    }
+
+    // Find the highest height where our active chain and the source agree. The anchor is
+    // pinned: a source that differs there is on another chain, and nothing below it is asked for.
+    let mut start: u32 = anchor_height;
     if let Some(lt) = local_tip {
         let mut h = lt.min(server_tip);
         let mut walked = 0;
@@ -126,8 +149,8 @@ async fn sync_into(
                 start = h + 1;
                 break;
             }
-            if h == 0 {
-                return Err("source genesis differs from ours".to_string());
+            if h == anchor_height {
+                return Err(format!("source anchor at height {} differs from ours", anchor_height));
             }
             walked += 1;
             if walked > MAX_WALK_BACK {
@@ -195,6 +218,8 @@ fn add_one(
 /// legacy behaviour", never "verified".
 pub struct HeaderService {
     pub chain: Mutex<HeaderChain>,
+    /// Lite chains only: headers below the window's anchor, from the configured trackers.
+    pub trackers: Option<HeaderTrackers>,
 }
 
 static SERVICE: OnceLock<Arc<HeaderService>> = OnceLock::new();
@@ -226,8 +251,8 @@ pub fn request_startup_recheck_once() {
     }
 }
 
-pub fn init(chain: HeaderChain) -> Arc<HeaderService> {
-    let svc = Arc::new(HeaderService { chain: Mutex::new(chain) });
+pub fn init(chain: HeaderChain, trackers: Option<HeaderTrackers>) -> Arc<HeaderService> {
+    let svc = Arc::new(HeaderService { chain: Mutex::new(chain), trackers });
     let _ = SERVICE.set(svc.clone());
     svc
 }
@@ -242,22 +267,88 @@ impl HeaderService {
         self.chain.lock().unwrap().tip_height()
     }
 
-    /// 80-byte header hex at `height` on the active verified chain.
+    /// A header the window does not hold, if the trackers have fetched it (heights below the anchor).
+    fn tracker_header(&self, height: u32) -> Option<Header> {
+        self.trackers.as_ref().and_then(|q| q.cached(height))
+    }
+
+    /// 80-byte header hex at `height`: the active verified chain, or a tracker-accepted header
+    /// below its anchor that has already been fetched (`ensure_header`).
     pub fn header_hex_at_height(&self, height: u32) -> Option<String> {
-        self.chain.lock().unwrap().header_at_height(height).map(|e| e.header.to_hex())
+        let from_window = self.chain.lock().unwrap().header_at_height(height).map(|e| e.header.to_hex());
+        from_window.or_else(|| self.tracker_header(height).map(|h| h.to_hex()))
     }
 
-    /// Block hash (display hex) at `height` on the active verified chain, computed from the
-    /// header itself. Use this instead of a hash an indexer or push event claims.
+    /// `header_hex_at_height`, fetching from the trackers first when the height is below the window.
+    pub async fn header_hex_at_height_or_fetch(&self, height: u32) -> Result<String, String> {
+        self.ensure_header(height).await?;
+        self.header_hex_at_height(height).ok_or_else(|| format!("no header at height {} after fetch", height))
+    }
+
+    /// Block hash (display hex) at `height`, computed from the header itself (the verified chain,
+    /// or a fetched tracker header below its anchor). Use this instead of a hash an indexer or push
+    /// event claims.
     pub fn block_hash_at_height(&self, height: u32) -> Option<String> {
-        self.chain.lock().unwrap().header_at_height(height).map(|e| e.header.hash_hex())
+        let from_window = self.chain.lock().unwrap().header_at_height(height).map(|e| e.header.hash_hex());
+        from_window.or_else(|| self.tracker_header(height).map(|h| h.hash_hex()))
     }
 
-    /// `Ok(true/false)` = verdict against the verified chain; `Err` = we cannot say
-    /// (no header at that height yet), which callers must not treat as a verdict.
+    /// Make `height` answerable by `check_merkle_root`: a height the window holds already is; a
+    /// height below the anchor is asked of the trackers (once; the answer is cached); a height
+    /// inside the window but above the tip waits for the sync. `Err` = cannot say, never a verdict.
+    pub async fn ensure_header(&self, height: u32) -> Result<(), String> {
+        let (held, anchor, tip) = {
+            let c = self.chain.lock().unwrap();
+            (c.header_at_height(height).is_some(), c.params().anchor.0, c.tip_height())
+        };
+        if held {
+            return Ok(());
+        }
+        if height < anchor {
+            return match &self.trackers {
+                Some(q) => q.header_at(height).await.map(|_| ()),
+                None => Err(format!(
+                    "height {} is below the verified window's anchor {} and no header trackers are configured",
+                    height, anchor
+                )),
+            };
+        }
+        Err(format!("header chain has no header at height {} (tip {:?}); sync pending", height, tip))
+    }
+
+    /// `ensure_header` for several heights, each asked for at most once; the first failure is
+    /// returned after the rest were still attempted.
+    pub async fn ensure_headers(&self, heights: &[u32]) -> Result<(), String> {
+        let wanted: std::collections::BTreeSet<u32> = heights.iter().copied().collect();
+        let mut first_err = None;
+        for h in wanted {
+            if let Err(e) = self.ensure_header(h).await {
+                first_err.get_or_insert(e);
+            }
+        }
+        match first_err {
+            None => Ok(()),
+            Some(e) => Err(e),
+        }
+    }
+
+    /// `Ok(true/false)` = verdict against the verified chain (or, below its anchor, against the
+    /// tracker-accepted header once fetched); `Err` = we cannot say (no header at that height yet),
+    /// which callers must not treat as a verdict.
     pub fn check_merkle_root(&self, height: u32, root_hex: &str) -> Result<bool, String> {
         let c = self.chain.lock().unwrap();
         if c.header_at_height(height).is_none() {
+            let anchor = c.params().anchor.0;
+            if height < anchor {
+                // Below the window there are no competing branches: the accepted header decides.
+                return match self.tracker_header(height) {
+                    Some(h) => Ok(h.merkle_root_hex().eq_ignore_ascii_case(root_hex)),
+                    None => Err(format!(
+                        "height {} is below the verified window (anchor {}) and has not been fetched from the header trackers",
+                        height, anchor
+                    )),
+                };
+            }
             return Err(format!(
                 "header chain has no header at height {} (tip {:?}); sync pending",
                 height,
@@ -305,21 +396,33 @@ mod tests {
     struct Fake {
         by_height: Mutex<HashMap<u32, String>>,
         tip: Mutex<u32>,
+        /// Every height asked for, in order.
+        asked: Mutex<Vec<u32>>,
     }
 
     impl Fake {
         fn from_chain(headers: &[Header]) -> Fake {
-            let f = Fake { by_height: Mutex::new(HashMap::new()), tip: Mutex::new(0) };
-            f.set(headers);
+            Fake::from_chain_at(0, headers)
+        }
+        /// Serves `headers` at heights `start..`.
+        fn from_chain_at(start: u32, headers: &[Header]) -> Fake {
+            let f = Fake { by_height: Mutex::new(HashMap::new()), tip: Mutex::new(0), asked: Mutex::new(Vec::new()) };
+            f.set_at(start, headers);
             f
         }
         fn set(&self, headers: &[Header]) {
+            self.set_at(0, headers)
+        }
+        fn set_at(&self, start: u32, headers: &[Header]) {
             let mut m = self.by_height.lock().unwrap();
             m.clear();
             for (i, h) in headers.iter().enumerate() {
-                m.insert(i as u32, h.to_hex());
+                m.insert(start + i as u32, h.to_hex());
             }
-            *self.tip.lock().unwrap() = headers.len() as u32 - 1;
+            *self.tip.lock().unwrap() = start + headers.len() as u32 - 1;
+        }
+        fn lowest_asked(&self) -> Option<u32> {
+            self.asked.lock().unwrap().iter().copied().min()
         }
     }
 
@@ -329,6 +432,7 @@ mod tests {
             Ok(*self.tip.lock().unwrap())
         }
         async fn header_hex_at(&self, h: u32) -> Result<String, String> {
+            self.asked.lock().unwrap().push(h);
             self.by_height.lock().unwrap().get(&h).cloned().ok_or(format!("no header {}", h))
         }
     }
@@ -346,8 +450,10 @@ mod tests {
         let params = Params {
             name: "test",
             difficulty: crate::header_chain::Difficulty::Fixed(0x207f_ffff),
-            genesis_hash: Box::leak(g.hash_hex().into_boxed_str()),
+            anchor: (0, Box::leak(g.hash_hex().into_boxed_str())),
+            assume_valid_height: 0,
             checkpoints: &[],
+            is_mainnet: false,
         };
         Mutex::new(HeaderChain::new(params))
     }
@@ -508,6 +614,184 @@ mod tests {
         assert!(sync_once(&chain, &server, NOW, &mut |_| {}).await.is_err());
     }
 
+    // -----------------------------------------------------------------------
+    // Lite chains: the sync starts at the anchor, never asks the source below it, and treats a
+    // source that cannot serve the window (tip below the anchor, or far behind ours after a
+    // reset) as unavailable rather than as a reorg or a silent no-op.
+    // -----------------------------------------------------------------------
+
+    /// Empty chain anchored at height `h` with `g` as its anchor header (fixed difficulty).
+    fn empty_anchored_at(h: u32, g: &Header) -> Mutex<HeaderChain> {
+        let params = Params {
+            name: "lite-test",
+            difficulty: crate::header_chain::Difficulty::Fixed(0x207f_ffff),
+            anchor: (h, Box::leak(g.hash_hex().into_boxed_str())),
+            assume_valid_height: 0,
+            checkpoints: &[],
+            is_mainnet: false,
+        };
+        Mutex::new(HeaderChain::new(params))
+    }
+
+    #[tokio::test]
+    async fn a_lite_chain_syncs_from_its_anchor_and_never_asks_below_it() {
+        let (_, g) = fixture();
+        let server = Fake::from_chain_at(100, &chain_of(&g, 10, 300)); // serves 100..=110
+        let chain = empty_anchored_at(100, &g);
+        let mut persisted = Vec::new();
+        let r = sync_once(&chain, &server, NOW, &mut |e| persisted.push(e.height)).await.unwrap();
+        assert_eq!((r.added, r.tip_height), (11, Some(110)));
+        assert_eq!(persisted, (100..=110).collect::<Vec<_>>());
+        assert!(server.lowest_asked().unwrap_or(u32::MAX) >= 100, "asked {:?}", server.lowest_asked());
+        let r2 = sync_once(&chain, &server, NOW, &mut |_| panic!("nothing new")).await.unwrap();
+        assert_eq!(r2.added, 0);
+        assert!(server.lowest_asked().unwrap() >= 100);
+    }
+
+    #[tokio::test]
+    async fn a_source_whose_tip_is_below_our_anchor_is_unavailable() {
+        let (_, g) = fixture();
+        let server = Fake::from_chain(&chain_of(&g, 50, 300)); // tip 50
+        let chain = empty_anchored_at(100, &g);
+        let (report, result) = sync_once_reporting(&chain, &server, NOW, &mut |_| panic!("nothing stored")).await;
+        let e = result.unwrap_err();
+        assert!(e.contains("unavailable"), "{}", e);
+        assert!(report.reorgs.is_empty());
+        assert_eq!(chain.lock().unwrap().tip_height(), None, "chain untouched");
+    }
+
+    #[tokio::test]
+    async fn a_source_far_behind_ours_is_unavailable_not_a_silent_no_op() {
+        // The public chaintracks reset case: a server that restarted from genesis still answers
+        // for the low heights it has, so the old walk-back found agreement and reported success.
+        let (_, g) = fixture();
+        let headers = chain_of(&g, 10_200, 2_000);
+        let chain = empty_with_genesis_of(&g);
+        sync_once(&chain, &Fake::from_chain(&headers), NOW, &mut |_| {}).await.unwrap();
+        assert_eq!(chain.lock().unwrap().tip_height(), Some(10_200));
+
+        let reset = Fake::from_chain(&headers[..=100]); // tip 100, more than MAX_WALK_BACK behind
+        let (report, result) = sync_once_reporting(&chain, &reset, NOW, &mut |_| panic!("nothing stored")).await;
+        let e = result.unwrap_err();
+        assert!(e.contains("unavailable"), "{}", e);
+        assert!(report.reorgs.is_empty());
+        assert_eq!(chain.lock().unwrap().tip_height(), Some(10_200), "chain untouched");
+
+        // Merely behind (within the bound) is still fine: nothing to add, no error.
+        let behind = Fake::from_chain(&headers[..=9_000]);
+        let r = sync_once(&chain, &behind, NOW, &mut |_| panic!("nothing stored")).await.unwrap();
+        assert_eq!((r.added, r.tip_height), (0, Some(10_200)));
+    }
+
+    #[tokio::test]
+    async fn a_walk_back_that_reaches_the_anchor_without_agreement_is_an_error_not_a_reorg() {
+        let (_, g) = fixture();
+        let chain = empty_anchored_at(100, &g);
+        sync_once(&chain, &Fake::from_chain_at(100, &chain_of(&g, 3, 300)), NOW, &mut |_| {}).await.unwrap();
+        assert_eq!(chain.lock().unwrap().tip_height(), Some(103));
+
+        // Another chain that also starts at height 100, from a different anchor.
+        let other = mine([0; 32], 78, 0x207f_ffff);
+        let server = Fake::from_chain_at(100, &chain_of(&other, 4, 500)); // tip 104
+        let (report, result) = sync_once_reporting(&chain, &server, NOW, &mut |_| panic!("nothing stored")).await;
+        let e = result.unwrap_err();
+        assert!(e.contains("anchor"), "{}", e);
+        assert!(report.reorgs.is_empty());
+        assert!(server.lowest_asked().unwrap() >= 100, "never asked below the anchor: {:?}", server.lowest_asked());
+        assert_eq!(chain.lock().unwrap().tip_height(), Some(103), "chain untouched");
+    }
+
+    // -----------------------------------------------------------------------
+    // HeaderService on a lite chain: the window answers what it holds, the trackers answer
+    // heights below the anchor (fetched once, then cached), and anything neither can say is an
+    // error, never `Ok(false)`.
+    // -----------------------------------------------------------------------
+
+    use crate::header_trackers::{tests::FakeSource, HeaderTrackers, TrackerSource};
+    use std::sync::atomic::Ordering;
+
+    /// A lite chain anchored at 100 (the fixture genesis as the anchor) holding 100..=103.
+    fn lite_chain_100_103(g: &Header) -> (HeaderChain, Vec<Header>) {
+        let headers = chain_of(g, 3, 700);
+        let mut c = empty_anchored_at(100, g).into_inner().unwrap();
+        for h in &headers {
+            c.add_header(h.clone(), NOW).unwrap();
+        }
+        assert_eq!(c.tip_height(), Some(103));
+        (c, headers)
+    }
+
+    fn lite_service(c: HeaderChain, sources: Vec<Arc<dyn TrackerSource>>, min: usize) -> HeaderService {
+        HeaderService { chain: Mutex::new(c), trackers: Some(HeaderTrackers::new(sources, min, &[])) }
+    }
+
+    #[tokio::test]
+    async fn inside_the_window_the_trackers_are_never_asked() {
+        let (_, g) = fixture();
+        let (c, headers) = lite_chain_100_103(&g);
+        let src = Arc::new(FakeSource::new("a", &[]));
+        let svc = lite_service(c, vec![src.clone()], 1);
+        assert_eq!(svc.ensure_header(101).await, Ok(()));
+        assert_eq!(svc.ensure_headers(&[100, 103, 103]).await, Ok(()));
+        assert_eq!(svc.check_merkle_root(101, &headers[1].merkle_root_hex()), Ok(true));
+        assert_eq!(src.calls.load(Ordering::SeqCst), 0);
+    }
+
+    #[tokio::test]
+    async fn below_the_anchor_the_trackers_answer_once_and_are_cached() {
+        let (_, g) = fixture();
+        let (c, _) = lite_chain_100_103(&g);
+        let h50 = mine([7; 32], 50, 0x207f_ffff);
+        let src = Arc::new(FakeSource::new("a", &[(50, h50.clone())]));
+        let svc = lite_service(c, vec![src.clone()], 1);
+        assert!(svc.check_merkle_root(50, &h50.merkle_root_hex()).is_err(), "not fetched yet: cannot say, never false");
+        assert_eq!(svc.block_hash_at_height(50), None);
+        assert_eq!(svc.ensure_header(50).await, Ok(()));
+        assert_eq!(src.calls.load(Ordering::SeqCst), 1);
+        assert_eq!(svc.check_merkle_root(50, &h50.merkle_root_hex()), Ok(true));
+        assert_eq!(svc.check_merkle_root(50, &"ff".repeat(32)), Ok(false));
+        assert_eq!(svc.block_hash_at_height(50), Some(h50.hash_hex()));
+        assert_eq!(svc.header_hex_at_height(50), Some(h50.to_hex()));
+        assert_eq!(svc.ensure_headers(&[50, 50, 101]).await, Ok(()));
+        assert_eq!(src.calls.load(Ordering::SeqCst), 1, "cached and in-window heights are not fetched again");
+    }
+
+    #[tokio::test]
+    async fn a_tracker_failure_is_cannot_say_never_a_verdict() {
+        let (_, g) = fixture();
+        let (c, _) = lite_chain_100_103(&g);
+        let src = Arc::new(FakeSource::failing("a", "connection refused"));
+        let svc = lite_service(c, vec![src], 1);
+        let e = svc.ensure_header(50).await.unwrap_err();
+        assert!(e.contains("connection refused"), "{}", e);
+        assert!(svc.check_merkle_root(50, &"ff".repeat(32)).is_err());
+        assert_eq!(svc.block_hash_at_height(50), None);
+        assert_eq!(svc.header_hex_at_height(50), None);
+    }
+
+    #[tokio::test]
+    async fn above_the_tip_is_sync_pending_not_a_tracker_question() {
+        let (_, g) = fixture();
+        let (c, _) = lite_chain_100_103(&g);
+        let src = Arc::new(FakeSource::new("a", &[(104, mine([8; 32], 104, 0x207f_ffff))]));
+        let svc = lite_service(c, vec![src.clone()], 1);
+        let e = svc.ensure_header(104).await.unwrap_err();
+        assert!(e.contains("sync pending"), "{}", e);
+        assert_eq!(src.calls.load(Ordering::SeqCst), 0, "the window, not the trackers, own heights at and above the anchor");
+        assert!(svc.check_merkle_root(104, &"ff".repeat(32)).is_err());
+    }
+
+    #[tokio::test]
+    async fn without_trackers_a_height_below_the_anchor_cannot_be_answered() {
+        let (_, g) = fixture();
+        let (c, _) = lite_chain_100_103(&g);
+        let svc = HeaderService { chain: Mutex::new(c), trackers: None };
+        let e = svc.ensure_header(50).await.unwrap_err();
+        assert!(e.contains("trackers"), "{}", e);
+        assert!(svc.check_merkle_root(50, &"ff".repeat(32)).is_err());
+        assert_eq!(svc.ensure_header(101).await, Ok(()), "the window still answers");
+    }
+
     /// Live: sync the real spv-testnet chain from genesis with the real regtest rules.
     /// `cargo test --lib header_sync_live -- --ignored --nocapture`
     #[tokio::test]
@@ -615,13 +899,13 @@ mod tests {
     #[test]
     fn cwi_accessors_come_from_the_verified_chain_only() {
         let (mut c, g) = fixture();
-        let svc0 = HeaderService { chain: Mutex::new(HeaderChain::new(crate::header_chain::Params::regtest())) };
+        let svc0 = HeaderService { chain: Mutex::new(HeaderChain::new(crate::header_chain::Params::regtest())), trackers: None };
         assert_eq!(svc0.tip_height(), None, "unsynced chain has no height to report");
         assert_eq!(svc0.header_hex_at_height(0), None);
 
         let a1 = mine(g.hash(), 1, 0x207f_ffff);
         c.add_header(a1.clone(), NOW).unwrap();
-        let svc = HeaderService { chain: Mutex::new(c) };
+        let svc = HeaderService { chain: Mutex::new(c), trackers: None };
         assert_eq!(svc.tip_height(), Some(1));
         assert_eq!(svc.header_hex_at_height(1), Some(a1.to_hex()));
         assert_eq!(svc.header_hex_at_height(2), None);
@@ -632,7 +916,7 @@ mod tests {
         let (mut c, g) = fixture();
         let a1 = mine(g.hash(), 1, 0x207f_ffff);
         c.add_header(a1.clone(), NOW).unwrap();
-        let svc = HeaderService { chain: Mutex::new(c) };
+        let svc = HeaderService { chain: Mutex::new(c), trackers: None };
         assert_eq!(svc.block_hash_at_height(1), Some(a1.hash_hex()));
         assert_eq!(svc.block_hash_at_height(0), Some(g.hash_hex()));
         assert_eq!(svc.block_hash_at_height(2), None);
@@ -649,7 +933,7 @@ mod tests {
         assert_ne!(a1.merkle_root_hex(), b1.merkle_root_hex(), "fixture must give distinct roots");
         c.add_header(a1.clone(), NOW).unwrap();
         assert_eq!(c.add_header(b1.clone(), NOW).unwrap(), AddOutcome::Fork);
-        let svc = HeaderService { chain: Mutex::new(c) };
+        let svc = HeaderService { chain: Mutex::new(c), trackers: None };
         assert_eq!(svc.check_merkle_root(1, &a1.merkle_root_hex()), Ok(true));
         assert!(svc.check_merkle_root(1, &b1.merkle_root_hex()).is_err(), "competing branch: cannot say yet");
         assert_eq!(svc.check_merkle_root(1, &"ff".repeat(32)), Ok(false), "a root no branch has is still false");
@@ -664,7 +948,7 @@ mod tests {
     #[test]
     fn check_merkle_root_distinguishes_unknown_from_mismatch() {
         let (c, g) = fixture();
-        let svc = HeaderService { chain: Mutex::new(c) };
+        let svc = HeaderService { chain: Mutex::new(c), trackers: None };
         assert_eq!(svc.check_merkle_root(0, &g.merkle_root_hex()), Ok(true));
         assert_eq!(svc.check_merkle_root(0, &"ff".repeat(32)), Ok(false));
         assert!(svc.check_merkle_root(5, &g.merkle_root_hex()).is_err());

@@ -75,6 +75,19 @@ pub fn find_orphaned(conn: &Connection, svc: &HeaderService, from_height: u32) -
     Ok(out)
 }
 
+/// Distinct heights of stored proofs at or above `from_height`.
+fn proof_heights_from(conn: &Connection, from_height: u32) -> Result<Vec<u32>, String> {
+    let mut stmt = conn
+        .prepare("SELECT DISTINCT height FROM proven_txs WHERE height >= ?1")
+        .map_err(|e| format!("prepare: {}", e))?;
+    let rows = stmt
+        .query_map([from_height as i64], |r| r.get::<_, i64>(0))
+        .map_err(|e| format!("query: {}", e))?
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(|e| format!("row: {}", e))?;
+    Ok(rows.into_iter().map(|h| h as u32).collect())
+}
+
 /// Swap an orphaned `proven_txs` row for a replacement proof (already verified by the
 /// caller) in one SQLite transaction: delete + insert, relink the transaction and the
 /// proof request, add a history note. Does not touch `transactions.status`, outputs or
@@ -117,6 +130,16 @@ pub async fn run(state: &web::Data<AppState>) -> Result<(), String> {
         return Ok(());
     };
 
+    // spv-lite: a stored proof below the verified window is judged against a tracker header, which
+    // must be fetched before the sync `find_orphaned` runs (a height it cannot fetch is skipped
+    // there, not flagged).
+    let heights: Vec<u32> = {
+        let db = state.database.lock().map_err(|e| format!("DB lock: {}", e))?;
+        proof_heights_from(db.connection(), from)?
+    };
+    if let Err(e) = svc.ensure_headers(&heights).await {
+        warn!("   ⚠️ TaskRecheckProofs: a proof height could not be fetched yet: {}", e);
+    }
     let orphaned = {
         let db = state.database.lock().map_err(|e| format!("DB lock: {}", e))?;
         find_orphaned(db.connection(), &svc, from)?
@@ -158,6 +181,9 @@ pub async fn run(state: &web::Data<AppState>) -> Result<(), String> {
         };
         if let Some(h) = status.block_height {
             tsc["height"] = serde_json::json!(h);
+            // Below the window the replacement's height must be fetched from the trackers first;
+            // a failure here surfaces as "not accepted yet" below.
+            let _ = svc.ensure_header(h as u32).await;
         }
         match crate::cache_helpers::verify_tsc_proof_against_header_chain(&o.txid, &tsc) {
             Ok(true) => {}
@@ -225,7 +251,7 @@ mod tests {
         // Branch A: height 1 carries the proof's root.
         let a1 = mine_with_root(g.hash(), &root, 1);
         chain.add_header(a1.clone(), NOW).unwrap();
-        let svc = HeaderService { chain: Mutex::new(chain) };
+        let svc = HeaderService { chain: Mutex::new(chain), trackers: None };
         let conn = db_with_proof(&txid, 1, &[&sib]);
 
         assert_eq!(find_orphaned(&conn, &svc, 0).unwrap(), vec![], "proof matches active chain");
@@ -250,7 +276,7 @@ mod tests {
     fn proof_above_the_synced_tip_is_skipped_not_flagged() {
         let txid = "33".repeat(32);
         let (chain, _) = fixture();
-        let svc = HeaderService { chain: Mutex::new(chain) };
+        let svc = HeaderService { chain: Mutex::new(chain), trackers: None };
         let conn = db_with_proof(&txid, 50, &[&"44".repeat(32)]);
         assert!(find_orphaned(&conn, &svc, 0).unwrap().is_empty());
     }
@@ -327,7 +353,7 @@ mod tests {
         std::env::set_var("HODOS_CHAINTRACKS_URL", "http://localhost:8083/chaintracks/v2");
         let http = reqwest::Client::new();
         let now = || std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_secs() as u32;
-        let svc = crate::header_sync::init(HeaderChain::new(crate::header_chain::Params::regtest()));
+        let svc = crate::header_sync::init(HeaderChain::new(crate::header_chain::Params::regtest()), None);
         let src = ChaintracksSource(ChaintracksProvider::new(http.clone(), "http://localhost:8083/chaintracks/v2".into()));
         sync_once(&svc.chain, &src, now(), &mut |_| {}).await.expect("initial sync");
 
@@ -434,7 +460,7 @@ mod tests {
     fn find_orphaned_never_modifies_the_database() {
         let txid = "55".repeat(32);
         let (chain, _) = fixture();
-        let svc = HeaderService { chain: Mutex::new(chain) };
+        let svc = HeaderService { chain: Mutex::new(chain), trackers: None };
         let conn = db_with_proof(&txid, 0, &[&"66".repeat(32)]);
         let before: i64 = conn.query_row("SELECT COUNT(*) FROM proven_txs", [], |r| r.get(0)).unwrap();
         let _ = HeaderChain::new(crate::header_chain::Params::regtest());
