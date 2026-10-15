@@ -917,20 +917,37 @@ async fn main() -> std::io::Result<()> {
                 .timeout(services::CallClass::IndexerAsync.timeout())
                 .build()
                 .unwrap_or_else(|_| reqwest::Client::new());
-            let sources: Vec<Arc<dyn header_trackers::TrackerSource>> = urls
+            let mut sources: Vec<Arc<dyn header_trackers::TrackerSource>> = urls
                 .iter()
                 .map(|u| Arc::new(header_trackers::ChaintracksTracker::new(client.clone(), u)) as Arc<dyn header_trackers::TrackerSource>)
                 .collect();
+            // Mainnet: WhatsOnChain is a second, independent tracker and JungleBus confirms the
+            // agreed hash. A header below the window is the one thing spv mode asks a public
+            // indexer for; tx and address lookups stay off them.
+            if tracker_params.is_mainnet {
+                sources.push(Arc::new(header_trackers::WhatsOnChainTracker::new(client.clone())));
+            }
+            let names: Vec<String> = sources.iter().map(|s| s.name().to_string()).collect();
             let min = chain_mode::min_agreeing(&tracker_params, sources.len());
             if min < 2 {
                 log::warn!(
                     "⚠️  Only one header tracker ({}): headers below the verified window (anchor {}) rest on it. Add a second chaintracks URL to {} when one exists",
-                    urls.join(", "), anchor_height, chain_mode::ENV_HEADER_TRACKERS
+                    names.join(", "), anchor_height, chain_mode::ENV_HEADER_TRACKERS
                 );
             } else {
-                log::info!("✅ Header trackers: {} configured, {} must agree, for heights below {}", urls.len(), min, anchor_height);
+                log::info!(
+                    "✅ Header trackers: {} ({} must agree), for heights below {}",
+                    names.join(", "), min, anchor_height
+                );
             }
-            Some(header_trackers::HeaderTrackers::new(sources, min, checkpoints))
+            let mut trackers = header_trackers::HeaderTrackers::new(sources, min, checkpoints);
+            if tracker_params.is_mainnet {
+                trackers = trackers.with_confirmers(vec![
+                    Arc::new(header_trackers::JungleBusConfirmer::new(client.clone())) as Arc<dyn header_trackers::HashConfirmer>,
+                ]);
+                log::info!("✅ Header confirmer(s): {} (asked at which height they have the agreed hash)", trackers.confirmer_names().join(", "));
+            }
+            Some(trackers)
         } else {
             None
         };

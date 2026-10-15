@@ -30,8 +30,8 @@ pub const ENV_ARCADE_PUSH: &str = "HODOS_ARCADE_PUSH";
 pub const ENV_TIP_STREAM: &str = "HODOS_TIP_STREAM";
 /// `off` / `0` / `false` / `no` disables zero-conf acceptance of received outputs.
 pub const ENV_ZERO_CONF: &str = "HODOS_ZERO_CONF";
-/// Which chain the verified header chain follows: `teratestnet` (default) or `regtest`.
-/// Only read in spv mode (`HODOS_CHAIN_MODE=spv`, itself off by default).
+/// Which chain the verified header chain follows: `teratestnet` (default), `regtest`, or
+/// `mainnet` (lite only). Only read in spv mode (`HODOS_CHAIN_MODE=spv`, itself off by default).
 pub const ENV_NETWORK: &str = "HODOS_CHAIN_NETWORK";
 /// Header verification depth in spv mode: `full` (default; every header from the genesis) or
 /// `lite` (a verified window from a pinned checkpoint; the header trackers answer below it).
@@ -95,7 +95,9 @@ pub fn headers_mode() -> Result<HeadersMode, String> {
 
 /// Header-chain rules for `HODOS_CHAIN_NETWORK` at the given depth. Unset means `teratestnet`
 /// (the public Teranode testnet); the local regtest stack must ask for `regtest` explicitly.
-/// `lite` exists for teratestnet only: regtest has no pinned checkpoint to anchor at.
+/// Regtest is full only (no pinned checkpoint to anchor a window at); mainnet is lite only (a
+/// window from the newest pinned checkpoint; the ~971k-header sync from the genesis is not
+/// offered); teratestnet is either.
 pub fn parse_network(value: Option<&str>, mode: HeadersMode) -> Result<crate::header_chain::Params, String> {
     use crate::header_chain::Params;
     match (value.map(|v| v.trim().to_ascii_lowercase()).as_deref(), mode) {
@@ -106,8 +108,15 @@ pub fn parse_network(value: Option<&str>, mode: HeadersMode) -> Result<crate::he
             "{}=lite is not available for regtest: there is no pinned checkpoint to anchor a window at (use {}=full)",
             ENV_HEADERS, ENV_HEADERS
         )),
+        (Some("mainnet"), HeadersMode::Lite) => Ok(Params::mainnet_lite()),
+        (Some("mainnet"), HeadersMode::Full) => Err(format!(
+            "{}=full is not available for mainnet: the wallet verifies a window from the pinned checkpoint at {} and asks the header trackers below it (use {}=lite)",
+            ENV_HEADERS,
+            Params::mainnet_lite().anchor.0,
+            ENV_HEADERS
+        )),
         (Some(other), _) => Err(format!(
-            "{} = '{}' is not recognised (expected 'regtest' or 'teratestnet')",
+            "{} = '{}' is not recognised (expected 'regtest', 'teratestnet' or 'mainnet')",
             ENV_NETWORK, other
         )),
     }
@@ -158,18 +167,31 @@ pub fn tracker_urls() -> Result<Vec<String>, String> {
     parse_tracker_urls(&primary, std::env::var(ENV_HEADER_TRACKERS).ok().as_deref())
 }
 
-/// How many trackers must agree: two, or every configured source when fewer exist. A
-/// single tracker is allowed because the test networks, the only networks spv mode has, have one
-/// public tracker; a mainnet `Params` must insist on two. Never zero. Stub: ignores the network.
+/// How many trackers must agree. On mainnet, two, whatever is configured: real coins never rest
+/// on one tracker (the roster there is the chaintracks list plus WhatsOnChain, so two exist
+/// without `HODOS_HEADER_TRACKERS`). On a test network, two, or every configured source when
+/// fewer exist: a single tracker is allowed because those networks have one public tracker.
+/// Never zero.
 pub fn min_agreeing(params: &crate::header_chain::Params, sources: usize) -> usize {
-    let _ = params;
-    sources.clamp(1, 2)
+    if params.is_mainnet {
+        2
+    } else {
+        sources.clamp(1, 2)
+    }
 }
 
-/// The BRC-100 `getNetwork` answer: `mainnet` in public mode, `testnet` in spv mode (both
-/// teratestnet and regtest are test networks to a dApp: same address prefixes, no real coins).
+/// The BRC-100 `getNetwork` answer: `mainnet` in public mode and in spv mode on mainnet, else
+/// `testnet` (teratestnet and regtest are test networks to a dApp: same address prefixes, no real
+/// coins). `validate_startup` has already refused params that do not parse, so a running wallet
+/// never reaches the `Err` arm; it reads as a test network.
 pub fn network_name() -> &'static str {
-    if is_spv() { "testnet" } else { "mainnet" }
+    if !is_spv() {
+        return "mainnet";
+    }
+    match header_params() {
+        Ok(p) if p.is_mainnet => "mainnet",
+        _ => "testnet",
+    }
 }
 
 /// A hint for the regtest trap: spv mode, no `HODOS_CHAIN_NETWORK`, and chaintracks on this
@@ -179,13 +201,19 @@ pub fn regtest_hint() -> Option<String> {
     if !is_spv() || non_empty_env(ENV_NETWORK) {
         return None;
     }
-    let ct = std::env::var(ENV_CHAINTRACKS).ok()?;
-    let host = reqwest::Url::parse(ct.trim()).ok()?.host_str()?.to_ascii_lowercase();
+    let host = local_host(ENV_CHAINTRACKS)?;
+    Some(format!(
+        "{} is unset and {} is on this machine ({}); the header chain follows teratestnet by default. A local regtest stack needs {}=regtest",
+        ENV_NETWORK, ENV_CHAINTRACKS, host, ENV_NETWORK
+    ))
+}
+
+/// The host of the URL in `var` when it is this machine (localhost or a loopback address).
+fn local_host(var: &str) -> Option<String> {
+    let url = std::env::var(var).ok()?;
+    let host = reqwest::Url::parse(url.trim()).ok()?.host_str()?.to_ascii_lowercase();
     if host == "localhost" || host == "127.0.0.1" || host == "::1" {
-        Some(format!(
-            "{} is unset and {} is on this machine ({}); the header chain follows teratestnet by default. A local regtest stack needs {}=regtest",
-            ENV_NETWORK, ENV_CHAINTRACKS, host, ENV_NETWORK
-        ))
+        Some(host)
     } else {
         None
     }
@@ -212,6 +240,17 @@ pub fn validate_startup() -> Result<ChainMode, String> {
         // A lite chain needs its header trackers; refuse a public indexer in the list up front.
         if params.anchor.0 > 0 {
             tracker_urls()?;
+        }
+        // The regtest trap, inverted: a chaintracks on this machine is the local regtest stack,
+        // and mainnet rules against it would reject every header and judge its proofs against the
+        // real chain. A mainnet node on this host is reached by its hostname or LAN address.
+        if params.is_mainnet {
+            if let Some(host) = local_host(ENV_CHAINTRACKS) {
+                return Err(format!(
+                    "{}=mainnet with {} on this machine ({}): a local stack is the regtest stack ({}=regtest); a mainnet node on this host must be named by its hostname or LAN address, not localhost",
+                    ENV_NETWORK, ENV_CHAINTRACKS, host, ENV_NETWORK
+                ));
+            }
         }
         let missing: Vec<&str> = [ENV_ARCADE, ENV_CHAINTRACKS]
             .into_iter()
