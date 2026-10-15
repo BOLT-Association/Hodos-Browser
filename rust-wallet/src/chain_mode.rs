@@ -33,11 +33,25 @@ pub const ENV_ZERO_CONF: &str = "HODOS_ZERO_CONF";
 /// Which chain the verified header chain follows: `teratestnet` (default) or `regtest`.
 /// Only read in spv mode (`HODOS_CHAIN_MODE=spv`, itself off by default).
 pub const ENV_NETWORK: &str = "HODOS_CHAIN_NETWORK";
+/// Header verification depth in spv mode: `full` (default; every header from the genesis) or
+/// `lite` (a verified window from a pinned checkpoint; the header trackers answer below it).
+pub const ENV_HEADERS: &str = "HODOS_HEADERS";
+/// Extra chaintracks base URLs for the header trackers, comma-separated. `HODOS_CHAINTRACKS_URL`
+/// is always the first source. Only read in lite mode.
+pub const ENV_HEADER_TRACKERS: &str = "HODOS_HEADER_TRACKERS";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ChainMode {
     Public,
     Spv,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum HeadersMode {
+    /// Every header from the genesis (today's behaviour).
+    Full,
+    /// A verified window from a pinned checkpoint; the header trackers answer below it.
+    Lite,
 }
 
 /// Public indexer hosts (and their subdomains) that spv mode never contacts.
@@ -63,9 +77,22 @@ pub fn parse(value: Option<&str>) -> Result<ChainMode, String> {
     }
 }
 
-/// Header-chain rules for `HODOS_CHAIN_NETWORK`. Unset means `teratestnet` (the public
-/// Teranode testnet); the local regtest stack must ask for `regtest` explicitly.
-pub fn parse_network(value: Option<&str>) -> Result<crate::header_chain::Params, String> {
+/// `HODOS_HEADERS`: unset or `full` is full, `lite` is lite. Stub: always full.
+pub fn parse_headers_mode(value: Option<&str>) -> Result<HeadersMode, String> {
+    let _ = value;
+    Ok(HeadersMode::Full)
+}
+
+pub fn headers_mode() -> Result<HeadersMode, String> {
+    parse_headers_mode(std::env::var(ENV_HEADERS).ok().as_deref())
+}
+
+/// Header-chain rules for `HODOS_CHAIN_NETWORK` at the given depth. Unset means `teratestnet`
+/// (the public Teranode testnet); the local regtest stack must ask for `regtest` explicitly.
+/// `lite` exists for teratestnet only: regtest has no pinned checkpoint to anchor at. Stub: the
+/// depth is ignored.
+pub fn parse_network(value: Option<&str>, mode: HeadersMode) -> Result<crate::header_chain::Params, String> {
+    let _ = mode;
     match value.map(|v| v.trim().to_ascii_lowercase()).as_deref() {
         None | Some("") | Some("teratestnet") => Ok(crate::header_chain::Params::teratestnet()),
         Some("regtest") => Ok(crate::header_chain::Params::regtest()),
@@ -79,7 +106,39 @@ pub fn parse_network(value: Option<&str>) -> Result<crate::header_chain::Params,
 /// The header-chain rules to verify against. `validate_startup` has already refused an
 /// unrecognised value, so the fallback is never reached by a running wallet.
 pub fn header_params() -> Result<crate::header_chain::Params, String> {
-    parse_network(std::env::var(ENV_NETWORK).ok().as_deref())
+    parse_network(std::env::var(ENV_NETWORK).ok().as_deref(), headers_mode()?)
+}
+
+/// True when `url` names a public indexer host, whatever the current mode (`is_blocked_url`
+/// answers for the running mode; this is for validating configuration).
+pub fn names_public_indexer(url: &str) -> bool {
+    reqwest::Url::parse(url.trim())
+        .ok()
+        .and_then(|u| u.host_str().map(host_blocked))
+        .unwrap_or(false)
+}
+
+/// The header trackers' URLs, in order: `primary` (`HODOS_CHAINTRACKS_URL`), then each entry
+/// of `extra` (`HODOS_HEADER_TRACKERS`), trimmed, without trailing slashes, empties and duplicates
+/// dropped. A public-indexer host is refused: the list is for trackers, not for the indexers
+/// spv mode exists to avoid. Stub: the extras are ignored.
+pub fn parse_tracker_urls(primary: &str, extra: Option<&str>) -> Result<Vec<String>, String> {
+    let _ = extra;
+    Ok(vec![primary.trim().trim_end_matches('/').to_string()])
+}
+
+/// The configured tracker URLs (spv mode; `HODOS_CHAINTRACKS_URL` must be set).
+pub fn tracker_urls() -> Result<Vec<String>, String> {
+    let primary = spv_url(ENV_CHAINTRACKS).ok_or_else(|| format!("{} is not set", ENV_CHAINTRACKS))?;
+    parse_tracker_urls(&primary, std::env::var(ENV_HEADER_TRACKERS).ok().as_deref())
+}
+
+/// How many trackers must agree: two, or every configured source when fewer exist. A
+/// single tracker is allowed because the test networks, the only networks spv mode has, have one
+/// public tracker; a mainnet `Params` must insist on two. Never zero. Stub: always two.
+pub fn min_agreeing(sources: usize) -> usize {
+    let _ = sources;
+    2
 }
 
 /// The BRC-100 `getNetwork` answer: `mainnet` in public mode, `testnet` in spv mode (both
@@ -312,11 +371,101 @@ mod tests {
 
     #[test]
     fn network_values() {
-        assert_eq!(parse_network(None).unwrap().name, "teratestnet");
-        assert_eq!(parse_network(Some("")).unwrap().name, "teratestnet");
-        assert_eq!(parse_network(Some(" TeraTestNet ")).unwrap().name, "teratestnet");
-        assert_eq!(parse_network(Some("regtest")).unwrap().name, "regtest");
-        assert!(parse_network(Some("mainnet")).is_err());
+        assert_eq!(parse_network(None, HeadersMode::Full).unwrap().name, "teratestnet");
+        assert_eq!(parse_network(Some(""), HeadersMode::Full).unwrap().name, "teratestnet");
+        assert_eq!(parse_network(Some(" TeraTestNet "), HeadersMode::Full).unwrap().name, "teratestnet");
+        assert_eq!(parse_network(Some("regtest"), HeadersMode::Full).unwrap().name, "regtest");
+        assert!(parse_network(Some("mainnet"), HeadersMode::Full).is_err());
+        // lite: a window from the 18000 checkpoint on teratestnet; regtest has nothing to anchor at.
+        let lite = parse_network(None, HeadersMode::Lite).unwrap();
+        assert_eq!((lite.name, lite.anchor.0), ("teratestnet-lite", 18000));
+        let e = parse_network(Some("regtest"), HeadersMode::Lite).unwrap_err();
+        assert!(e.contains("regtest") && e.contains(ENV_HEADERS), "{}", e);
+    }
+
+    #[test]
+    fn headers_mode_values() {
+        assert_eq!(parse_headers_mode(None), Ok(HeadersMode::Full));
+        assert_eq!(parse_headers_mode(Some("")), Ok(HeadersMode::Full));
+        assert_eq!(parse_headers_mode(Some(" FULL ")), Ok(HeadersMode::Full));
+        assert_eq!(parse_headers_mode(Some("lite")), Ok(HeadersMode::Lite));
+        assert!(parse_headers_mode(Some("light")).unwrap_err().contains(ENV_HEADERS));
+    }
+
+    /// Set extra env vars for `f`, restoring them after. The caller holds `ENV_LOCK` via `with_env`.
+    fn with_vars<F: FnOnce()>(vars: &[(&str, Option<&str>)], f: F) {
+        let set = |k: &str, v: Option<&str>| match v {
+            Some(v) => std::env::set_var(k, v),
+            None => std::env::remove_var(k),
+        };
+        let old: Vec<_> = vars.iter().map(|(k, _)| (*k, std::env::var(k).ok())).collect();
+        for (k, v) in vars {
+            set(k, *v);
+        }
+        f();
+        for (k, v) in old {
+            set(k, v.as_deref());
+        }
+    }
+
+    #[test]
+    fn unknown_headers_mode_and_lite_on_regtest_refuse_startup() {
+        with_env(Some("spv"), Some("http://a"), Some("http://c"), || {
+            with_vars(&[(ENV_HEADERS, Some("light")), (ENV_NETWORK, None)], || {
+                assert!(validate_startup().unwrap_err().contains(ENV_HEADERS));
+            });
+            with_vars(&[(ENV_HEADERS, Some("lite")), (ENV_NETWORK, Some("regtest"))], || {
+                let e = validate_startup().unwrap_err();
+                assert!(e.contains("regtest") && e.contains(ENV_HEADERS), "{}", e);
+            });
+            with_vars(&[(ENV_HEADERS, Some("lite")), (ENV_NETWORK, None)], || {
+                assert_eq!(validate_startup(), Ok(ChainMode::Spv));
+                assert_eq!(header_params().unwrap().name, "teratestnet-lite");
+            });
+            with_vars(&[(ENV_HEADERS, None), (ENV_NETWORK, None)], || {
+                assert_eq!(header_params().unwrap().name, "teratestnet", "full is the default");
+            });
+        });
+    }
+
+    #[test]
+    fn tracker_urls_are_the_chaintracks_url_then_the_extras_deduplicated() {
+        assert_eq!(parse_tracker_urls("https://a/chaintracks/v2/", None).unwrap(), vec!["https://a/chaintracks/v2"]);
+        let v = parse_tracker_urls(
+            "https://a/chaintracks/v2/",
+            Some(" https://b/chaintracks/v2 ,, https://a/chaintracks/v2, https://c/ct/ "),
+        )
+        .unwrap();
+        assert_eq!(v, vec!["https://a/chaintracks/v2", "https://b/chaintracks/v2", "https://c/ct"]);
+        let e = parse_tracker_urls("https://a/ct", Some("https://api.whatsonchain.com/v1/bsv/main")).unwrap_err();
+        assert!(e.contains("whatsonchain.com"), "{}", e);
+        assert!(names_public_indexer("https://junglebus.gorillapool.io/v1"));
+        assert!(!names_public_indexer("https://arcade-ttn-us-1.bsvblockchain.tech/chaintracks/v2"));
+    }
+
+    #[test]
+    fn min_agreeing_is_two_or_every_source_when_fewer() {
+        assert_eq!(min_agreeing(0), 1);
+        assert_eq!(min_agreeing(1), 1);
+        assert_eq!(min_agreeing(2), 2);
+        assert_eq!(min_agreeing(5), 2);
+    }
+
+    #[test]
+    fn a_public_indexer_in_the_header_trackers_refuses_startup() {
+        with_env(Some("spv"), Some("http://a"), Some("http://c/chaintracks/v2"), || {
+            with_vars(&[(ENV_HEADERS, Some("lite")), (ENV_NETWORK, None), (ENV_HEADER_TRACKERS, Some("https://arc.gorillapool.io"))], || {
+                let e = validate_startup().unwrap_err();
+                assert!(e.contains(ENV_HEADER_TRACKERS) && e.contains("gorillapool"), "{}", e);
+            });
+            with_vars(&[(ENV_HEADERS, Some("lite")), (ENV_NETWORK, None), (ENV_HEADER_TRACKERS, Some("https://d/chaintracks/v2"))], || {
+                assert_eq!(validate_startup(), Ok(ChainMode::Spv));
+                assert_eq!(tracker_urls().unwrap(), vec!["http://c/chaintracks/v2", "https://d/chaintracks/v2"]);
+            });
+            with_vars(&[(ENV_HEADERS, None), (ENV_NETWORK, None), (ENV_HEADER_TRACKERS, Some("https://arc.gorillapool.io"))], || {
+                assert_eq!(validate_startup(), Ok(ChainMode::Spv), "full mode builds no trackers and does not read the list");
+            });
+        });
     }
 
     #[test]
