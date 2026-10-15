@@ -4,7 +4,9 @@
   "type": "module",
   "scripts": {
     "connect": "node connect.mjs",
-    "fund": "node fund.mjs"
+    "fund": "node fund.mjs",
+    "anchor": "node mainnet-anchor.mjs",
+    "proof": "node proof.mjs"
   },
   "dependencies": { "@bsv/sdk": "1.10.4" }
 }
